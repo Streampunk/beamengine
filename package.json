@@ -1,0 +1,33 @@
+{
+  "name": "beamengine",
+  "version": "0.0.1",
+  "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test",
+    "lint": "eslint **/*.js",
+    "lint-html": "eslint **/*.js -f html -o ./reports/lint-results.html",
+    "lint-fix": "eslint --fix **/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Streampunk/aerostat.git"
+  },
+  "keywords": [
+    "Media",
+    "Beam API",
+    "Agile Media Blueprint",
+    "Beam Engine",
+    "AMB"
+  ],
+  "author": "Streampunk Media Ltd",
+  "license": "GPL-2.0",
+  "devDependencies": {
+    "eslint": "^5.9.0",
+    "tap": "^12.1.0"
+  },
+  "bugs": {
+    "url": "https://github.com/Streampunk/aerostat/issues"
+  },
+  "homepage": "https://github.com/Streampunk/aerostat#readme"
+}
