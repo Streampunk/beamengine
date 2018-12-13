@@ -3,8 +3,10 @@
   "version": "0.0.1",
   "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
   "main": "index.js",
+  "engines": "^8.0.0",
   "scripts": {
     "test": "npm test",
+    "dev": "nodemon app.js",
     "lint": "eslint **/*.js",
     "lint-html": "eslint **/*.js -f html -o ./reports/lint-results.html",
     "lint-fix": "eslint --fix **/*.js"
@@ -24,10 +26,21 @@
   "license": "GPL-2.0",
   "devDependencies": {
     "eslint": "^5.9.0",
+    "nodemon": "^1.18.8",
     "tap": "^12.1.0"
   },
   "bugs": {
     "url": "https://github.com/Streampunk/aerostat/issues"
   },
-  "homepage": "https://github.com/Streampunk/aerostat#readme"
+  "homepage": "https://github.com/Streampunk/aerostat#readme",
+  "dependencies": {
+    "ioredis": "^4.3.0",
+    "koa": "^2.6.2",
+    "koa-ejs": "^4.1.2",
+    "koa-router": "^7.4.0"
+  },
+  "nodemonConfig": {
+    "watch": ["views", "src"],
+    "ext": "js,html"
+  }
 }
