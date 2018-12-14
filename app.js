@@ -25,8 +25,7 @@ const Router = require('koa-router');
 const Redis = require('ioredis');
 const Bull = require('bull');
 const producer = new Bull('my-first-queue');
-const consumer = new Bull('my-first-queue');
-const completed = new Bull('my-first-queue');
+const beamcoder = require('bindings')('beamcoder');
 const render = require('koa-ejs');
 const path = require('path');
 
@@ -60,10 +59,15 @@ const timer = t => new Promise(f => {
 });
 
 router.get('/fred', async ctx => {
-  await redis.set('bang', 'bomb');
-  await timer(500);
-  ctx.body = 'Hello Burp ' + await redis.get('bang');
+  let job = await producer.add(
+    { foo: 'bar', date: (new Date()).toString() }
+  );
+  console.log('Initial state is ', await job.getState());
+  let result = await job.finished();
+  ctx.body = 'Done IN! ' + beamcoder.version + JSON.stringify(result);
 });
+
+
 
 router.get('/ginger.html', async (ctx) => {
   const users = [{ name: 'Dead Rabbit' }, { name: 'Jack' }, { name: 'Tom' }];
@@ -83,24 +87,3 @@ app.listen(3000);
 app.on('error', (err) => {
   console.log(err.stack);
 });
-
-async function boot() {
-  let date = Date.now();
-  let job = await producer.add({ foo: 'bar', start: date });
-
-  consumer.process(async job => {
-    let jd = Date.now();
-    console.log('Running job', job.data, jd - job.data.start);
-    await new Promise(r => setTimeout(r, 1000));
-    console.log('Finished job');
-    return job.data;
-  });
-}
-
-completed.on('global:completed', async (job, result) => {
-  let date = Date.now();
-  console.log(`Job complted with result ${result}`);
-  let nj = await producer.add({ foo: 'bar', start: date });
-});
-
-boot();

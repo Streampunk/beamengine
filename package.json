@@ -4,6 +4,7 @@
   "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
   "main": "index.js",
   "engines": "^8.0.0",
+  "gypfile": true,
   "scripts": {
     "test": "npm test",
     "dev": "nodemon app.js",
@@ -34,6 +35,7 @@
   },
   "homepage": "https://github.com/Streampunk/aerostat#readme",
   "dependencies": {
+    "bindings": "^1.3.1",
     "bull": "^3.5.2",
     "ioredis": "^4.3.0",
     "koa": "^2.6.2",
