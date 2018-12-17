@@ -24,6 +24,7 @@
 
 extern "C" {
   #include <libavformat/avformat.h>
+  #include <libavutil/opt.h>
   #include <libavutil/dict.h>
 }
 
@@ -35,7 +36,10 @@ void metadataComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value metadata(napi_env env, napi_callback_info info);
 
 struct metadataCarrier : carrier {
-  ~metadataCarrier() { }
+  const char* filename = nullptr;
+  AVFormatContext* fmt_ctx = nullptr;
+  ~metadataCarrier() {
+    if (fmt_ctx != nullptr) { avformat_close_input(&fmt_ctx); }}
 };
 
 #endif //METADATA_H
