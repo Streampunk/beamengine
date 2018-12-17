@@ -19,20 +19,23 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-const beamcoder = require('bindings')('beamcoder');
+#ifndef METADATA_H
+#define METADATA_H
 
-// Provide useful debug on segfault-related crash
-const SegfaultHandler = require('segfault-handler');
-SegfaultHandler.registerHandler('crash.log');
+extern "C" {
+  #include <libavformat/avformat.h>
+  #include <libavutil/dict.h>
+}
 
-const splash = `Aerostat Beamengine  Copyright (C) 2018  Streampunk Media Ltd
-GPL v3.0 or later license. This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions. Conditions and warranty at:
-https://github.com/Streampunk/aerostat/blob/master/LICENSE`;
+#include "beamcoder_util.h"
+#include "node_api.h"
 
-console.log(splash);
+void metadataExecute(napi_env env, void* data);
+void metadataComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value metadata(napi_env env, napi_callback_info info);
 
-module.exports = {
-  beamcoder
+struct metadataCarrier : carrier {
+  ~metadataCarrier() { }
 };
+
+#endif //METADATA_H

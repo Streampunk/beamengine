@@ -24,7 +24,7 @@
     "AMB"
   ],
   "author": "Streampunk Media Ltd",
-  "license": "GPL-2.0",
+  "license": "GPL-3.0",
   "devDependencies": {
     "eslint": "^5.9.0",
     "nodemon": "^1.18.8",
@@ -40,7 +40,8 @@
     "ioredis": "^4.3.0",
     "koa": "^2.6.2",
     "koa-ejs": "^4.1.2",
-    "koa-router": "^7.4.0"
+    "koa-router": "^7.4.0",
+    "segfault-handler": "^1.0.1"
   },
   "nodemonConfig": {
     "watch": [

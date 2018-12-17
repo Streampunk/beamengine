@@ -12,6 +12,6 @@ Contributions can be made via pull requests and will be considered by the author
 
 ## License
 
-This project is licensed under the GNU General Public License, version 2. Copyright (C) 2018, Streampunk Media Ltd.
+This project is licensed under the GNU General Public License, version 3 or later. Copyright (C) 2018, Streampunk Media Ltd.
 
-This software links to libraries from the FFmpeg project, including optional parts and optimizations covered by the GPL v2.0. Your attention is drawn to the FFmpeg project's page [FFmpeg License and Legal Considerations](https://www.ffmpeg.org/legal.html).
+This software links to libraries from the FFmpeg project, including optional parts and optimizations covered by the GPL v2.0 or later. Your attention is drawn to the FFmpeg project's page [FFmpeg License and Legal Considerations](https://www.ffmpeg.org/legal.html).
