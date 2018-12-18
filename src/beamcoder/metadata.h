@@ -37,9 +37,9 @@ napi_value metadata(napi_env env, napi_callback_info info);
 
 struct metadataCarrier : carrier {
   const char* filename = nullptr;
-  AVFormatContext* fmt_ctx = nullptr;
+  AVFormatContext* format = nullptr;
   ~metadataCarrier() {
-    if (fmt_ctx != nullptr) { avformat_close_input(&fmt_ctx); }}
+    if (format != nullptr) { avformat_close_input(&format); }}
 };
 
 #endif //METADATA_H
