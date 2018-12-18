@@ -266,14 +266,64 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
     c->status = napi_set_named_property(env, prop, "codecTag", subprop);
     REJECT_STATUS;
 
-    
-
     c->status = napi_set_named_property(env, item, "codec", prop);
     REJECT_STATUS;
 
+    if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+      const char* pixelFormatName = av_get_pix_fmt_name((AVPixelFormat) codec->format);
+      if (pixelFormatName != nullptr) {
+        c->status = napi_create_string_utf8(env, pixelFormatName, NAPI_AUTO_LENGTH, &subprop);
+        REJECT_STATUS;
+        c->status = napi_set_named_property(env, prop, "pixelFormat", subprop);
+        REJECT_STATUS;
+      }
+
+      c->status = napi_create_int32(env, codec->width, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "width", subprop);
+      REJECT_STATUS;
+
+      c->status = napi_create_int32(env, codec->height, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "height", subprop);
+      REJECT_STATUS;
+    }
+
+    if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+      const char* sampleFormatName = av_get_sample_fmt_name((AVSampleFormat) codec->format);
+      if (sampleFormatName != nullptr) {
+        c->status = napi_create_string_utf8(env, sampleFormatName, NAPI_AUTO_LENGTH, &subprop);
+        REJECT_STATUS;
+        c->status = napi_set_named_property(env, prop, "sampleFormat", subprop);
+        REJECT_STATUS;
+      }
+    }
+
+    c->status = napi_create_int32(env, codec->bit_rate, &subprop);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, prop, "bitrate", subprop);
+    REJECT_STATUS;
+
+    if (codec->profile >= 0) {
+      const char* profileName = avcodec_profile_name(codec->codec_id, codec->profile);
+      if (profileName != nullptr) {
+        c->status = napi_create_string_utf8(env, profileName, NAPI_AUTO_LENGTH, &subprop);
+        REJECT_STATUS;
+        c->status = napi_set_named_property(env, prop, "profile", subprop);
+        REJECT_STATUS;
+      }
+    }
+
+    if (codec->level >= 0) {
+      c->status = napi_create_int32(env, codec->level, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "level", subprop);
+      REJECT_STATUS;
+    }
+
     c->status = napi_set_element(env, value, stream->index, item);
     REJECT_STATUS;
-  }
+  } // End of stream section
   c->status = napi_set_named_property(env, result, "streams", value);
   REJECT_STATUS;
 

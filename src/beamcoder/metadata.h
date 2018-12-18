@@ -26,6 +26,9 @@ extern "C" {
   #include <libavformat/avformat.h>
   #include <libavutil/opt.h>
   #include <libavutil/dict.h>
+  #include <libavutil/pixfmt.h>
+  #include <libavutil/attributes.h>
+  #include <libavutil/pixdesc.h>  
 }
 
 #include "beamcoder_util.h"
