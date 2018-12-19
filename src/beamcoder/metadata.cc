@@ -58,7 +58,7 @@ void metadataExecute(napi_env env, void* data) {
 
 void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
   metadataCarrier* c = (metadataCarrier*) data;
-  napi_value result, value, item, prop, subprop;
+  napi_value result, value, item, prop, subprop, nested;
   AVDictionaryEntry* tag = nullptr;
 
   if (asyncStatus != napi_ok) {
@@ -266,9 +266,6 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
     c->status = napi_set_named_property(env, prop, "codecTag", subprop);
     REJECT_STATUS;
 
-    c->status = napi_set_named_property(env, item, "codec", prop);
-    REJECT_STATUS;
-
     if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {
       const char* pixelFormatName = av_get_pix_fmt_name((AVPixelFormat) codec->format);
       if (pixelFormatName != nullptr) {
@@ -287,7 +284,56 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
       REJECT_STATUS;
       c->status = napi_set_named_property(env, prop, "height", subprop);
       REJECT_STATUS;
-    }
+
+      switch (codec->field_order) {
+        case AV_FIELD_PROGRESSIVE:
+          c->status = napi_create_string_utf8(env, "progressive", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        case AV_FIELD_TT:
+          c->status = napi_create_string_utf8(env,
+            "top coded_first, top displayed first", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        case AV_FIELD_BB:
+          c->status = napi_create_string_utf8(env,
+            "bottom coded first, bottom displayed first", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        case AV_FIELD_TB:
+          c->status = napi_create_string_utf8(env,
+            "top coded first, bottom displayed first", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        case AV_FIELD_BT:
+          c->status = napi_create_string_utf8(env,
+            "bottom coded first, top displayed first", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        default:
+        case AV_FIELD_UNKNOWN:
+          c->status = napi_get_null(env, &subprop);
+          break;
+      }
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "fieldOrder", subprop);
+      REJECT_STATUS;
+
+      switch (codec->color_range) {
+        case AVCOL_RANGE_MPEG:
+          c->status = napi_create_string_utf8(env, "MPEG", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        case AVCOL_RANGE_JPEG:
+          c->status = napi_create_string_utf8(env, "JPEG", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        case AVCOL_RANGE_NB:
+          c->status = napi_create_string_utf8(env, "nb", NAPI_AUTO_LENGTH, &subprop);
+          break;
+        default:
+        case AVCOL_RANGE_UNSPECIFIED:
+          c->status = napi_create_string_utf8(env, "unspecified", NAPI_AUTO_LENGTH, &subprop);
+          break;
+      }
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "colorRange", subprop);
+      REJECT_STATUS;
+
+    } // Video-only properties
 
     if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
       const char* sampleFormatName = av_get_sample_fmt_name((AVSampleFormat) codec->format);
@@ -320,6 +366,22 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
       c->status = napi_set_named_property(env, prop, "level", subprop);
       REJECT_STATUS;
     }
+
+    c->status = napi_create_array(env, &subprop);
+    REJECT_STATUS;
+    c->status = napi_create_int32(env, codec->sample_aspect_ratio.num, &nested);
+    REJECT_STATUS;
+    c->status = napi_set_element(env, subprop, 0, nested);
+    REJECT_STATUS;
+    c->status = napi_create_int32(env, codec->sample_aspect_ratio.den, &nested);
+    REJECT_STATUS;
+    c->status = napi_set_element(env, subprop, 1, nested);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, prop, "sampleAspectRatio", subprop);
+    REJECT_STATUS;
+
+    c->status = napi_set_named_property(env, item, "codec", prop);
+    REJECT_STATUS;
 
     c->status = napi_set_element(env, value, stream->index, item);
     REJECT_STATUS;
@@ -387,3 +449,5 @@ napi_value metadata(napi_env env, napi_callback_info info) {
 
   return promise;
 }
+
+//?''
