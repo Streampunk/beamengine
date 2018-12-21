@@ -314,25 +314,35 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
       c->status = napi_set_named_property(env, prop, "fieldOrder", subprop);
       REJECT_STATUS;
 
-      switch (codec->color_range) {
-        case AVCOL_RANGE_MPEG:
-          c->status = napi_create_string_utf8(env, "MPEG", NAPI_AUTO_LENGTH, &subprop);
-          break;
-        case AVCOL_RANGE_JPEG:
-          c->status = napi_create_string_utf8(env, "JPEG", NAPI_AUTO_LENGTH, &subprop);
-          break;
-        case AVCOL_RANGE_NB:
-          c->status = napi_create_string_utf8(env, "nb", NAPI_AUTO_LENGTH, &subprop);
-          break;
-        default:
-        case AVCOL_RANGE_UNSPECIFIED:
-          c->status = napi_create_string_utf8(env, "unspecified", NAPI_AUTO_LENGTH, &subprop);
-          break;
-      }
+      c->status = napi_create_string_utf8(env,
+        av_color_range_name(codec->color_range), NAPI_AUTO_LENGTH, &subprop);
       REJECT_STATUS;
       c->status = napi_set_named_property(env, prop, "colorRange", subprop);
       REJECT_STATUS;
 
+      c->status = napi_create_string_utf8(env,
+        av_color_primaries_name(codec->color_primaries), NAPI_AUTO_LENGTH, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "colorPrimaries", subprop);
+      REJECT_STATUS;
+
+      c->status = napi_create_string_utf8(env,
+        av_color_transfer_name(codec->color_trc), NAPI_AUTO_LENGTH, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "transferCharacteristic", subprop);
+      REJECT_STATUS;
+
+      c->status = napi_create_string_utf8(env,
+        av_color_space_name(codec->color_space), NAPI_AUTO_LENGTH, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "colorSpace", subprop);
+      REJECT_STATUS;
+
+      c->status = napi_create_string_utf8(env,
+        av_chroma_location_name(codec->chroma_location), NAPI_AUTO_LENGTH, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "chromaLocation", subprop);
+      REJECT_STATUS;
     } // Video-only properties
 
     if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -343,7 +353,30 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
         c->status = napi_set_named_property(env, prop, "sampleFormat", subprop);
         REJECT_STATUS;
       }
-    }
+
+
+      c->status = napi_create_int32(env, codec->channels, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "channels", subprop);
+      REJECT_STATUS;
+
+      c->status = napi_create_int32(env, codec->sample_rate, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "sampleRate", subprop);
+      REJECT_STATUS;
+
+      c->status = napi_create_int32(env, codec->block_align, &subprop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, prop, "blockAlign", subprop);
+      REJECT_STATUS;
+
+      if (codec->channel_layout != 0) {
+        c->status = napi_create_int64(env, codec->channel_layout, &subprop);
+        REJECT_STATUS;
+        c->status = napi_set_named_property(env, prop, "channelLayout", subprop);
+        REJECT_STATUS;
+      }
+    } // Audio-only properties
 
     c->status = napi_create_int32(env, codec->bit_rate, &subprop);
     REJECT_STATUS;
