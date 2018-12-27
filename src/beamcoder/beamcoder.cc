@@ -22,6 +22,7 @@
 #include "node_api.h"
 #include "beamcoder_util.h"
 #include "metadata.h"
+#include "decode.h"
 #include <stdio.h>
 
 extern "C" {

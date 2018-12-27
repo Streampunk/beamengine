@@ -433,6 +433,12 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "metadata", prop);
   REJECT_STATUS;
 
+  c->status = napi_create_external(env, c->format, formatFinalizer, nullptr, &subprop);
+  REJECT_STATUS;
+  c->format = nullptr;
+  c->status = napi_set_named_property(env, result, "format", subprop);
+  REJECT_STATUS;
+
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
   FLOATING_STATUS;
@@ -441,10 +447,9 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
 }
 
 napi_value metadata(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result, resourceName, promise;
+  napi_value resourceName, promise;
   napi_valuetype type;
-  size_t bufSize, strLen;
+  size_t strLen;
   metadataCarrier* c = new metadataCarrier;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
@@ -483,4 +488,7 @@ napi_value metadata(napi_env env, napi_callback_info info) {
   return promise;
 }
 
-//?''
+void formatFinalizer(napi_env env, void* data, void* hint) {
+  AVFormatContext *fmtCtx = (AVFormatContext*) data;
+  avformat_close_input(&fmtCtx);
+}

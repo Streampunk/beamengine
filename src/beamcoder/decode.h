@@ -19,32 +19,11 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-#ifndef METADATA_H
-#define METADATA_H
-
-extern "C" {
-  #include <libavformat/avformat.h>
-  #include <libavutil/opt.h>
-  #include <libavutil/dict.h>
-  #include <libavutil/pixfmt.h>
-  #include <libavutil/attributes.h>
-  #include <libavutil/pixdesc.h>
-}
+#ifndef DECODE_H
+#define DECODE_H
 
 #include "beamcoder_util.h"
-#include "node_api.h"
 
-void metadataExecute(napi_env env, void* data);
-void metadataComplete(napi_env env, napi_status asyncStatus, void* data);
-napi_value metadata(napi_env env, napi_callback_info info);
+napi_value decode(napi_env env, napi_callback_info info);
 
-void formatFinalizer(napi_env env, void* data, void* hint);
-
-struct metadataCarrier : carrier {
-  const char* filename = nullptr;
-  AVFormatContext* format = nullptr;
-  ~metadataCarrier() {
-    if (format != nullptr) { avformat_close_input(&format); }}
-};
-
-#endif //METADATA_H
+#endif // DECODE_H
