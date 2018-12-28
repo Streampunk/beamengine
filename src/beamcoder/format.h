@@ -38,6 +38,10 @@ void formatExecute(napi_env env, void* data);
 void formatComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value format(napi_env env, napi_callback_info info);
 
+void readFrameExecute(napi_env env, void* data);
+void readFrameComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value readFrame(napi_env env, napi_callback_info info);
+
 void formatFinalizer(napi_env env, void* data, void* hint);
 
 struct formatCarrier : carrier {
@@ -45,6 +49,14 @@ struct formatCarrier : carrier {
   AVFormatContext* format = nullptr;
   ~formatCarrier() {
     if (format != nullptr) { avformat_close_input(&format); }}
+};
+
+struct readFrameCarrier : carrier {
+  AVFormatContext* format = nullptr;
+  AVPacket* packet = av_packet_alloc();
+  ~readFrameCarrier() {
+    if (packet != nullptr) av_packet_free(&packet);
+  }
 };
 
 #endif // FORMAT_H

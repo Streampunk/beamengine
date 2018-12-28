@@ -163,3 +163,18 @@ napi_value nop(napi_env env, napi_callback_info info) {
   if (status != napi_ok) NAPI_THROW_ERROR("Failed to retrieve undefined in nop.");
   return value;
 }
+
+char* avErrorMsg(const char* base, int avError) {
+  char errMsg[AV_ERROR_MAX_STRING_SIZE];
+  char* both;
+  int ret = av_strerror(avError, errMsg, AV_ERROR_MAX_STRING_SIZE);
+  if (ret < 0) {
+    strcpy(errMsg, "Unable to create AV error string.");
+  }
+  size_t len = strlen(base) + strlen(errMsg);
+  both = (char*) malloc(sizeof(char) * (len + 1));
+  both[0] = '\0';
+  strcat(both, base);
+  strcat(both, errMsg);
+  return both;
+}

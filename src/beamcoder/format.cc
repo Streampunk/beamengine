@@ -44,14 +44,13 @@ void formatExecute(napi_env env, void* data) {
   int ret;
 
   if ((ret = avformat_open_input(&c->format, c->filename, nullptr, nullptr))) {
-    printf("DEBUG: Could not read file %s\n", c->filename);
     c->status = BEAMCODER_ERROR_START;
-    c->errorMsg = "Failed to open file.";
+    c->errorMsg = avErrorMsg("Problem opening input format: ", ret);
     return;
   }
 
   if ((ret = avformat_find_stream_info(c->format, nullptr))) {
-    printf("DEBUG: Counld not find stream info for file %s, retuen value %i.",
+    printf("DEBUG: Counld not find stream info for file %s, return value %i.",
       c->filename, ret);
   }
 }
@@ -63,7 +62,7 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
 
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
-    c->errorMsg = "Async capture creator failed to complete.";
+    c->errorMsg = "Format creator failed to complete.";
   }
   REJECT_STATUS;
 
@@ -233,12 +232,8 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
       REJECT_STATUS;
     }
 
-    char codecTag[5];
-    codecTag[3] = (char) (codec->codec_tag >> 24);
-    codecTag[2] = (char) ((codec->codec_tag >> 16) & 0xff);
-    codecTag[1] = (char) ((codec->codec_tag >> 8) & 0xff);
-    codecTag[0] = (char) (codec->codec_tag & 0xff);
-    codecTag[4] = '\0';
+    char codecTag[64];
+    av_get_codec_tag_string(codecTag, 64, codec->codec_tag);
     c->status = napi_create_string_utf8(env, codecTag, NAPI_AUTO_LENGTH, &subprop);
     REJECT_STATUS;
     c->status = napi_set_named_property(env, prop, "codecTag", subprop);
@@ -378,19 +373,6 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
       REJECT_STATUS;
     }
 
-    c->status = napi_create_array(env, &subprop);
-    REJECT_STATUS;
-    c->status = napi_create_int32(env, codec->sample_aspect_ratio.num, &nested);
-    REJECT_STATUS;
-    c->status = napi_set_element(env, subprop, 0, nested);
-    REJECT_STATUS;
-    c->status = napi_create_int32(env, codec->sample_aspect_ratio.den, &nested);
-    REJECT_STATUS;
-    c->status = napi_set_element(env, subprop, 1, nested);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, prop, "sampleAspectRatio", subprop);
-    REJECT_STATUS;
-
     c->status = napi_set_named_property(env, item, "codec", prop);
     REJECT_STATUS;
 
@@ -414,7 +396,13 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_create_external(env, c->format, formatFinalizer, nullptr, &subprop);
   REJECT_STATUS;
   c->format = nullptr;
-  c->status = napi_set_named_property(env, result, "format", subprop);
+  c->status = napi_set_named_property(env, result, "_format", subprop);
+  REJECT_STATUS;
+
+  c->status = napi_create_function(env, "readFrame", NAPI_AUTO_LENGTH, readFrame,
+    nullptr, &subprop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "readFrame", subprop);
   REJECT_STATUS;
 
   napi_status status;
@@ -440,7 +428,7 @@ napi_value format(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
 
   if (argc < 1) {
-    REJECT_ERROR_RETURN("Metadata requires a filename, URL or buffer.",
+    REJECT_ERROR_RETURN("Format requires a filename, URL or buffer.",
       BEAMCODER_INVALID_ARGS);
   }
 
@@ -455,7 +443,7 @@ napi_value format(napi_env env, napi_callback_info info) {
     REJECT_RETURN;
   }
 
-  c->status = napi_create_string_utf8(env, "Metadata", NAPI_AUTO_LENGTH, &resourceName);
+  c->status = napi_create_string_utf8(env, "Format", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;
   c->status = napi_create_async_work(env, nullptr, resourceName, formatExecute,
     formatComplete, c, &c->_request);
@@ -469,4 +457,106 @@ napi_value format(napi_env env, napi_callback_info info) {
 void formatFinalizer(napi_env env, void* data, void* hint) {
   AVFormatContext *fmtCtx = (AVFormatContext*) data;
   avformat_close_input(&fmtCtx);
+}
+
+void readFrameExecute(napi_env env, void* data) {
+  readFrameCarrier* c = (readFrameCarrier*) data;
+  int ret;
+
+  if ((ret = av_read_frame(c->format, c->packet))) {
+    c->status = BEAMCODER_ERROR_READ_FRAME;
+    c->errorMsg = avErrorMsg("Problem reading frame: ", ret);
+    return;
+  }
+}
+
+void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
+  readFrameCarrier* c = (readFrameCarrier*) data;
+  napi_value result, value, prop;
+  if (asyncStatus != napi_ok) {
+    c->status = asyncStatus;
+    c->errorMsg = "Read frame failed to complete.";
+  }
+  REJECT_STATUS;
+
+  c->status = napi_create_object(env, &result);
+  REJECT_STATUS;
+
+  c->status = napi_create_string_utf8(env, "packet", NAPI_AUTO_LENGTH, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "type", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_int32(env, c->packet->stream_index, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "stream", value);
+  REJECT_STATUS;
+
+  // TODO convert to use BigInts when more stable in Javascript
+  if (c->packet->pts == AV_NOPTS_VALUE) {
+    c->status = napi_get_null(env, &value);
+  }
+  else {
+    c->status = napi_create_int64(env, c->packet->pts, &value);
+  }
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "pts", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_int64(env, c->packet->dts, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "dts", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_int32(env, c->packet->size, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "size", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_int64(env, c->packet->duration, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "duration", value);
+  REJECT_STATUS;
+
+  if (c->packet->pos >= 0) {
+    c->status = napi_create_int64(env, c->packet->pos, &value);
+  }
+  else {
+    c->status = napi_get_null(env, &value);
+  }
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "pos", value);
+  REJECT_STATUS;
+
+  napi_status status;
+  status = napi_resolve_deferred(env, c->_deferred, result);
+  FLOATING_STATUS;
+
+  tidyCarrier(env, c);
+}
+
+napi_value readFrame(napi_env env, napi_callback_info info) {
+  napi_value resourceName, promise, formatJS, formatExt;
+  readFrameCarrier* c = new readFrameCarrier;
+
+  c->status = napi_create_promise(env, &c->_deferred, &promise);
+  REJECT_RETURN;
+
+  size_t argc = 0;
+  c->status = napi_get_cb_info(env, info, &argc, nullptr, &formatJS, nullptr);
+  REJECT_RETURN;
+  c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
+  REJECT_RETURN;
+  c->status = napi_get_value_external(env, formatExt, (void**) &c->format);
+  REJECT_RETURN;
+
+  c->status = napi_create_string_utf8(env, "ReadFrame", NAPI_AUTO_LENGTH, &resourceName);
+  REJECT_RETURN;
+  c->status = napi_create_async_work(env, nullptr, resourceName, readFrameExecute,
+    readFrameComplete, c, &c->_request);
+  REJECT_RETURN;
+  c->status = napi_queue_async_work(env, c->_request);
+  REJECT_RETURN;
+
+  return promise;
 }

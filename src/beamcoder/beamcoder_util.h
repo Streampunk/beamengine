@@ -1,3 +1,4 @@
+
 /*
   Aerostat Beam Engine - Redis-backed highly-scale-able and cloud-fit media beam engine.
   Copyright (C) 2018  Streampunk Media Ltd.
@@ -27,6 +28,10 @@
 #include <string>
 #include "node_api.h"
 
+extern "C" {
+  #include <libavutil/error.h>
+}
+
 #define DECLARE_NAPI_METHOD(name, func) { name, 0, func, 0, 0, 0, napi_default, 0 }
 
 // Handling NAPI errors - use "napi_status status;" where used
@@ -49,6 +54,7 @@ napi_status checkArgs(napi_env env, napi_callback_info info, char* methodName,
 // Async error handling
 #define BEAMCODER_ERROR_START 5000
 #define BEAMCODER_INVALID_ARGS 5001
+#define BEAMCODER_ERROR_READ_FRAME 5002
 #define BEAMCODER_SUCCESS 0
 
 struct carrier {
@@ -92,5 +98,6 @@ int32_t rejectStatus(napi_env env, carrier* c, char* file, int32_t line);
 }
 
 napi_value nop(napi_env env, napi_callback_info info);
+char* avErrorMsg(const char* base, int avErrorCode);
 
 #endif // BEAMCODER_UTIL_H
