@@ -344,7 +344,9 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
       REJECT_STATUS;
 
       if (codec->channel_layout != 0) {
-        c->status = napi_create_int64(env, codec->channel_layout, &subprop);
+        char cl[64];
+        av_get_channel_layout_string(cl, 64, codec->channels, codec->channel_layout);
+        c->status = napi_create_string_utf8(env, cl, NAPI_AUTO_LENGTH, &subprop);
         REJECT_STATUS;
         c->status = napi_set_named_property(env, prop, "channelLayout", subprop);
         REJECT_STATUS;
@@ -393,16 +395,31 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "metadata", prop);
   REJECT_STATUS;
 
-  c->status = napi_create_external(env, c->format, formatFinalizer, nullptr, &subprop);
+  c->status = napi_create_double(env, (double) c->format->start_time / AV_TIME_BASE, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "startTime", prop);
+  REJECT_STATUS;
+
+  c->status = napi_create_double(env, (double) c->format->duration / AV_TIME_BASE, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "duration", prop);
+  REJECT_STATUS;
+
+  c->status = napi_create_int32(env, c->format->bit_rate, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "bitrate", prop);
+  REJECT_STATUS;
+
+  c->status = napi_create_external(env, c->format, formatFinalizer, nullptr, &prop);
   REJECT_STATUS;
   c->format = nullptr;
-  c->status = napi_set_named_property(env, result, "_format", subprop);
+  c->status = napi_set_named_property(env, result, "_format", prop);
   REJECT_STATUS;
 
   c->status = napi_create_function(env, "readFrame", NAPI_AUTO_LENGTH, readFrame,
-    nullptr, &subprop);
+    nullptr, &prop);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "readFrame", subprop);
+  c->status = napi_set_named_property(env, result, "readFrame", prop);
   REJECT_STATUS;
 
   napi_status status;
