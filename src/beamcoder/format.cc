@@ -36,10 +36,10 @@
 
 */
 
-#include "metadata.h"
+#include "format.h"
 
-void metadataExecute(napi_env env, void* data) {
-  metadataCarrier* c = (metadataCarrier*) data;
+void formatExecute(napi_env env, void* data) {
+  formatCarrier* c = (formatCarrier*) data;
 
   int ret;
 
@@ -56,8 +56,8 @@ void metadataExecute(napi_env env, void* data) {
   }
 }
 
-void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
-  metadataCarrier* c = (metadataCarrier*) data;
+void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
+  formatCarrier* c = (formatCarrier*) data;
   napi_value result, value, item, prop, subprop, nested;
   AVDictionaryEntry* tag = nullptr;
 
@@ -210,30 +210,8 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
     REJECT_STATUS;
     c->status = napi_set_named_property(env, prop, "type", subprop);
     REJECT_STATUS;
-    switch (codec->codec_type) {
-      case AVMEDIA_TYPE_VIDEO:
-        c->status = napi_create_string_utf8(env, "video", NAPI_AUTO_LENGTH, &subprop);
-        break;
-      case AVMEDIA_TYPE_AUDIO:
-        c->status = napi_create_string_utf8(env, "audio", NAPI_AUTO_LENGTH, &subprop);
-        break;
-      case AVMEDIA_TYPE_DATA: // Opaque data information usually continuous.
-        c->status = napi_create_string_utf8(env, "data", NAPI_AUTO_LENGTH, &subprop);
-        break;
-      case AVMEDIA_TYPE_SUBTITLE:
-        c->status = napi_create_string_utf8(env, "subtitle", NAPI_AUTO_LENGTH, &subprop);
-        break;
-      case AVMEDIA_TYPE_ATTACHMENT: // Opaque data information usually sparse.
-        c->status = napi_create_string_utf8(env, "attachment", NAPI_AUTO_LENGTH, &subprop);
-        break;
-      case AVMEDIA_TYPE_NB:
-        c->status = napi_create_string_utf8(env, "nb", NAPI_AUTO_LENGTH, &subprop);
-        break;
-      default:
-      case AVMEDIA_TYPE_UNKNOWN:
-        c->status = napi_create_string_utf8(env, "unknown", NAPI_AUTO_LENGTH, &subprop);
-        break;
-    }
+    c->status = napi_create_string_utf8(env, av_get_media_type_string(codec->codec_type),
+      NAPI_AUTO_LENGTH, &subprop);
     REJECT_STATUS;
     c->status = napi_set_named_property(env, prop, "codecType", subprop);
     REJECT_STATUS;
@@ -446,11 +424,11 @@ void metadataComplete(napi_env env,  napi_status asyncStatus, void* data) {
   tidyCarrier(env, c);
 }
 
-napi_value metadata(napi_env env, napi_callback_info info) {
+napi_value format(napi_env env, napi_callback_info info) {
   napi_value resourceName, promise;
   napi_valuetype type;
   size_t strLen;
-  metadataCarrier* c = new metadataCarrier;
+  formatCarrier* c = new formatCarrier;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
@@ -479,8 +457,8 @@ napi_value metadata(napi_env env, napi_callback_info info) {
 
   c->status = napi_create_string_utf8(env, "Metadata", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;
-  c->status = napi_create_async_work(env, nullptr, resourceName, metadataExecute,
-    metadataComplete, c, &c->_request);
+  c->status = napi_create_async_work(env, nullptr, resourceName, formatExecute,
+    formatComplete, c, &c->_request);
   REJECT_RETURN;
   c->status = napi_queue_async_work(env, c->_request);
   REJECT_RETURN;

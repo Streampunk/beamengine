@@ -4,7 +4,7 @@
     "conditions": [
       ['OS=="win"', {
       "sources" : [ "src/beamcoder/beamcoder.cc", "src/beamcoder/beamcoder_util.cc",
-                    "src/beamcoder/metadata.cc", "src/beamcoder/decode.cc" ],
+                    "src/beamcoder/format.cc", "src/beamcoder/decode.cc" ],
       "configurations": {
         "Release": {
           "msvs_settings": {

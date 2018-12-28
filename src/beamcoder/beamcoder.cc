@@ -21,7 +21,7 @@
 
 #include "node_api.h"
 #include "beamcoder_util.h"
-#include "metadata.h"
+#include "format.h"
 #include "decode.h"
 #include <stdio.h>
 
@@ -252,7 +252,7 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("versionStrings", versionStrings),
     DECLARE_NAPI_METHOD("configurations", configurations),
     DECLARE_NAPI_METHOD("licenses", licenses),
-    DECLARE_NAPI_METHOD("metadata", metadata)
+    DECLARE_NAPI_METHOD("format", format)
    };
   status = napi_define_properties(env, exports, 6, desc);
   CHECK_STATUS;
