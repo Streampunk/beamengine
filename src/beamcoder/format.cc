@@ -57,7 +57,7 @@ void formatExecute(napi_env env, void* data) {
 
 void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   formatCarrier* c = (formatCarrier*) data;
-  napi_value result, value, item, prop, subprop, nested;
+  napi_value result, value, item, prop, subprop;
   AVDictionaryEntry* tag = nullptr;
 
   if (asyncStatus != napi_ok) {
@@ -410,6 +410,26 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "bitrate", prop);
   REJECT_STATUS;
 
+  if (c->format->start_time_realtime != AV_NOPTS_VALUE) {
+    c->status = napi_create_int64(env, c->format->start_time_realtime, &prop);
+  }
+  else {
+    c->status = napi_get_null(env, &prop);
+  }
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "startRealtime", prop);
+  REJECT_STATUS;
+
+  c->status = napi_create_uint32(env, c->format->packet_size, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "packetSize", prop);
+  REJECT_STATUS;
+
+  c->status = napi_create_uint32(env, c->format->max_delay, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "maxDelay", prop);
+  REJECT_STATUS;
+
   c->status = napi_create_external(env, c->format, formatFinalizer, nullptr, &prop);
   REJECT_STATUS;
   c->format = nullptr;
@@ -489,7 +509,7 @@ void readFrameExecute(napi_env env, void* data) {
 
 void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   readFrameCarrier* c = (readFrameCarrier*) data;
-  napi_value result, value, prop;
+  napi_value result, value;
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
     c->errorMsg = "Read frame failed to complete.";
@@ -565,6 +585,9 @@ napi_value readFrame(napi_env env, napi_callback_info info) {
   c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, formatExt, (void**) &c->format);
+  REJECT_RETURN;
+
+  c->status = napi_create_reference(env, formatJS, 1, &c->passthru);
   REJECT_RETURN;
 
   c->status = napi_create_string_utf8(env, "ReadFrame", NAPI_AUTO_LENGTH, &resourceName);
