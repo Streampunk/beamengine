@@ -42,7 +42,12 @@ void readFrameExecute(napi_env env, void* data);
 void readFrameComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value readFrame(napi_env env, napi_callback_info info);
 
+void seekFrameExecute(napi_env env, void *data);
+void seekFrameComplete(napi_env env, napi_status asyncStatus, void *data);
+napi_value seekFrame(napi_env env, napi_callback_info info);
+
 void formatFinalizer(napi_env env, void* data, void* hint);
+void packetFinalizer(napi_env env, void* data, void* hint);
 
 struct formatCarrier : carrier {
   const char* filename = nullptr;
@@ -57,6 +62,14 @@ struct readFrameCarrier : carrier {
   ~readFrameCarrier() {
     if (packet != nullptr) av_packet_free(&packet);
   }
+};
+
+struct seekFrameCarrier : carrier {
+  AVFormatContext* format = nullptr;
+  int streamIndex = -1;
+  int64_t timestamp = 0;
+  int flags = 0;
+  ~seekFrameCarrier() { }
 };
 
 #endif // FORMAT_H

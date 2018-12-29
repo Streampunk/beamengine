@@ -55,6 +55,7 @@ napi_status checkArgs(napi_env env, napi_callback_info info, char* methodName,
 #define BEAMCODER_ERROR_START 5000
 #define BEAMCODER_INVALID_ARGS 5001
 #define BEAMCODER_ERROR_READ_FRAME 5002
+#define BEAMCODER_ERROR_SEEK_FRAME 5003
 #define BEAMCODER_SUCCESS 0
 
 struct carrier {

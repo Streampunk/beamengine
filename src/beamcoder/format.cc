@@ -442,6 +442,12 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "readFrame", prop);
   REJECT_STATUS;
 
+  c->status = napi_create_function(env, "seekFrame", NAPI_AUTO_LENGTH, seekFrame,
+    nullptr, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "seekFrame", prop);
+  REJECT_STATUS;
+
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
   FLOATING_STATUS;
@@ -565,6 +571,12 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "pos", value);
   REJECT_STATUS;
 
+  c->status = napi_create_external(env, c->packet, packetFinalizer, nullptr, &value);
+  REJECT_STATUS;
+  c->packet = nullptr;
+  c->status = napi_set_named_property(env, result, "_packet", value);
+  REJECT_STATUS;
+
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
   FLOATING_STATUS;
@@ -600,3 +612,68 @@ napi_value readFrame(napi_env env, napi_callback_info info) {
 
   return promise;
 }
+
+void packetFinalizer(napi_env env, void* data, void* hint) {
+  AVPacket* pkt = (AVPacket*) data;
+  av_packet_free(&pkt);
+}
+
+void seekFrameExecute(napi_env env, void *data) {
+  seekFrameCarrier* c = (seekFrameCarrier*) data;
+  int ret;
+
+  ret = av_seek_frame(c->format, c->streamIndex, c->timestamp, c->flags);
+  if (ret < 0) {
+    c->status = BEAMCODER_ERROR_SEEK_FRAME;
+    c->errorMsg = avErrorMsg("Problem seeking frame: ", ret);
+    return;
+  }
+};
+
+void seekFrameComplete(napi_env env, napi_status asyncStatus, void *data) {
+  seekFrameCarrier* c = (seekFrameCarrier*) data;
+  napi_value result, value;
+  if (asyncStatus != napi_ok) {
+    c->status = asyncStatus;
+    c->errorMsg = "Seek frame failed to complete.";
+  }
+  REJECT_STATUS;
+
+  c->status = napi_get_null(env, &result);
+  REJECT_STATUS;
+
+  napi_status status;
+  status = napi_resolve_deferred(env, c->_deferred, result);
+  FLOATING_STATUS;
+
+  tidyCarrier(env, c);
+};
+
+napi_value seekFrame(napi_env env, napi_callback_info info) {
+  napi_value resourceName, promise, formatJS, formatExt;
+  seekFrameCarrier* c = new seekFrameCarrier;
+
+  c->status = napi_create_promise(env, &c->_deferred, &promise);
+  REJECT_RETURN;
+
+  size_t argc = 0;
+  c->status = napi_get_cb_info(env, info, &argc, nullptr, &formatJS, nullptr);
+  REJECT_RETURN;
+  c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
+  REJECT_RETURN;
+  c->status = napi_get_value_external(env, formatExt, (void**) &c->format);
+  REJECT_RETURN;
+
+  c->status = napi_create_reference(env, formatJS, 1, &c->passthru);
+  REJECT_RETURN;
+
+  c->status = napi_create_string_utf8(env, "SeekFrame", NAPI_AUTO_LENGTH, &resourceName);
+  REJECT_RETURN;
+  c->status = napi_create_async_work(env, nullptr, resourceName, seekFrameExecute,
+    seekFrameComplete, c, &c->_request);
+  REJECT_RETURN;
+  c->status = napi_queue_async_work(env, c->_request);
+  REJECT_RETURN;
+
+  return promise;
+};
