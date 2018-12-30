@@ -516,6 +516,8 @@ void readFrameExecute(napi_env env, void* data) {
 void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   readFrameCarrier* c = (readFrameCarrier*) data;
   napi_value result, value;
+  AVBufferRef* hintRef;
+  int64_t externalMemory;
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
     c->errorMsg = "Read frame failed to complete.";
@@ -571,6 +573,32 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "pos", value);
   REJECT_STATUS;
 
+  c->status = napi_get_boolean(env, (c->packet->flags & AV_PKT_FLAG_KEY) != 0, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "key", value);
+  REJECT_STATUS;
+
+  c->status = napi_get_boolean(env, (c->packet->flags & AV_PKT_FLAG_KEY) != 0, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "key", value);
+  REJECT_STATUS;
+
+  if ((c->packet->flags & AV_PKT_FLAG_CORRUPT) != 0) {
+    c->status = napi_get_boolean(env, true, &value);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, result, "corrupt", value);
+    REJECT_STATUS;
+  }
+
+  hintRef = av_buffer_ref(c->packet->buf);
+  c->status = napi_create_external_buffer(env, hintRef->size, hintRef->data,
+    readBufferFinalizer, hintRef, &value);
+  REJECT_STATUS;
+  c->status = napi_adjust_external_memory(env, hintRef->size, &externalMemory);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "data", value);
+  REJECT_STATUS;
+
   c->status = napi_create_external(env, c->packet, packetFinalizer, nullptr, &value);
   REJECT_STATUS;
   c->packet = nullptr;
@@ -618,6 +646,17 @@ void packetFinalizer(napi_env env, void* data, void* hint) {
   av_packet_free(&pkt);
 }
 
+void readBufferFinalizer(napi_env env, void* data, void* hint) {
+  AVBufferRef* hintRef = (AVBufferRef*) hint;
+  napi_status status;
+  int64_t externalMemory;
+  status = napi_adjust_external_memory(env, -hintRef->size, &externalMemory);
+  if (status != napi_ok) {
+    printf("DEBUG: Napi failure to adjust external memory. In beamcoder format.cc readFrameFinalizer.");
+  }
+  av_buffer_unref(&hintRef);
+}
+
 void seekFrameExecute(napi_env env, void *data) {
   seekFrameCarrier* c = (seekFrameCarrier*) data;
   int ret;
@@ -649,15 +688,30 @@ void seekFrameComplete(napi_env env, napi_status asyncStatus, void *data) {
   tidyCarrier(env, c);
 };
 
+/*
+  let frame = await format.seek({
+    streamIndex: 0, // Default is -1 - use primary stream, seek in seconds
+    timestamp: 12345, // Timestamp - default units are stream timeBase
+    backward: false, // Seek backwards
+    byte: false, // Timestamp is a byte position
+    any: false, // Select any frame, not just key frames
+    frame: false // Timestamp is frame number
+  });
+*/
+
 napi_value seekFrame(napi_env env, napi_callback_info info) {
-  napi_value resourceName, promise, formatJS, formatExt;
+  napi_value resourceName, promise, formatJS, formatExt, value;
+  napi_valuetype type;
   seekFrameCarrier* c = new seekFrameCarrier;
+  bool isArray, bValue;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
 
-  size_t argc = 0;
-  c->status = napi_get_cb_info(env, info, &argc, nullptr, &formatJS, nullptr);
+  size_t argc = 1;
+  napi_value argv[1];
+
+  c->status = napi_get_cb_info(env, info, &argc, argv, &formatJS, nullptr);
   REJECT_RETURN;
   c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
   REJECT_RETURN;
@@ -666,6 +720,93 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
 
   c->status = napi_create_reference(env, formatJS, 1, &c->passthru);
   REJECT_RETURN;
+
+  if ((argc < 1) || (argc > 1)) {
+    REJECT_ERROR_RETURN("Seek must have exactly one options object argument.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->status = napi_typeof(env, argv[0], &type);
+  REJECT_RETURN;
+  c->status = napi_is_array(env, argv[0], &isArray);
+  REJECT_RETURN;
+  if ((type != napi_object) || (isArray == true)) {
+    REJECT_ERROR_RETURN("Single argument options object must be an object and not an array.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "streamIndex", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_number) {
+    c->status = napi_get_value_int32(env, value, &c->streamIndex);
+    REJECT_RETURN;
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "timestamp", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type != napi_number) {
+    REJECT_ERROR_RETURN("Seek must have a timestamp specified.",
+      BEAMCODER_INVALID_ARGS);
+  }
+  c->status = napi_get_value_int64(env, value, &c->timestamp);
+  REJECT_RETURN;
+
+  if (c->streamIndex == -1) {
+    c->timestamp = c->timestamp * AV_TIME_BASE;
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "backward", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_boolean) {
+    c->status = napi_get_value_bool(env, value, &bValue);
+    REJECT_RETURN;
+    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_BACKWARD : c->flags;
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "byte", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_boolean) {
+    c->status = napi_get_value_bool(env, value, &bValue);
+    REJECT_RETURN;
+    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_BYTE : c->flags;
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "any", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_boolean) {
+    c->status = napi_get_value_bool(env, value, &bValue);
+    REJECT_RETURN;
+    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_ANY : c->flags;
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "frame", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_boolean) {
+    c->status = napi_get_value_bool(env, value, &bValue);
+    REJECT_RETURN;
+    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_FRAME : c->flags;
+  }
+
+  c->status = napi_typeof(env, argv[0], &type);
+  REJECT_RETURN;
+  c->status = napi_is_array(env, argv[0], &isArray);
+  REJECT_RETURN;
+  if ((type != napi_object) || (isArray == true)) {
+    REJECT_ERROR_RETURN("Single argument options object must be an object and not an array.",
+      BEAMCODER_INVALID_ARGS);
+  }
 
   c->status = napi_create_string_utf8(env, "SeekFrame", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;

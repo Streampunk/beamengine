@@ -48,6 +48,7 @@ napi_value seekFrame(napi_env env, napi_callback_info info);
 
 void formatFinalizer(napi_env env, void* data, void* hint);
 void packetFinalizer(napi_env env, void* data, void* hint);
+void readBufferFinalizer(napi_env env, void* data, void* hint);
 
 struct formatCarrier : carrier {
   const char* filename = nullptr;
