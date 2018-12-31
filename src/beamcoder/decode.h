@@ -23,6 +23,7 @@
 #define DECODE_H
 
 #include "beamcoder_util.h"
+#include <vector>
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -32,12 +33,16 @@ void decoderExecute(napi_env env, void* data);
 void decoderComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decoder(napi_env env, napi_callback_info info);
 
+void decodeExecute(napi_env env, void* data);
+void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value decode(napi_env env, napi_callback_info info);
+
 void decoderFinalizer(napi_env env, void* data, void* hint);
 
 struct decoderCarrier : carrier {
   AVCodecContext* decoder = nullptr;
   char* codecName;
-  size_t codecNameLen = 64;
+  size_t codecNameLen = 0;
   ~decoderCarrier() {
     if (decoder != nullptr) {
       avcodec_close(decoder);
@@ -45,5 +50,17 @@ struct decoderCarrier : carrier {
     }
   }
 };
+
+struct decodeCarrier : carrier {
+  AVCodecContext* decoder;
+  std::vector<AVPacket*> packets;
+  std::vector<AVFrame*> frames;
+  ~decodeCarrier() {
+    // printf("Decode carrier called.\n");
+  }
+};
+
+napi_status isPacket(napi_env env, napi_value packet);
+AVPacket* getPacket(napi_env env, napi_value packet);
 
 #endif // DECODE_H
