@@ -24,6 +24,26 @@
 
 #include "beamcoder_util.h"
 
-napi_value decode(napi_env env, napi_callback_info info);
+extern "C" {
+  #include <libavcodec/avcodec.h>
+}
+
+void decoderExecute(napi_env env, void* data);
+void decoderComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value decoder(napi_env env, napi_callback_info info);
+
+void decoderFinalizer(napi_env env, void* data, void* hint);
+
+struct decoderCarrier : carrier {
+  AVCodecContext* decoder = nullptr;
+  char* codecName;
+  size_t codecNameLen = 64;
+  ~decoderCarrier() {
+    if (decoder != nullptr) {
+      avcodec_close(decoder);
+      avcodec_free_context(&decoder);
+    }
+  }
+};
 
 #endif // DECODE_H

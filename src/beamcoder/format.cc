@@ -518,6 +518,7 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   napi_value result, value;
   AVBufferRef* hintRef;
   int64_t externalMemory;
+  
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
     c->errorMsg = "Read frame failed to complete.";
