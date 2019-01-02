@@ -27,6 +27,7 @@
 
 extern "C" {
   #include <libavcodec/avcodec.h>
+  #include <libavutil/pixdesc.h>
 }
 
 void decoderExecute(napi_env env, void* data);
@@ -38,6 +39,8 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decode(napi_env env, napi_callback_info info);
 
 void decoderFinalizer(napi_env env, void* data, void* hint);
+void frameFinalizer(napi_env env, void* data, void* hint);
+void frameBufferFinalize(napi_env env, void* data, void* hint);
 
 struct decoderCarrier : carrier {
   AVCodecContext* decoder = nullptr;
@@ -56,7 +59,7 @@ struct decodeCarrier : carrier {
   std::vector<AVPacket*> packets;
   std::vector<AVFrame*> frames;
   ~decodeCarrier() {
-    // printf("Decode carrier called.\n");
+    // printf("Decode carrier destructor.\n");
   }
 };
 

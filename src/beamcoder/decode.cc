@@ -155,28 +155,29 @@ void decodeExecute(napi_env env, void* data) {
   decodeCarrier* c = (decodeCarrier*) data;
   int ret = 0;
   AVFrame* frame = nullptr;
+  HR_TIME_POINT decodeStart = NOW;
 
   for ( auto it = c->packets.cbegin() ; it != c->packets.cend() ; it++ ) {
   bump:
     ret = avcodec_send_packet(c->decoder, *it);
     switch (ret) {
       case AVERROR(EAGAIN):
-        printf("Input is not accepted in the current state - user must read output with avcodec_receive_frame().\n");
+        // printf("Input is not accepted in the current state - user must read output with avcodec_receive_frame().\n");
         frame = av_frame_alloc();
         avcodec_receive_frame(c->decoder, frame);
         c->frames.push_back(frame);
         goto bump;
       case AVERROR_EOF:
-        printf("The decoder has been flushed, and no new packets can be sent to it.\n");
+        // printf("The decoder has been flushed, and no new packets can be sent to it.\n");
         break;
       case AVERROR(EINVAL):
-        printf("Codec not opened.\n");
+        // printf("Codec not opened.\n");
         break;
       case AVERROR(ENOMEM):
-        printf("Failed to add packet to internal queue.\n");
+        // printf("Failed to add packet to internal queue.\n");
         break;
       case 0:
-        printf("Successfully sent packet to codec.\n");
+        // printf("Successfully sent packet to codec.\n");
         break;
       default:
         printf("Error sending packet %i.\n", ret);
@@ -193,11 +194,14 @@ void decodeExecute(napi_env env, void* data) {
     }
   } while (ret == 0);
   av_frame_free(&frame);
+
+  c->totalTime = microTime(decodeStart);
 };
 
 void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   decodeCarrier* c = (decodeCarrier*) data;
-  napi_value result, value, frame, prop;
+  napi_value result, value, frame, prop, el;
+  int64_t totalMem;
 
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
@@ -218,24 +222,123 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
     c->status = napi_set_named_property(env, frame, "type", prop);
     REJECT_STATUS;
 
-    c->status = napi_create_int32(env, item->buf[0]->size, &prop);
+    c->status = napi_create_string_utf8(env, av_get_media_type_string(c->decoder->codec_type),
+      NAPI_AUTO_LENGTH, &prop);
     REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "size", prop);
-    REJECT_STATUS;
-
-    c->status = napi_create_int32(env, item->linesize[0], &prop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "linesize", prop);
+    c->status = napi_set_named_property(env, frame, "mediaType", prop);
     REJECT_STATUS;
 
-    c->status = napi_create_int32(env, item->width, &prop);
+    c->status = napi_create_int64(env, item->pts, &prop);
     REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "width", prop);
+    c->status = napi_set_named_property(env, frame, "pts", prop);
     REJECT_STATUS;
 
-    c->status = napi_create_int32(env, item->height, &prop);
+    c->status = napi_create_int64(env, item->pkt_dts, &prop);
     REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "height", prop);
+    c->status = napi_set_named_property(env, frame, "pktDts", prop);
+    REJECT_STATUS;
+
+    if (c->decoder->codec_type == AVMEDIA_TYPE_VIDEO) {
+      c->status = napi_create_int32(env, item->width, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "width", prop);
+      REJECT_STATUS;
+
+      c->status = napi_create_int32(env, item->height, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "height", prop);
+      REJECT_STATUS;
+
+      c->status = napi_create_string_utf8(env,
+        av_get_pix_fmt_name((AVPixelFormat) item->format),
+        NAPI_AUTO_LENGTH, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "format", prop);
+      REJECT_STATUS;
+
+      c->status = napi_create_array(env, &prop);
+      REJECT_STATUS;
+      for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+        if (item->linesize[x] == 0) break;
+        c->status = napi_create_int32(env, item->linesize[x], &el);
+        REJECT_STATUS;
+        c->status = napi_set_element(env, prop, x, el);
+        REJECT_STATUS;
+      }
+      c->status = napi_set_named_property(env, frame, "linesize", prop);
+      REJECT_STATUS;
+
+      c->status = napi_get_boolean(env, item->key_frame == 1, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "keyFrame", prop);
+      REJECT_STATUS;
+
+      c->status = napi_get_boolean(env, item->interlaced_frame == true, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "interlacedFrame", prop);
+      REJECT_STATUS;
+
+      if (item->interlaced_frame) {
+        c->status = napi_get_boolean(env, item->top_field_first == true, &prop);
+        REJECT_STATUS;
+        c->status = napi_set_named_property(env, frame, "topFieldFirst", prop);
+        REJECT_STATUS;
+      }
+    } // Media type video
+
+    if (c->decoder->codec_type == AVMEDIA_TYPE_AUDIO) {
+      c->status = napi_create_int32(env, item->nb_samples, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "nbSamples", prop);
+      REJECT_STATUS;
+
+      c->status = napi_create_int32(env, item->sample_rate, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "sampleRate", prop);
+      REJECT_STATUS;
+
+      c->status = napi_create_string_utf8(env,
+        av_get_sample_fmt_name((AVSampleFormat) item->format),
+        NAPI_AUTO_LENGTH, &prop);
+      REJECT_STATUS;
+      c->status = napi_set_named_property(env, frame, "format", prop);
+      REJECT_STATUS;
+
+      if (item->channel_layout != 0) {
+        char cl[64];
+        av_get_channel_layout_string(cl, 64, c->decoder->channels, item->channel_layout);
+        c->status = napi_create_string_utf8(env, cl, NAPI_AUTO_LENGTH, &prop);
+        REJECT_STATUS;
+        c->status = napi_set_named_property(env, frame, "channelLayout", prop);
+        REJECT_STATUS;
+      }
+
+    }
+
+    c->status = napi_create_int64(env, c->totalTime, &prop);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, frame, "totalTime", prop);
+    REJECT_STATUS;
+
+    c->status = napi_create_array(env, &prop);
+    REJECT_STATUS;
+    for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+      if (item->buf[x] == nullptr) break;
+      AVBufferRef* mybuf = av_buffer_ref(item->buf[x]);
+      c->status = napi_create_external_buffer(env, mybuf->size, mybuf->data,
+        frameBufferFinalize, mybuf, &el);
+      REJECT_STATUS;
+      c->status = napi_set_element(env, prop, x, el);
+      REJECT_STATUS;
+      c->status = napi_adjust_external_memory(env, mybuf->size, &totalMem);
+      REJECT_STATUS;
+    }
+    c->status = napi_set_named_property(env, frame, "data", prop);
+    REJECT_STATUS;
+
+    c->status = napi_create_external(env, item, frameFinalizer, nullptr, &prop);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, frame, "_frame", prop);
     REJECT_STATUS;
 
     c->status = napi_set_element(env, result, frameCount++, frame);
@@ -247,7 +350,6 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   FLOATING_STATUS;
 
   tidyCarrier(env, c);
-  printf("Completing and resolving.\n");
 };
 
 napi_value decode(napi_env env, napi_callback_info info) {
@@ -320,6 +422,25 @@ napi_value decode(napi_env env, napi_callback_info info) {
   return promise;
 };
 
+void frameFinalizer(napi_env env, void* data, void* hint) {
+  AVFrame* frame = (AVFrame*) data;
+  // printf("Frame finalizer called.\n");
+  av_frame_free(&frame);
+}
+
+void frameBufferFinalize(napi_env env, void* data, void* hint) {
+  AVBufferRef* hintRef = (AVBufferRef*) hint;
+  // printf("Frame buffer finalizer called with %p.\n", hint);
+  napi_status status;
+  int64_t externalMemory;
+  status = napi_adjust_external_memory(env, -hintRef->size, &externalMemory);
+  printf("External memory is %i\n", externalMemory);
+  if (status != napi_ok) {
+    printf("DEBUG: Napi failure to adjust external memory. In beamcoder decode.cc frameBufferFinalizer.");
+  }
+  av_buffer_unref(&hintRef);
+}
+
 napi_status isPacket(napi_env env, napi_value packet) {
   napi_status status;
   napi_value value;
@@ -361,13 +482,9 @@ AVPacket* getPacket(napi_env env, napi_value packet) {
   napi_value value;
   AVPacket* result = nullptr;
   status = napi_get_named_property(env, packet, "_packet", &value);
-  printf("AVPacket result pointer 1 %p\n", result);
   if (status != napi_ok) return nullptr;
   status = napi_get_value_external(env, value, (void**) &result);
-  printf("AVPacket result pointer 2 %p\n", result);
   if (status != napi_ok) return nullptr;
-
-  printf("AVPacket result pointer 3 %p\n", result);
 
   return result;
 }
