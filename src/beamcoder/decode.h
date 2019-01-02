@@ -28,6 +28,7 @@
 extern "C" {
   #include <libavcodec/avcodec.h>
   #include <libavutil/pixdesc.h>
+  #include <libavformat/avformat.h>
 }
 
 void decoderExecute(napi_env env, void* data);
@@ -44,6 +45,7 @@ void frameBufferFinalize(napi_env env, void* data, void* hint);
 
 struct decoderCarrier : carrier {
   AVCodecContext* decoder = nullptr;
+  AVCodecParameters* params = nullptr;
   char* codecName;
   size_t codecNameLen = 0;
   ~decoderCarrier() {

@@ -29,7 +29,7 @@ async function run() {
     if (packet.stream == 0) {
       //console.log(packet);
       let frames = await decoder.decode(packet);
-      console.log(frames[0] ? frames[0] : null);
+      console.log(frames.frames[0]);
     }
   }
 }
