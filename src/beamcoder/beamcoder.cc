@@ -23,6 +23,7 @@
 #include "beamcoder_util.h"
 #include "format.h"
 #include "decode.h"
+#include "encode.h"
 #include <stdio.h>
 
 extern "C" {
@@ -253,9 +254,10 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("configurations", configurations),
     DECLARE_NAPI_METHOD("licenses", licenses),
     DECLARE_NAPI_METHOD("format", format),
-    DECLARE_NAPI_METHOD("decoder", decoder)
+    DECLARE_NAPI_METHOD("decoder", decoder),
+    DECLARE_NAPI_METHOD("encoder", encoder)
    };
-  status = napi_define_properties(env, exports, 7, desc);
+  status = napi_define_properties(env, exports, 8, desc);
   CHECK_STATUS;
   return exports;
 }
