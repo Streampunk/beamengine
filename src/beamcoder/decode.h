@@ -46,6 +46,7 @@ void frameBufferFinalize(napi_env env, void* data, void* hint);
 struct decoderCarrier : carrier {
   AVCodecContext* decoder = nullptr;
   AVCodecParameters* params = nullptr;
+  int streamIdx = -1;
   char* codecName;
   size_t codecNameLen = 0;
   ~decoderCarrier() {

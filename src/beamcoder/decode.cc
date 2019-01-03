@@ -33,6 +33,11 @@ void decoderExecute(napi_env env, void* data) {
     return;
   }
   c->decoder = avcodec_alloc_context3(codec);
+  if (c->decoder == nullptr) {
+    c->status = BEAMCODER_ERROR_ALLOC_DECODER;
+    c->errorMsg = "Problem allocating decoder context.";
+    return;
+  }
   if (c->params != nullptr) {
     if ((ret = avcodec_parameters_to_context(c->decoder, c->params))) {
       printf("DEBUG: Failed to set context parameters from those provided.");
@@ -63,6 +68,19 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "type", value);
   REJECT_STATUS;
 
+  c->status = napi_create_string_utf8(env, avcodec_get_name(c->decoder->codec_id),
+    NAPI_AUTO_LENGTH, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "name", value);
+  REJECT_STATUS;
+
+  if (c->streamIdx != -1) {
+    c->status = napi_create_int32(env, c->streamIdx, &value);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, result, "stream", value);
+    REJECT_STATUS;
+  }
+
   c->status = napi_create_external(env, c->decoder, decoderFinalizer, nullptr, &value);
   REJECT_STATUS;
   c->decoder = nullptr;
@@ -88,7 +106,6 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   bool isArray, hasName, hasID, hasFormat, hasStream;
   AVCodecID id = AV_CODEC_ID_NONE;
   AVFormatContext* format = nullptr;
-  int32_t streamIdx = 0;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
@@ -132,13 +149,15 @@ napi_value decoder(napi_env env, napi_callback_info info) {
 
     c->status = napi_get_named_property(env, args[0], "stream", &value);
     REJECT_RETURN;
-    c->status = napi_get_value_int32(env, value, &streamIdx);
+    c->status = napi_get_value_int32(env, value, &c->streamIdx);
     REJECT_RETURN;
-    if (streamIdx < 0 || streamIdx >= format->nb_streams) {
+    if (c->streamIdx < 0 || c->streamIdx >= format->nb_streams) {
       REJECT_ERROR_RETURN("Stream index is out of bounds for the given format.",
         BEAMCODER_ERROR_OUT_OF_BOUNDS);
     }
-    // TODO
+    c->params = format->streams[c->streamIdx]->codecpar;
+    c->codecName = (char*) avcodec_get_name(c->params->codec_id);
+    c->codecNameLen = strlen(c->codecName);
     goto create;
   }
 

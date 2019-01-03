@@ -24,13 +24,14 @@ const { beamcoder } = require('../index.js');
 async function run() {
   let format = await beamcoder.format('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
   console.log(format.streams[1]);
-  let decoder = await beamcoder.decoder({ name: 'pcm_s24le' });
+  let decoder = await beamcoder.decoder({ format: format, stream : 1 });
+  console.log(decoder);
   for ( let x = 0 ; x < 100 ; x++ ) {
     let packet = await format.readFrame();
     if (packet.stream == 1) {
       //console.log(packet);
       let frames = await decoder.decode(packet);
-      console.log(frames[0]);
+      console.log(frames.frames);
     }
   }
 }
