@@ -43,6 +43,8 @@ void encoderFinalizer(napi_env env, void* data, void* hint);
 
 struct encoderCarrier : carrier {
   AVCodecContext* encoder;
+  char* codecName;
+  size_t codecNameLen = 0;
   ~encoderCarrier() {
     if (encoder != nullptr) {
       avcodec_close(encoder);

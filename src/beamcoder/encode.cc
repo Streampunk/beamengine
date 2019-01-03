@@ -23,7 +23,26 @@
 
 void encoderExecute(napi_env env, void* data) {
   encoderCarrier* c = (encoderCarrier*) data;
-  printf("Executing encoder creation.\n");
+  const AVCodec* codec = nullptr;
+  int ret;
+
+  codec = avcodec_find_decoder_by_name(c->codecName);
+  if (codec == nullptr) {
+    c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
+    c->errorMsg = "Failed to find an encoder from it's name.";
+    return;
+  }
+  c->encoder = avcodec_alloc_context3(codec);
+  if (c->encoder == nullptr) {
+    c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
+    c->errorMsg = "Problem allocating encoder context.";
+    return;
+  }
+  if ((ret = avcodec_open2(c->encoder, codec, nullptr))) {
+    c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
+    c->errorMsg = avErrorMsg("Problem allocating encoder: ", ret);
+    return;
+  }
 };
 
 void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {
@@ -61,10 +80,58 @@ napi_value encoder(napi_env env, napi_callback_info info) {
   napi_value resourceName, promise, value;
   napi_valuetype type;
   encoderCarrier* c = new encoderCarrier;
-  bool isArray;
+  bool isArray, hasName, hasID;
+  AVCodecID id;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  REJECT_RETURN;
+
+  if (argc != 1) {
+    REJECT_ERROR_RETURN("Encoder requires a single options object.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->status = napi_typeof(env, args[0], &type);
+  REJECT_RETURN;
+  c->status = napi_is_array(env, args[0], &isArray);
+  REJECT_RETURN;
+  if ((type != napi_object) || (isArray == true)) {
+    REJECT_ERROR_RETURN("Encoder must be configured with a single parameter, an options object.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->status = napi_has_named_property(env, args[0], "name", &hasName);
+  REJECT_RETURN;
+  c->status = napi_has_named_property(env, args[0], "codecID", &hasID);
+  REJECT_RETURN;
+
+  if (!(hasName || hasID)) {
+    REJECT_ERROR_RETURN("Decoder must be identified with a 'codecID' or a 'name'.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  if (hasName) {
+    c->status = napi_get_named_property(env, args[0], "name", &value);
+    REJECT_RETURN;
+    c->codecName = (char*) malloc(sizeof(char) * (c->codecNameLen + 1));
+    c->status = napi_get_value_string_utf8(env, value, c->codecName,
+      64, &c->codecNameLen);
+    REJECT_RETURN;
+  }
+  else {
+    c->status = napi_get_named_property(env, args[0], "codecID", &value);
+    REJECT_RETURN;
+    c->status = napi_get_value_int32(env, value, (int32_t*) &id);
+    REJECT_RETURN;
+    c->codecName = (char*) avcodec_get_name(id);
+    c->codecNameLen = strlen(c->codecName);
+  }
 
   c->status = napi_create_string_utf8(env, "Encoder", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;

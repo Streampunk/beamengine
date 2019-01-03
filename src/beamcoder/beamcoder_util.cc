@@ -178,3 +178,85 @@ char* avErrorMsg(const char* base, int avError) {
   strcat(both, errMsg);
   return both;
 }
+
+napi_value codecToJS(napi_env env, AVCodecContext* codec) {
+  return nullptr;
+};
+
+napi_value setCodecParams(napi_env env, AVCodecContext* codec, napi_value params) {
+ return nullptr;
+};
+
+napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_create_uint32(env, value, &prop);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, prop);
+};
+
+napi_status beam_set_int32(napi_env env, napi_value target, char* name, int32_t value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_create_int32(env, value, &prop);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_set_int64(napi_env env, napi_value target, char* name, int64_t value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_create_int64(env, value, &prop);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_create_string_utf8(env, value, NAPI_AUTO_LENGTH, &prop);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_get_boolean(env, value, &prop);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, prop);
+};
+
+napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRational value) {
+  napi_status status;
+  napi_value pair, element;
+  status = napi_create_array(env, &pair);
+  if (status != napi_ok) return status;
+  status = napi_create_int32(env, value.num, &element);
+  if (status != napi_ok) return status;
+  status = napi_set_element(env, pair, 0, element);
+  if (status != napi_ok) return status;
+  status = napi_create_int32(env, value.den, &element);
+  if (status != napi_ok) return status;
+  status = napi_set_element(env, pair, 1, element);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, pair);
+};
+
+const char* beam_field_order_name(AVFieldOrder field_order) {
+  switch (field_order) {
+    case AV_FIELD_PROGRESSIVE:
+      return "progressive";
+    case AV_FIELD_TT:
+      return "top coded_first, top displayed first";
+    case AV_FIELD_BB:
+      return "bottom coded first, bottom displayed first";
+    case AV_FIELD_TB:
+      return "top coded first, bottom displayed first";
+    case AV_FIELD_BT:
+      return "bottom coded first, top displayed first";
+    default:
+    case AV_FIELD_UNKNOWN:
+      return "unknown";
+  }
+};

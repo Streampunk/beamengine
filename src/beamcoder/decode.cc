@@ -25,6 +25,8 @@ void decoderExecute(napi_env env, void* data) {
   decoderCarrier* c = (decoderCarrier*) data;
   const AVCodec* codec = nullptr;
   int ret;
+  AVDictionary* dict = nullptr;
+  // AVDictionaryEntry* entry = nullptr;
 
   codec = avcodec_find_decoder_by_name(c->codecName);
   if (codec == nullptr) {
@@ -43,7 +45,8 @@ void decoderExecute(napi_env env, void* data) {
       printf("DEBUG: Failed to set context parameters from those provided.");
     }
   }
-  if ((ret = avcodec_open2(c->decoder, codec, nullptr))) {
+
+  if ((ret = avcodec_open2(c->decoder, codec, &dict))) {
     c->status = BEAMCODER_ERROR_ALLOC_DECODER;
     c->errorMsg = avErrorMsg("Problem allocating decoder: ", ret);
     return;
@@ -162,7 +165,7 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   }
 
   if (!(hasName || hasID)) {
-    REJECT_ERROR_RETURN("Decoder must be identified with a 'codecID' or a 'codecName'.",
+    REJECT_ERROR_RETURN("Decoder must be identified with a 'codecID' or a 'name'.",
       BEAMCODER_INVALID_ARGS);
   }
 
@@ -172,7 +175,6 @@ napi_value decoder(napi_env env, napi_callback_info info) {
     c->codecName = (char*) malloc(sizeof(char) * (c->codecNameLen + 1));
     c->status = napi_get_value_string_utf8(env, value, c->codecName,
       64, &c->codecNameLen);
-    printf("Codec name is %s AV_CODEC_ID_H264 = %i\n", c->codecName,  AV_CODEC_ID_H264);
     REJECT_RETURN;
   }
   else {

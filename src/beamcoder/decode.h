@@ -28,6 +28,7 @@
 extern "C" {
   #include <libavcodec/avcodec.h>
   #include <libavutil/pixdesc.h>
+  #include <libavutil/opt.h>
   #include <libavformat/avformat.h>
 }
 

@@ -30,6 +30,7 @@
 
 extern "C" {
   #include <libavutil/error.h>
+  #include <libavcodec/avcodec.h>
 }
 
 #define DECLARE_NAPI_METHOD(name, func) { name, 0, func, 0, 0, 0, napi_default, 0 }
@@ -62,6 +63,7 @@ napi_status checkArgs(napi_env env, napi_callback_info info, char* methodName,
 #define BEAMCODER_ERROR_ENOMEM 5007
 #define BEAMCODER_ERROR_DECODE 5008
 #define BEAMCODER_ERROR_OUT_OF_BOUNDS 5009
+#define BEAMCODER_ERROR_ALLOC_ENCODER 5010
 #define BEAMCODER_SUCCESS 0
 
 struct carrier {
@@ -106,5 +108,17 @@ int32_t rejectStatus(napi_env env, carrier* c, char* file, int32_t line);
 
 napi_value nop(napi_env env, napi_callback_info info);
 char* avErrorMsg(const char* base, int avErrorCode);
+
+napi_value codecToJS(napi_env env, AVCodecContext* codec);
+napi_value setCodecParams(napi_env env, AVCodecContext* codec, napi_value params);
+
+napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value);
+napi_status beam_set_int32(napi_env env, napi_value target, char* name, int32_t value);
+napi_status beam_set_int64(napi_env env, napi_value target, char* name, int64_t value);
+napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value);
+napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool value);
+napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRational value);
+
+const char* beam_field_order_name(AVFieldOrder field_order);
 
 #endif // BEAMCODER_UTIL_H
