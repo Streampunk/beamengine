@@ -180,9 +180,7 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
 
     char codecTag[64];
     av_get_codec_tag_string(codecTag, 64, codec->codec_tag);
-    c->status = napi_create_string_utf8(env, codecTag, NAPI_AUTO_LENGTH, &subprop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, prop, "codec_tag", subprop);
+    c->status = beam_set_string_utf8(env, prop, "codec_tag", codecTag);
     REJECT_STATUS;
 
     if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {

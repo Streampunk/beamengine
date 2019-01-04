@@ -83,7 +83,7 @@ napi_status checkArgs(napi_env env, napi_callback_info info, char* methodName,
 
   size_t realArgc = argc;
   status = napi_get_cb_info(env, info, &realArgc, args, nullptr, nullptr);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
 
   if (realArgc != argc) {
     char errorMsg[100];
@@ -96,7 +96,7 @@ napi_status checkArgs(napi_env env, napi_callback_info info, char* methodName,
   napi_valuetype t;
   for ( size_t x = 0 ; x < argc ; x++ ) {
     status = napi_typeof(env, args[x], &t);
-    if (status != napi_ok) return status;
+    PASS_STATUS;
     if (t != types[x]) {
       char errorMsg[100];
       sprintf(errorMsg, "For method %s argument %zu, expected type %s and got %s.",
@@ -179,59 +179,159 @@ char* avErrorMsg(const char* base, int avError) {
   return both;
 }
 
-napi_value codecToJS(napi_env env, AVCodecContext* codec) {
-  return nullptr;
+napi_status getPropsFromCodec(napi_env env, napi_value target,
+    AVCodecContext* codec, bool encoding) {
+  napi_status status;
+
+  status = beam_set_int32(env, target, "codec_id", codec->codec_id);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, target, "name", (char*) codec->codec->name);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, target, "long_name", (char*) codec->codec->long_name);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, target, "codec_type",
+    (char*) av_get_media_type_string(codec->codec_type));
+  PASS_STATUS;
+  char codecTag[64];
+  av_get_codec_tag_string(codecTag, 64, codec->codec_tag);
+  status = beam_set_string_utf8(env, target, "codec_tag", codecTag);
+  PASS_STATUS;
+  // TODO consider priv_data
+  // Choosing to ignore internal
+  // Choosing to ignore opaque
+  status = beam_set_int64(env, target, "bit_rate", codec->bit_rate);
+  PASS_STATUS;
+  if (encoding) {
+    status = beam_set_int32(env, target, "bit_rate_tolerance", codec->bit_rate_tolerance);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_set_int32(env, target, "global_quality", codec->global_quality);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_set_int32(env, target, "compression_level", codec->compression_level);
+    PASS_STATUS;
+  }
+
+
+  return napi_ok;
 };
 
-napi_value setCodecParams(napi_env env, AVCodecContext* codec, napi_value params) {
- return nullptr;
+napi_status setCodecFromProps(napi_env env, AVCodecContext* codec, napi_value props) {
+  napi_status status;
+  napi_value value;
+
+  status = napi_get_named_property(env, props, "bit_rate", &value);
+  PASS_STATUS;
+  status = napi_get_value_int64(env, value, &codec->bit_rate);
+  ACCEPT_STATUS(napi_number_expected);
+
+  return napi_ok;
 };
 
 napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value) {
   napi_status status;
   napi_value prop;
   status = napi_create_uint32(env, value, &prop);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, prop);
 };
+
+napi_status beam_get_uint32(napi_env env, napi_value target, char* name, uint32_t* value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_get_named_property(env, target, name, &prop);
+  PASS_STATUS;
+  status = napi_get_value_uint32(env, prop, value);
+  ACCEPT_STATUS(napi_number_expected);
+  return napi_ok;
+}
 
 napi_status beam_set_int32(napi_env env, napi_value target, char* name, int32_t value) {
   napi_status status;
   napi_value prop;
   status = napi_create_int32(env, value, &prop);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_get_int32(napi_env env, napi_value target, char* name, int32_t* value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_get_named_property(env, target, name, &prop);
+  PASS_STATUS;
+  status = napi_get_value_int32(env, prop, value);
+  ACCEPT_STATUS(napi_number_expected);
+  return napi_ok;
 }
 
 napi_status beam_set_int64(napi_env env, napi_value target, char* name, int64_t value) {
   napi_status status;
   napi_value prop;
   status = napi_create_int64(env, value, &prop);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_get_int64(napi_env env, napi_value target, char* name, int64_t* value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_get_named_property(env, target, name, &prop);
+  PASS_STATUS;
+  status = napi_get_value_int64(env, prop, value);
+  ACCEPT_STATUS(napi_number_expected);
+  return napi_ok;
 }
 
 napi_status beam_set_double(napi_env env, napi_value target, char* name, double value) {
   napi_status status;
   napi_value prop;
   status = napi_create_double(env, value, &prop);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_get_double(napi_env env, napi_value target, char* name, double* value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_get_named_property(env, target, name, &prop);
+  PASS_STATUS;
+  status = napi_get_value_double(env, prop, value);
+  ACCEPT_STATUS(napi_number_expected);
+  return napi_ok;
 }
 
 napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value) {
   napi_status status;
   napi_value prop;
   status = napi_create_string_utf8(env, value, NAPI_AUTO_LENGTH, &prop);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, prop);
+}
+
+napi_status beam_get_string_utf8(napi_env env, napi_value target, char* name, char** value) {
+  napi_status status;
+  napi_value prop;
+  char* str;
+  size_t len;
+  status = napi_get_named_property(env, target, name, &prop);
+  PASS_STATUS;
+  status = napi_get_value_string_utf8(env, prop, nullptr, 0, &len);
+  if (status == napi_string_expected) return napi_ok;
+  PASS_STATUS;
+  str = (char*) malloc((len + 1) * sizeof(char));
+  status = napi_get_value_string_utf8(env, prop, str, len + 1, &len);
+  PASS_STATUS;
+  *value = str;
+  return napi_ok;
 }
 
 napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool value) {
   napi_status status;
   napi_value prop;
   status = napi_get_boolean(env, value, &prop);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, prop);
 };
 
@@ -239,15 +339,15 @@ napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRat
   napi_status status;
   napi_value pair, element;
   status = napi_create_array(env, &pair);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   status = napi_create_int32(env, value.num, &element);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   status = napi_set_element(env, pair, 0, element);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   status = napi_create_int32(env, value.den, &element);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   status = napi_set_element(env, pair, 1, element);
-  if (status != napi_ok) return status;
+  PASS_STATUS;
   return napi_set_named_property(env, target, name, pair);
 };
 

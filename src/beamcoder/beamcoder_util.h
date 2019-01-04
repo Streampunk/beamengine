@@ -39,6 +39,7 @@ extern "C" {
 #define CHECK_STATUS if (checkStatus(env, status, __FILE__, __LINE__ - 1) != napi_ok) return nullptr
 #define CHECK_BAIL if (checkStatus(env, status, __FILE__, __LINE__ - 1) != napi_ok) goto bail
 #define PASS_STATUS if (status != napi_ok) return status
+#define ACCEPT_STATUS(s) if ((status != s) && (status != napi_ok)) return status
 
 napi_status checkStatus(napi_env env, napi_status status,
   const char * file, uint32_t line);
@@ -109,8 +110,9 @@ int32_t rejectStatus(napi_env env, carrier* c, char* file, int32_t line);
 napi_value nop(napi_env env, napi_callback_info info);
 char* avErrorMsg(const char* base, int avErrorCode);
 
-napi_value codecToJS(napi_env env, AVCodecContext* codec);
-napi_value setCodecParams(napi_env env, AVCodecContext* codec, napi_value params);
+napi_status getPropsFromCodec(napi_env env, napi_value value,
+    AVCodecContext* codec, bool encoding);
+napi_status setCodecFromProps(napi_env env, AVCodecContext* codec, napi_value params);
 
 napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value);
 napi_status beam_set_int32(napi_env env, napi_value target, char* name, int32_t value);

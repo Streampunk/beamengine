@@ -45,12 +45,6 @@ void decoderExecute(napi_env env, void* data) {
       printf("DEBUG: Failed to set context parameters from those provided.");
     }
   }
-
-  if ((ret = avcodec_open2(c->decoder, codec, &dict))) {
-    c->status = BEAMCODER_ERROR_ALLOC_DECODER;
-    c->errorMsg = avErrorMsg("Problem allocating decoder: ", ret);
-    return;
-  }
 }
 
 void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
@@ -65,6 +59,8 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
+
+  setCodecFromProps(env, c->decoder, result);
 
   c->status = beam_set_string_utf8(env, result, "type", "decoder");
   REJECT_STATUS;
@@ -223,9 +219,12 @@ void decodeExecute(napi_env env, void* data) {
         c->errorMsg = "The decoder has been flushed, and no new packets can be sent to it.";
         return;
       case AVERROR(EINVAL):
-        c->status = BEAMCODER_ERROR_EINVAL;
-        c->errorMsg = "The decoder has not been opened.";
-        return;
+        if ((ret = avcodec_open2(c->decoder, c->decoder->codec, nullptr))) {
+          c->status = BEAMCODER_ERROR_ALLOC_DECODER;
+          c->errorMsg = avErrorMsg("Problem opening decoder: ", ret);
+          return;
+        }
+        goto bump;
       case AVERROR(ENOMEM):
         c->status = BEAMCODER_ERROR_ENOMEM;
         c->errorMsg = "Failed to add packet to internal queue.";
@@ -321,7 +320,12 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
       c->status = beam_set_string_utf8(env, frame, "pict_type", pt);
       REJECT_STATUS;
 
-      c->status = beam_set_bool(env, frame, "interlacedFrame", item->interlaced_frame != 0);
+      if (item->sample_aspect_ratio.num != 0) {
+        c->status = beam_set_rational(env, frame, "sample_aspect_ratio", item->sample_aspect_ratio);
+        REJECT_STATUS;
+      }
+
+      c->status = beam_set_bool(env, frame, "interlaced_frame", item->interlaced_frame != 0);
       REJECT_STATUS;
       if (item->interlaced_frame) {
         c->status = beam_set_bool(env, frame, "top_field_first", item->top_field_first != 0);
