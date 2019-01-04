@@ -115,6 +115,7 @@ napi_value setCodecParams(napi_env env, AVCodecContext* codec, napi_value params
 napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value);
 napi_status beam_set_int32(napi_env env, napi_value target, char* name, int32_t value);
 napi_status beam_set_int64(napi_env env, napi_value target, char* name, int64_t value);
+napi_status beam_set_double(napi_env env, napi_value target, char* name, double value);
 napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value);
 napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool value);
 napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRational value);

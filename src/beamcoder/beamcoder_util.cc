@@ -211,6 +211,14 @@ napi_status beam_set_int64(napi_env env, napi_value target, char* name, int64_t 
   return napi_set_named_property(env, target, name, prop);
 }
 
+napi_status beam_set_double(napi_env env, napi_value target, char* name, double value) {
+  napi_status status;
+  napi_value prop;
+  status = napi_create_double(env, value, &prop);
+  if (status != napi_ok) return status;
+  return napi_set_named_property(env, target, name, prop);
+}
+
 napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value) {
   napi_status status;
   napi_value prop;

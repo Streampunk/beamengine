@@ -69,12 +69,12 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
-  c->status = beam_set_string_utf8(env, result, "type", "format");
+  c->status = beam_set_string_utf8(env, result, "type", "formatContext");
   REJECT_STATUS;
 
   c->status = napi_create_object(env, &value);
   REJECT_STATUS;
-  c->status = beam_set_string_utf8(env, value, "type", "container");
+  c->status = beam_set_string_utf8(env, value, "type", "inputFormat");
   REJECT_STATUS;
   if (c->format->iformat->name != nullptr) {
     c->status = beam_set_string_utf8(env, value, "name", (char*) c->format->iformat->name);
@@ -88,7 +88,7 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
     c->status = beam_set_string_utf8(env, value, "mime_type", (char*) c->format->iformat->mime_type);
     REJECT_STATUS;
   }
-  c->status = napi_set_named_property(env, result, "container", value);
+  c->status = napi_set_named_property(env, result, "iformat", value);
   REJECT_STATUS;
 
   c->status = napi_create_array(env, &value);
@@ -157,7 +157,7 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
 
     c->status = napi_create_object(env, &prop);
     REJECT_STATUS;
-    c->status = beam_set_string_utf8(env, prop, "type", "codec");
+    c->status = beam_set_string_utf8(env, prop, "type", "codecParameters");
     REJECT_STATUS;
 
     c->status = beam_set_string_utf8(env, prop, "codec_type",
@@ -241,54 +241,38 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
         REJECT_STATUS;
       }
 
-      c->status = napi_create_int32(env, codec->channels, &subprop);
+      c->status = beam_set_int32(env, prop, "channels", codec->channels);
       REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "channels", subprop);
+      c->status = beam_set_int32(env, prop, "sample_rate", codec->sample_rate);
       REJECT_STATUS;
-
-      c->status = napi_create_int32(env, codec->sample_rate, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "sample_rate", subprop);
-      REJECT_STATUS;
-
-      c->status = napi_create_int32(env, codec->block_align, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "block_align", subprop);
+      c->status = beam_set_int32(env, prop, "block_align", codec->block_align);
       REJECT_STATUS;
 
       if (codec->channel_layout != 0) {
         char cl[64];
         av_get_channel_layout_string(cl, 64, codec->channels, codec->channel_layout);
-        c->status = napi_create_string_utf8(env, cl, NAPI_AUTO_LENGTH, &subprop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, prop, "channe_layout", subprop);
+        c->status = beam_set_string_utf8(env, prop, "channel_layout", cl);
         REJECT_STATUS;
       }
     } // Audio-only properties
 
-    c->status = napi_create_int32(env, codec->bit_rate, &subprop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, prop, "bit_rate", subprop);
+    c->status = beam_set_int32(env, prop, "bit_rate", codec->bit_rate);
     REJECT_STATUS;
 
     if (codec->profile >= 0) {
       const char* profileName = avcodec_profile_name(codec->codec_id, codec->profile);
       if (profileName != nullptr) {
-        c->status = napi_create_string_utf8(env, profileName, NAPI_AUTO_LENGTH, &subprop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, prop, "profile", subprop);
+        c->status = beam_set_string_utf8(env, prop, "profile", (char*) profileName);
         REJECT_STATUS;
       }
     }
 
     if (codec->level >= 0) {
-      c->status = napi_create_int32(env, codec->level, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "level", subprop);
+      c->status = beam_set_int32(env, prop, "level", codec->level);
       REJECT_STATUS;
     }
 
-    c->status = napi_set_named_property(env, item, "codec", prop);
+    c->status = napi_set_named_property(env, item, "codecpar", prop);
     REJECT_STATUS;
 
     c->status = napi_set_element(env, value, stream->index, item);
@@ -300,27 +284,18 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &prop);
   REJECT_STATUS;
   while ((tag = av_dict_get(c->format->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-    c->status = napi_create_string_utf8(env, tag->value, NAPI_AUTO_LENGTH, &subprop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, prop, tag->key, subprop);
+    c->status = beam_set_string_utf8(env, prop, tag->key, tag->value);
     REJECT_STATUS;
   }
   c->status = napi_set_named_property(env, result, "metadata", prop);
   REJECT_STATUS;
 
-  c->status = napi_create_double(env, (double) c->format->start_time / AV_TIME_BASE, &prop);
+  c->status = beam_set_int64(env, result, "start_time", c->format->start_time);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "start_time", prop);
-  REJECT_STATUS;
-
-  c->status = napi_create_double(env, (double) c->format->duration / AV_TIME_BASE, &prop);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "duration", prop);
+  c->status = beam_set_int64(env, result, "duration", c->format->duration);
   REJECT_STATUS;
 
-  c->status = napi_create_int32(env, c->format->bit_rate, &prop);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "bit_rate", prop);
+  c->status = beam_set_int32(env, result, "bit_rate", c->format->bit_rate);
   REJECT_STATUS;
 
   if (c->format->start_time_realtime != AV_NOPTS_VALUE) {
@@ -333,20 +308,15 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "start_time_realtime", prop);
   REJECT_STATUS;
 
-  c->status = napi_create_uint32(env, c->format->packet_size, &prop);
+  c->status = beam_set_uint32(env, result, "packet_size", c->format->packet_size);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "packet_size", prop);
-  REJECT_STATUS;
-
-  c->status = napi_create_uint32(env, c->format->max_delay, &prop);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "max_delay", prop);
+  c->status = beam_set_uint32(env, result, "max_delay", c->format->max_delay);
   REJECT_STATUS;
 
   c->status = napi_create_external(env, c->format, formatFinalizer, nullptr, &prop);
   REJECT_STATUS;
   c->format = nullptr;
-  c->status = napi_set_named_property(env, result, "_format", prop);
+  c->status = napi_set_named_property(env, result, "_formatContext", prop);
   REJECT_STATUS;
 
   c->status = napi_create_function(env, "readFrame", NAPI_AUTO_LENGTH, readFrame,
@@ -441,14 +411,9 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
-  c->status = napi_create_string_utf8(env, "packet", NAPI_AUTO_LENGTH, &value);
+  c->status = beam_set_string_utf8(env,  result, "type", "packet");
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "type", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_int32(env, c->packet->stream_index, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "stream", value);
+  c->status = beam_set_int32(env, result, "stream", c->packet->stream_index);
   REJECT_STATUS;
 
   // TODO convert to use BigInts when more stable in Javascript
@@ -462,19 +427,11 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "pts", value);
   REJECT_STATUS;
 
-  c->status = napi_create_int64(env, c->packet->dts, &value);
+  c->status = beam_set_int64(env, result, "dts", c->packet->dts);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "dts", value);
+  c->status = beam_set_int32(env, result, "size", c->packet->size);
   REJECT_STATUS;
-
-  c->status = napi_create_int32(env, c->packet->size, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "size", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_int64(env, c->packet->duration, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "duration", value);
+  c->status = beam_set_int64(env, result, "duration", c->packet->duration);
   REJECT_STATUS;
 
   if (c->packet->pos >= 0) {
@@ -487,20 +444,20 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "pos", value);
   REJECT_STATUS;
 
-  c->status = napi_get_boolean(env, (c->packet->flags & AV_PKT_FLAG_KEY) != 0, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "key", value);
-  REJECT_STATUS;
-
-  c->status = napi_get_boolean(env, (c->packet->flags & AV_PKT_FLAG_KEY) != 0, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "key", value);
+  c->status = beam_set_bool(env, result, "key", (c->packet->flags & AV_PKT_FLAG_KEY) != 0);
   REJECT_STATUS;
 
   if ((c->packet->flags & AV_PKT_FLAG_CORRUPT) != 0) {
     c->status = napi_get_boolean(env, true, &value);
     REJECT_STATUS;
     c->status = napi_set_named_property(env, result, "corrupt", value);
+    REJECT_STATUS;
+  }
+
+  if ((c->packet->flags & AV_PKT_FLAG_DISCARD) != 0) {
+    c->status = napi_get_boolean(env, true, &value);
+    REJECT_STATUS;
+    c->status = napi_set_named_property(env, result, "discard", value);
     REJECT_STATUS;
   }
 
@@ -536,7 +493,7 @@ napi_value readFrame(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   c->status = napi_get_cb_info(env, info, &argc, nullptr, &formatJS, nullptr);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
+  c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, formatExt, (void**) &c->format);
   REJECT_RETURN;
@@ -627,7 +584,7 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
 
   c->status = napi_get_cb_info(env, info, &argc, argv, &formatJS, nullptr);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
+  c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, formatExt, (void**) &c->format);
   REJECT_RETURN;

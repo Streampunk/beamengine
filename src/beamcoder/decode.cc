@@ -66,9 +66,7 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
-  c->status = napi_create_string_utf8(env, "decoder", NAPI_AUTO_LENGTH, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "type", value);
+  c->status = beam_set_string_utf8(env, result, "type", "decoder");
   REJECT_STATUS;
 
   c->status = napi_create_string_utf8(env, avcodec_get_name(c->decoder->codec_id),
@@ -145,7 +143,7 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   if (hasFormat && hasStream) {
     c->status = napi_get_named_property(env, args[0], "format", &formatJS);
     REJECT_RETURN;
-    c->status = napi_get_named_property(env, formatJS, "_format", &formatExt);
+    c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
     REJECT_RETURN;
     c->status = napi_get_value_external(env, formatExt, (void**) &format);
     REJECT_RETURN;
@@ -268,6 +266,9 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
+  c->status = beam_set_string_utf8(env, result, "type", "frames");
+  REJECT_STATUS;
+
   c->status = napi_create_array(env, &frames);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "frames", frames);
@@ -275,47 +276,28 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   uint32_t frameCount = 0;
   for ( auto it = c->frames.begin() ; it != c->frames.end() ; it++ ) {
+    AVFrame* item = *it;
     c->status = napi_create_object(env, &frame);
     REJECT_STATUS;
-    AVFrame* item = *it;
 
-    c->status = napi_create_string_utf8(env, "frame", NAPI_AUTO_LENGTH, &prop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "type", prop);
+    c->status = beam_set_string_utf8(env, frame, "type", "frame");
     REJECT_STATUS;
 
-    c->status = napi_create_string_utf8(env, av_get_media_type_string(c->decoder->codec_type),
-      NAPI_AUTO_LENGTH, &prop);
+    c->status = beam_set_string_utf8(env, frame,
+      "media_type", (char*) av_get_media_type_string(c->decoder->codec_type));
     REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "mediaType", prop);
+    c->status = beam_set_int64(env, frame, "pts", item->pts);
     REJECT_STATUS;
-
-    c->status = napi_create_int64(env, item->pts, &prop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "pts", prop);
-    REJECT_STATUS;
-
-    c->status = napi_create_int64(env, item->pkt_dts, &prop);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, frame, "pktDts", prop);
+    c->status = beam_set_int64(env, frame, "pkt_dts", item->pkt_dts);
     REJECT_STATUS;
 
     if (c->decoder->codec_type == AVMEDIA_TYPE_VIDEO) {
-      c->status = napi_create_int32(env, item->width, &prop);
+      c->status = beam_set_int32(env, frame, "width", item->width);
       REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "width", prop);
+      c->status = beam_set_int32(env, frame, "height", item->height);
       REJECT_STATUS;
-
-      c->status = napi_create_int32(env, item->height, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "height", prop);
-      REJECT_STATUS;
-
-      c->status = napi_create_string_utf8(env,
-        av_get_pix_fmt_name((AVPixelFormat) item->format),
-        NAPI_AUTO_LENGTH, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "format", prop);
+      c->status = beam_set_string_utf8(env, frame, "format",
+        (char*) av_get_pix_fmt_name((AVPixelFormat) item->format));
       REJECT_STATUS;
 
       c->status = napi_create_array(env, &prop);
@@ -330,79 +312,68 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
       c->status = napi_set_named_property(env, frame, "linesize", prop);
       REJECT_STATUS;
 
-      c->status = napi_get_boolean(env, item->key_frame == 1, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "keyFrame", prop);
+      c->status = beam_set_bool(env, frame, "key_frame", item->key_frame == 1);
       REJECT_STATUS;
 
       char pt[2];
       pt[0] = av_get_picture_type_char(item->pict_type);
       pt[1] = '\0';
-      c->status = napi_create_string_utf8(env, pt, NAPI_AUTO_LENGTH, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "pictType", prop);
+      c->status = beam_set_string_utf8(env, frame, "pict_type", pt);
       REJECT_STATUS;
 
-      c->status = napi_get_boolean(env, item->interlaced_frame != 0, &prop);
+      c->status = beam_set_bool(env, frame, "interlacedFrame", item->interlaced_frame != 0);
       REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "interlacedFrame", prop);
-      REJECT_STATUS;
-
       if (item->interlaced_frame) {
-        c->status = napi_get_boolean(env, item->top_field_first != 0, &prop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, frame, "topFieldFirst", prop);
+        c->status = beam_set_bool(env, frame, "top_field_first", item->top_field_first != 0);
         REJECT_STATUS;
       }
 
       if (item->coded_picture_number > 0) {
-        c->status = napi_create_int32(env, item->coded_picture_number, &prop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, frame, "codedPictureNumber", prop);
+        c->status = beam_set_int32(env,  frame, "coded_picture_number", item->coded_picture_number);
         REJECT_STATUS;
       }
-
       if (item->display_picture_number > 0) {
-        c->status = napi_create_int32(env, item->display_picture_number, &prop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, frame, "displayPictureNumber", prop);
+        c->status = beam_set_int32(env, frame, "display_picture_number", item->display_picture_number);
         REJECT_STATUS;
       }
-
+      if (item->crop_top > 0) {
+        c->status = beam_set_int64(env, frame, "crop_top", item->crop_top);
+        REJECT_STATUS;
+      }
+      if (item->crop_bottom > 0) {
+        c->status = beam_set_int64(env, frame, "crop_bottom", item->crop_bottom);
+        REJECT_STATUS;
+      }
+      if (item->crop_left > 0) {
+        c->status = beam_set_int64(env, frame, "crop_left", item->crop_left);
+        REJECT_STATUS;
+      }
+      if (item->crop_right > 0) {
+        c->status = beam_set_int64(env, frame, "crop_right", item->crop_right);
+        REJECT_STATUS;
+      }
     } // Media type video
 
     if (c->decoder->codec_type == AVMEDIA_TYPE_AUDIO) {
-      c->status = napi_create_int32(env, item->nb_samples, &prop);
+      c->status = beam_set_int32(env, frame, "nb_samples", item->nb_samples);
       REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "nbSamples", prop);
-      REJECT_STATUS;
-
-      c->status = napi_create_int32(env, item->sample_rate, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "sampleRate", prop);
+      c->status = beam_set_int32(env, frame, "sample_rate", item->sample_rate);
       REJECT_STATUS;
 
-      c->status = napi_create_string_utf8(env,
-        av_get_sample_fmt_name((AVSampleFormat) item->format),
-        NAPI_AUTO_LENGTH, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "format", prop);
+      c->status = beam_set_string_utf8(env, frame, "format",
+        (char*) av_get_sample_fmt_name((AVSampleFormat) item->format));
       REJECT_STATUS;
 
       if (item->channel_layout != 0) {
         char cl[64];
         av_get_channel_layout_string(cl, 64, c->decoder->channels, item->channel_layout);
-        c->status = napi_create_string_utf8(env, cl, NAPI_AUTO_LENGTH, &prop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, frame, "channelLayout", prop);
+        c->status = beam_set_string_utf8(env, frame, "channel_layout", (char*) cl);
         REJECT_STATUS;
       }
     }
 
     if (item->quality != 0) {
-      c->status = napi_create_int32(env, item->quality, &prop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, frame, "quality", prop);
+      c->status = beam_set_int32(env, frame, "quality", item->quality);
       REJECT_STATUS;
     }
 
