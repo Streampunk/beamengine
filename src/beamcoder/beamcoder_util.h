@@ -30,6 +30,7 @@
 
 extern "C" {
   #include <libavutil/error.h>
+  #include <libavutil/pixdesc.h>
   #include <libavcodec/avcodec.h>
 }
 

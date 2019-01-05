@@ -385,6 +385,21 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
       status = beam_set_int32(env, target, "coded_height", codec->coded_height);
       PASS_STATUS;
     }
+    status = beam_set_string_utf8(env, target, "pix_fmt",
+      (char*) av_get_pix_fmt_name(codec->pix_fmt));
+    PASS_STATUS;
+    if (encoding) {
+      status = beam_set_int32(env, target, "max_b_frames", codec->max_b_frames);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "b_quant_factor", codec->b_quant_factor);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "b_quant_offset", codec->b_quant_offset);
+      PASS_STATUS;
+    }
   } // Video-only parameters
 
   return napi_ok;
@@ -656,6 +671,30 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       status = beam_get_int32(env, props, "coded_height", &codec->coded_height);
       PASS_STATUS;
     }
+    char* pixFmtName;
+    status = beam_get_string_utf8(env, props, "pix_fmt", &pixFmtName);
+    PASS_STATUS;
+    codec->pix_fmt = av_get_pix_fmt((const char *) pixFmtName);
+    if (encoding) {
+      status = beam_get_int32(env, props, "max_b_frames", &codec->max_b_frames);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      double bQuantFactor = -87654321.0;
+      status = beam_get_double(env, props, "b_quant_factor", &bQuantFactor);
+      PASS_STATUS;
+      if (bQuantFactor != -87654321.0) {
+        codec->b_quant_factor = (float) bQuantFactor;
+      }
+    }
+    if (encoding) {
+      double bQuantOffset = -87654321.0;
+      status = beam_get_double(env, props, "b_quant_offset", &bQuantOffset);
+      PASS_STATUS;
+      if (bQuantOffset != -87654321.0) {
+        codec->b_quant_offset = (float) bQuantOffset;
+      }
+    }
   } // Video-only parameters
 
   return napi_ok;
@@ -736,8 +775,13 @@ napi_status beam_get_double(napi_env env, napi_value target, char* name, double*
 napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value) {
   napi_status status;
   napi_value prop;
-  status = napi_create_string_utf8(env, value, NAPI_AUTO_LENGTH, &prop);
-  PASS_STATUS;
+  if (value == nullptr) {
+    status = napi_get_null(env, &prop);
+  }
+  else {
+    status = napi_create_string_utf8(env, value, NAPI_AUTO_LENGTH, &prop);
+  }
+  ACCEPT_STATUS(napi_string_expected);
   return napi_set_named_property(env, target, name, prop);
 }
 
