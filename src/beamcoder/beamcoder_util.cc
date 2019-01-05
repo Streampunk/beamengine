@@ -213,7 +213,179 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     status = beam_set_int32(env, target, "compression_level", codec->compression_level);
     PASS_STATUS;
   }
+  /**
+   * Allow decoders to produce frames with data planes that are not aligned
+   * to CPU requirements (e.g. due to cropping).
+   */
+  status = beam_set_bool(env, target, "UNALIGNED", (codec->flags & AV_CODEC_FLAG_UNALIGNED) != 0);
+  PASS_STATUS;
+  /**
+   * Use fixed qscale.
+   */
+  status = beam_set_bool(env, target, "QSCALE", (codec->flags & AV_CODEC_FLAG_QSCALE) != 0);
+  PASS_STATUS;
+  /**
+   * 4 MV per MB allowed / advanced prediction for H.263.
+   */
+  status = beam_set_bool(env, target, "4MV", (codec->flags & AV_CODEC_FLAG_4MV) != 0);
+  PASS_STATUS;
+  /**
+   * Output even those frames that might be corrupted.
+   */
+  status = beam_set_bool(env, target, "OUTPUT_CORRUPT", (codec->flags & AV_CODEC_FLAG_OUTPUT_CORRUPT) != 0);
+  PASS_STATUS;
+  /**
+   * Use qpel MC.
+   */
+  status = beam_set_bool(env, target, "QPEL", (codec->flags & AV_CODEC_FLAG_QPEL) != 0);
+  PASS_STATUS;
+  /**
+   * Use internal 2pass ratecontrol in first pass mode.
+   */
+  status = beam_set_bool(env, target, "PASS1", (codec->flags & AV_CODEC_FLAG_PASS1) != 0);
+  PASS_STATUS;
+  /**
+   * Use internal 2pass ratecontrol in second pass mode.
+   */
+  status = beam_set_bool(env, target, "PASS2", (codec->flags & AV_CODEC_FLAG_PASS2) != 0);
+  PASS_STATUS;
+  /**
+   * loop filter.
+   */
+  status = beam_set_bool(env, target, "LOOP_FILTER", (codec->flags & AV_CODEC_FLAG_LOOP_FILTER) != 0);
+  PASS_STATUS;
+  /**
+   * Only decode/encode grayscale.
+   */
+  status = beam_set_bool(env, target, "GRAY", (codec->flags & AV_CODEC_FLAG_GRAY) != 0);
+  PASS_STATUS;
+  /**
+   * error[?] variables will be set during encoding.
+   */
+  status = beam_set_bool(env, target, "PSNR", (codec->flags & AV_CODEC_FLAG_PSNR) != 0);
+  PASS_STATUS;
+  /**
+   * Input bitstream might be truncated at a random location
+   * instead of only at frame boundaries.
+   */
+  status = beam_set_bool(env, target, "TRUNCATED", (codec->flags & AV_CODEC_FLAG_TRUNCATED) != 0);
+  PASS_STATUS;
+  /**
+   * Use interlaced DCT.
+   */
+  status = beam_set_bool(env, target, "INTERLACED_DCT", (codec->flags & AV_CODEC_FLAG_INTERLACED_DCT) != 0);
+  PASS_STATUS;
+  /**
+   * Force low delay.
+   */
+  status = beam_set_bool(env, target, "LOW_DELAY", (codec->flags & AV_CODEC_FLAG_LOW_DELAY) != 0);
+  PASS_STATUS;
+  /**
+   * Place global headers in extradata instead of every keyframe.
+   */
+  status = beam_set_bool(env, target, "GLOBAL_HEADER", (codec->flags & AV_CODEC_FLAG_GLOBAL_HEADER) != 0);
+  PASS_STATUS;
+  /**
+   * Use only bitexact stuff (except (I)DCT).
+   */
+  status = beam_set_bool(env, target, "BITEXACT", (codec->flags & AV_CODEC_FLAG_BITEXACT) != 0);
+  PASS_STATUS;
+  /* Fx : Flag for H.263+ extra options */
+  /**
+   * H.263 advanced intra coding / MPEG-4 AC prediction
+   */
+  status = beam_set_bool(env, target, "AC_PRED", (codec->flags & AV_CODEC_FLAG_AC_PRED) != 0);
+  PASS_STATUS;
+  /**
+   * interlaced motion estimation
+   */
+  status = beam_set_bool(env, target, "INTERLACED_ME", (codec->flags & AV_CODEC_FLAG_INTERLACED_ME) != 0);
+  PASS_STATUS;
 
+  status = beam_set_bool(env, target, "CLOSED_GOP", (codec->flags & AV_CODEC_FLAG_CLOSED_GOP) != 0);
+  PASS_STATUS;
+
+  /**
+   * Allow non spec compliant speedup tricks.
+   */
+  status = beam_set_bool(env, target, "FAST", (codec->flags2 & AV_CODEC_FLAG2_FAST) != 0);
+  PASS_STATUS;
+  /**
+   * Skip bitstream encoding.
+   */
+  status = beam_set_bool(env, target, "NO_OUTPUT", (codec->flags2 & AV_CODEC_FLAG2_NO_OUTPUT) != 0);
+  PASS_STATUS;
+  /**
+   * Place global headers at every keyframe instead of in extradata.
+   */
+  status = beam_set_bool(env, target, "LOCAL_HEADER", (codec->flags2 & AV_CODEC_FLAG2_LOCAL_HEADER) != 0);
+  PASS_STATUS;
+
+  /**
+   * timecode is in drop frame format. DEPRECATED!!!!
+   */
+  status = beam_set_bool(env, target, "DROP_FRAME_TIMECODE", (codec->flags2 & AV_CODEC_FLAG2_DROP_FRAME_TIMECODE) != 0);
+  PASS_STATUS;
+
+  /**
+   * Input bitstream might be truncated at a packet boundaries
+   * instead of only at frame boundaries.
+   */
+  status = beam_set_bool(env, target, "CHUNKS", (codec->flags2 & AV_CODEC_FLAG2_CHUNKS) != 0);
+  PASS_STATUS;
+  /**
+   * Discard cropping information from SPS.
+   */
+  status = beam_set_bool(env, target, "IGNORE_CROP", (codec->flags2 & AV_CODEC_FLAG2_IGNORE_CROP) != 0);
+  PASS_STATUS;
+
+  /**
+   * Show all frames before the first keyframe
+   */
+  status = beam_set_bool(env, target, "SHOW_ALL", (codec->flags2 & AV_CODEC_FLAG2_SHOW_ALL) != 0);
+  PASS_STATUS;
+  /**
+   * Export motion vectors through frame side data
+   */
+  status = beam_set_bool(env, target, "EXPORT_MVS", (codec->flags2 & AV_CODEC_FLAG2_EXPORT_MVS) != 0);
+  PASS_STATUS;
+  /**
+   * Do not skip samples and export skip information as frame side data
+   */
+  status = beam_set_bool(env, target, "SKIP_MANUAL", (codec->flags2 & AV_CODEC_FLAG2_SKIP_MANUAL) != 0);
+  PASS_STATUS;
+  /**
+   * Do not reset ASS ReadOrder field on flush (subtitles decoding)
+   */
+  status = beam_set_bool(env, target, "RO_FLUSH_NOOP", (codec->flags2 & AV_CODEC_FLAG2_RO_FLUSH_NOOP) != 0);
+  PASS_STATUS;
+
+  // TODO ignoring extradata (for now)
+
+  if (encoding) {
+    status = beam_set_rational(env, target, "time_base", codec->time_base);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "ticks_per_frame", codec->ticks_per_frame);
+    PASS_STATUS;
+  }
+
+  if (!(encoding && (codec->codec_type == AVMEDIA_TYPE_AUDIO))) {
+    status = beam_set_int32(env, target, "delay", codec->delay);
+    PASS_STATUS;
+  }
+
+  if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+    status = beam_set_int32(env, target, "width", codec->width);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "height", codec->height);
+    PASS_STATUS;
+    if (!encoding) {
+      status = beam_set_int32(env, target, "coded_width", codec->coded_width);
+      PASS_STATUS;
+      status = beam_set_int32(env, target, "coded_height", codec->coded_height);
+      PASS_STATUS;
+    }
+  } // Video-only parameters
 
   return napi_ok;
 };
@@ -222,6 +394,7 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     napi_value props, bool encoding) {
   napi_status status;
   napi_value value;
+  bool present, flag;
 
   status = beam_get_int64(env, props, "bit_rate", &codec->bit_rate);
   PASS_STATUS;
@@ -237,6 +410,253 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     status = beam_get_int32(env, props, "compression_level", &codec->compression_level);
     PASS_STATUS;
   }
+  /**
+   * Allow decoders to produce frames with data planes that are not aligned
+   * to CPU requirements (e.g. due to cropping).
+   */
+  status = beam_get_bool(env, props, "UNALIGNED", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_UNALIGNED :
+    codec->flags & ~AV_CODEC_FLAG_UNALIGNED; }
+  /**
+   * Use fixed qscale.
+   */
+  status = beam_get_bool(env, props, "QSCALE", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_QSCALE :
+    codec->flags & ~AV_CODEC_FLAG_QSCALE; }
+  /**
+   * 4 MV per MB allowed / advanced prediction for H.263.
+   */
+  status = beam_get_bool(env, props, "4MV", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_4MV :
+    codec->flags & ~AV_CODEC_FLAG_4MV; }
+  /**
+   * Output even those frames that might be corrupted.
+   */
+  status = beam_get_bool(env, props, "OUTPUT_CORRUPT", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_OUTPUT_CORRUPT :
+    codec->flags & ~AV_CODEC_FLAG_OUTPUT_CORRUPT; }
+  /**
+   * Use qpel MC.
+   */
+  status = beam_get_bool(env, props, "QPEL", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_QPEL :
+    codec->flags & ~AV_CODEC_FLAG_QPEL; }
+  /**
+   * Use internal 2pass ratecontrol in first pass mode.
+   */
+  status = beam_get_bool(env, props, "PASS1", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_PASS1 :
+    codec->flags & ~AV_CODEC_FLAG_PASS1; }
+  /**
+   * Use internal 2pass ratecontrol in second pass mode.
+   */
+  status = beam_get_bool(env, props, "PASS2", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_PASS2 :
+    codec->flags & ~AV_CODEC_FLAG_PASS2; }
+  /**
+   * loop filter.
+   */
+  status = beam_get_bool(env, props, "LOOP_FILTER", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_LOOP_FILTER :
+    codec->flags & ~AV_CODEC_FLAG_LOOP_FILTER; }
+  /**
+   * Only decode/encode grayscale.
+   */
+  status = beam_get_bool(env, props, "GRAY", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_GRAY :
+    codec->flags & ~AV_CODEC_FLAG_GRAY; }
+  /**
+   * error[?] variables will be set during encoding.
+   */
+  status = beam_get_bool(env, props, "PSNR", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_PSNR:
+    codec->flags & ~AV_CODEC_FLAG_PSNR; }
+  /**
+   * Input bitstream might be truncated at a random location
+   * instead of only at frame boundaries.
+   */
+  status = beam_get_bool(env, props, "TRUNCATED", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_TRUNCATED :
+    codec->flags & ~AV_CODEC_FLAG_TRUNCATED; }
+  /**
+   * Use interlaced DCT.
+   */
+  status = beam_get_bool(env, props, "INTERLACED_DCT", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_INTERLACED_DCT :
+    codec->flags & ~AV_CODEC_FLAG_INTERLACED_DCT; }
+  /**
+   * Force low delay.
+   */
+  status = beam_get_bool(env, props, "LOW_DELAY", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_LOW_DELAY :
+    codec->flags & ~AV_CODEC_FLAG_LOW_DELAY; }
+  /**
+   * Place global headers in extradata instead of every keyframe.
+   */
+  status = beam_get_bool(env, props, "GLOBAL_HEADER", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_GLOBAL_HEADER :
+    codec->flags & ~AV_CODEC_FLAG_GLOBAL_HEADER; }
+  /**
+   * Use only bitexact stuff (except (I)DCT).
+   */
+  status = beam_get_bool(env, props, "BITEXACT", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_BITEXACT :
+    codec->flags & ~AV_CODEC_FLAG_BITEXACT; }
+  /* Fx : Flag for H.263+ extra options */
+  /**
+   * H.263 advanced intra coding / MPEG-4 AC prediction
+   */
+  status = beam_get_bool(env, props, "AC_PRED", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_AC_PRED :
+    codec->flags & ~AV_CODEC_FLAG_AC_PRED; }
+  /**
+   * interlaced motion estimation
+   */
+  status = beam_get_bool(env, props, "INTERLACED_ME", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_INTERLACED_ME :
+    codec->flags & ~AV_CODEC_FLAG_INTERLACED_ME; }
+
+  status = beam_get_bool(env, props, "CLOSED_GOP", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags = (flag) ?
+    codec->flags | AV_CODEC_FLAG_CLOSED_GOP :
+    codec->flags & ~AV_CODEC_FLAG_CLOSED_GOP; }
+
+  /**
+   * Allow non spec compliant speedup tricks.
+   */
+  status = beam_get_bool(env, props, "FAST", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_FAST :
+    codec->flags2 & ~AV_CODEC_FLAG2_FAST; }
+  /**
+   * Skip bitstream encoding.
+   */
+  status = beam_get_bool(env, props, "NO_OUTPUT", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_NO_OUTPUT :
+    codec->flags2 & ~AV_CODEC_FLAG2_NO_OUTPUT; }
+  /**
+   * Place global headers at every keyframe instead of in extradata.
+   */
+  status = beam_get_bool(env, props, "LOCAL_HEADER", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_LOCAL_HEADER :
+    codec->flags2 & ~AV_CODEC_FLAG2_LOCAL_HEADER; }
+  /**
+   * timecode is in drop frame format. DEPRECATED!!!!
+   */
+  status = beam_get_bool(env, props, "DROP_FRAME_TIMECODE", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_DROP_FRAME_TIMECODE :
+    codec->flags2 & ~AV_CODEC_FLAG2_DROP_FRAME_TIMECODE; }
+  /**
+   * Input bitstream might be truncated at a packet boundaries
+   * instead of only at frame boundaries.
+   */
+  status = beam_get_bool(env, props, "CHUNKS", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_CHUNKS :
+    codec->flags2 & ~AV_CODEC_FLAG2_CHUNKS; }
+  /**
+   * Discard cropping information from SPS.
+   */
+  status = beam_get_bool(env, props, "IGNORE_CROP", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_IGNORE_CROP :
+    codec->flags2 & ~AV_CODEC_FLAG2_IGNORE_CROP; }
+  /**
+   * Show all frames before the first keyframe
+   */
+  status = beam_get_bool(env, props, "SHOW_ALL", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_SHOW_ALL :
+    codec->flags2 & ~AV_CODEC_FLAG2_SHOW_ALL; }
+  /**
+   * Export motion vectors through frame side data
+   */
+  status = beam_get_bool(env, props, "EXPORT_MVS", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_EXPORT_MVS :
+    codec->flags2 & ~AV_CODEC_FLAG2_EXPORT_MVS; }
+  /**
+   * Do not skip samples and export skip information as frame side data
+   */
+  status = beam_get_bool(env, props, "SKIP_MANUAL", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_SKIP_MANUAL :
+    codec->flags2 & ~AV_CODEC_FLAG2_SKIP_MANUAL; }
+  /**
+   * Do not reset ASS ReadOrder field on flush (subtitles decoding)
+   */
+  status = beam_get_bool(env, props, "RO_FLUSH_NOOP", &present, &flag);
+  PASS_STATUS;
+  if (present) { codec->flags2 = (flag) ?
+    codec->flags2 | AV_CODEC_FLAG2_RO_FLUSH_NOOP :
+    codec->flags2 & ~AV_CODEC_FLAG2_RO_FLUSH_NOOP; }
+
+  if (encoding) {
+    status = beam_get_rational(env, props, "time_base", &codec->time_base);
+    PASS_STATUS;
+    status = beam_get_int32(env, props, "ticks_per_frame", &codec->ticks_per_frame);
+    PASS_STATUS;
+  }
+
+  if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+    status = beam_get_int32(env, props, "width", &codec->width);
+    PASS_STATUS;
+    status = beam_get_int32(env, props, "height", &codec->height);
+    PASS_STATUS;
+    if (!encoding) {
+      status = beam_get_int32(env, props, "coded_width", &codec->coded_width);
+      PASS_STATUS;
+      status = beam_get_int32(env, props, "coded_height", &codec->coded_height);
+      PASS_STATUS;
+    }
+  } // Video-only parameters
 
   return napi_ok;
 };
@@ -346,13 +766,20 @@ napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool valu
   return napi_set_named_property(env, target, name, prop);
 }
 
-napi_status beam_get_bool(napi_env env, napi_value target, char* name, bool* value) {
+napi_status beam_get_bool(napi_env env, napi_value target, char* name, bool* present, bool* value) {
   napi_status status;
   napi_value prop;
   status = napi_get_named_property(env, target, name, &prop);
   PASS_STATUS;
   status = napi_get_value_bool(env, prop, value);
-  ACCEPT_STATUS(napi_boolean_expected);
+  if (status == napi_boolean_expected) {
+    *present = false;
+    status = napi_ok;
+  }
+  else {
+    *present = true;
+  }
+  PASS_STATUS;
   return napi_ok;
 }
 

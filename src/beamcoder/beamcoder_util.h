@@ -126,7 +126,7 @@ napi_status beam_get_double(napi_env env, napi_value target, char* name, double*
 napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, char* value);
 napi_status beam_get_string_utf8(napi_env env, napi_value target, char* name, char** value);
 napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool value);
-napi_status beam_get_bool(napi_env env, napi_value target, char* name, bool* value);
+napi_status beam_get_bool(napi_env env, napi_value target, char* name, bool* present, bool* value);
 napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRational value);
 napi_status beam_get_rational(napi_env env, napi_value target, char* name, AVRational* value);
 
