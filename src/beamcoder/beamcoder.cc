@@ -245,6 +245,31 @@ napi_value licenses(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value testSetProps(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVCodec* codec;
+  AVCodecContext* codecCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  CHECK_STATUS;
+
+  if (argc != 1) NAPI_THROW_ERROR("Arguments object must be provided.");
+
+  codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+  codecCtx = avcodec_alloc_context3(codec);
+  status = setCodecFromProps(env, codecCtx, args[0], true);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  status = getPropsFromCodec(env, result, codecCtx, true);
+  return result;
+}
+
 napi_value Init(napi_env env, napi_value exports) {
   napi_status status;
   napi_property_descriptor desc[] = {
@@ -255,9 +280,10 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("licenses", licenses),
     DECLARE_NAPI_METHOD("format", format),
     DECLARE_NAPI_METHOD("decoder", decoder),
-    DECLARE_NAPI_METHOD("encoder", encoder)
+    DECLARE_NAPI_METHOD("encoder", encoder),
+    DECLARE_NAPI_METHOD("testSetProps", testSetProps)
    };
-  status = napi_define_properties(env, exports, 8, desc);
+  status = napi_define_properties(env, exports, 9, desc);
   CHECK_STATUS;
   return exports;
 }

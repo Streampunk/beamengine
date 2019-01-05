@@ -60,7 +60,7 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
-  setCodecFromProps(env, c->decoder, result);
+  // setCodecFromProps(env, c->decoder, result);
 
   c->status = beam_set_string_utf8(env, result, "type", "decoder");
   REJECT_STATUS;
