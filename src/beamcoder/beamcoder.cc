@@ -291,7 +291,7 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("encoder", encoder),
     DECLARE_NAPI_METHOD("testSetProps", testSetProps)
    };
-  status = napi_define_properties(env, exports, 9, desc);
+  status = napi_define_properties(env, exports, 10, desc);
   CHECK_STATUS;
   return exports;
 }

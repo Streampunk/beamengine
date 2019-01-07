@@ -486,6 +486,83 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
       status = beam_set_int32(env, target, "me_range", codec->me_range);
       PASS_STATUS;
     }
+
+    if (!encoding) {
+      // draw_horiz_band() is called in coded order instead of display
+      status = beam_set_bool(env, target, "SLICE_FLAG_CODED_ORDER",
+        (codec->slice_flags & SLICE_FLAG_CODED_ORDER) != 0);
+      PASS_STATUS;
+      // allow draw_horiz_band() with field slices (MPEG-2 field pics)
+      status = beam_set_bool(env, target, "SLICE_FLAG_ALLOW_FIELD",
+        (codec->slice_flags & SLICE_FLAG_ALLOW_FIELD) != 0);
+      PASS_STATUS;
+      // allow draw_horiz_band() with 1 component at a time (SVQ1)
+      status = beam_set_bool(env, target, "SLICE_FLAG_ALLOW_PLANE",
+        (codec->slice_flags & SLICE_FLAG_ALLOW_PLANE) != 0);
+      PASS_STATUS;
+    }
+
+    if (encoding) {
+      status = beam_set_enum(env, target, "mb_decision", beam_ff_mb_decision, codec->mb_decision);
+      PASS_STATUS;
+    }
+
+    if (codec->intra_matrix != nullptr) {
+      status = napi_create_array(env, &array);
+      PASS_STATUS;
+      for ( int x = 0 ; x < 64 ; x++ ) {
+        status = napi_create_uint32(env, codec->intra_matrix[x], &element);
+        PASS_STATUS;
+        status = napi_set_element(env, array, x, element);
+        PASS_STATUS;
+      }
+      status = napi_set_named_property(env, target, "intra_matrix", array);
+      PASS_STATUS;
+    }
+
+    if (codec->inter_matrix != nullptr) {
+      status = napi_create_array(env, &array);
+      PASS_STATUS;
+      for ( int x = 0 ; x < 64 ; x++ ) {
+        status = napi_create_uint32(env, codec->inter_matrix[x], &element);
+        PASS_STATUS;
+        status = napi_set_element(env, array, x, element);
+        PASS_STATUS;
+      }
+      status = napi_set_named_property(env, target, "inter_matrix", array);
+      PASS_STATUS;
+    }
+
+    status = beam_set_int32(env, target, "intra_dc_precision", codec->intra_dc_precision);
+    PASS_STATUS;
+    if (!encoding) {
+      status = beam_set_int32(env, target, "skip_top", codec->skip_top);
+      PASS_STATUS;
+    }
+    if (!encoding) {
+      status = beam_set_int32(env, target, "skip_bottom", codec->skip_bottom);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "mb_lmin", codec->mb_lmin);
+      PASS_STATUS;
+      status = beam_set_int32(env, target, "mb_lmax", codec->mb_lmax);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "bidir_refine", codec->bidir_refine);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "keyint_min", codec->keyint_min);
+      PASS_STATUS;
+    }
+    status = beam_set_int32(env, target, "refs", codec->refs);
+    PASS_STATUS;
+    if (encoding) {
+      status = beam_set_int32(env, target, "mv0_threshold", codec->mv0_threshold);
+      PASS_STATUS;
+    }
   } // Video-only parameters
 
   return napi_ok;
@@ -495,8 +572,10 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     napi_value props, bool encoding) {
   napi_status status;
   napi_value value, element;
+  napi_valuetype type;
   bool present, flag, isArray;
   double dValue;
+  uint32_t uThirtwo;
 
   status = beam_get_int64(env, props, "bit_rate", &codec->bit_rate);
   PASS_STATUS;
@@ -911,6 +990,123 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       status = beam_get_int32(env, props, "me_range", &codec->me_range);
       PASS_STATUS;
     }
+    if (!encoding) {
+      // draw_horiz_band() is called in coded order instead of display
+      status = beam_get_bool(env, props, "SLICE_FLAG_CODED_ORDER", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->slice_flags = (flag) ?
+        codec->slice_flags | SLICE_FLAG_CODED_ORDER :
+        codec->slice_flags & ~SLICE_FLAG_CODED_ORDER ; }
+      // allow draw_horiz_band() with field slices (MPEG-2 field pics)
+      status = beam_get_bool(env, props, "SLICE_FLAG_ALLOW_FIELD", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->slice_flags = (flag) ?
+        codec->slice_flags | SLICE_FLAG_ALLOW_FIELD :
+        codec->slice_flags & ~SLICE_FLAG_ALLOW_FIELD ; }
+      // allow draw_horiz_band() with 1 component at a time (SVQ1)
+      status = beam_get_bool(env, props, "SLICE_FLAG_ALLOW_PLANE", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->slice_flags = (flag) ?
+        codec->slice_flags | SLICE_FLAG_ALLOW_PLANE :
+        codec->slice_flags & ~SLICE_FLAG_ALLOW_PLANE ; }
+    }
+
+    if (encoding) {
+      status = beam_get_enum(env, props, "mb_decision", beam_ff_mb_decision, &codec->mb_decision);
+      PASS_STATUS;
+    }
+
+    if (encoding) {
+      status = napi_get_named_property(env, props, "intra_matrix", &value);
+      PASS_STATUS;
+      status = napi_is_array(env, value, &isArray);
+      PASS_STATUS;
+      if (isArray) {
+        codec->intra_matrix = (uint16_t*) av_mallocz(sizeof(uint16_t) * 64);
+        for ( int x = 0 ; x < 64 ; x++ ) {
+          status = napi_get_element(env, value, x, &element);
+          PASS_STATUS;
+          status = napi_typeof(env, element, &type);
+          PASS_STATUS;
+          if (type == napi_number) {
+            status = napi_get_value_uint32(env, element, &uThirtwo);
+            PASS_STATUS;
+            codec->intra_matrix[x] = (uint16_t) uThirtwo;
+          } else {
+            codec->intra_matrix[x] = 0;
+          }
+        }
+      }
+    } else {
+      status = napi_has_named_property(env, props, "intra_matrix", &present);
+      PASS_STATUS;
+      if (present) {
+        codec->intra_matrix = nullptr;
+      }
+    }
+
+    if (encoding) {
+      status = napi_get_named_property(env, props, "inter_matrix", &value);
+      PASS_STATUS;
+      status = napi_is_array(env, value, &isArray);
+      PASS_STATUS;
+      if (isArray) {
+        codec->inter_matrix = (uint16_t*) av_mallocz(sizeof(uint16_t) * 64);
+        for ( int x = 0 ; x < 64 ; x++ ) {
+          status = napi_get_element(env, value, x, &element);
+          PASS_STATUS;
+          status = napi_typeof(env, element, &type);
+          PASS_STATUS;
+          if (type == napi_number) {
+            status = napi_get_value_uint32(env, element, &uThirtwo);
+            PASS_STATUS;
+            codec->inter_matrix[x] = (uint16_t) uThirtwo;
+          } else {
+            codec->inter_matrix[x] = 0;
+          }
+        }
+      }
+    } else {
+      status = napi_has_named_property(env, props, "inter_matrix", &present);
+      PASS_STATUS;
+      if (present) {
+        codec->inter_matrix = nullptr;
+      }
+    }
+
+    if (encoding) {
+      status = beam_get_int32(env, props, "intra_dc_precision", &codec->intra_dc_precision);
+      PASS_STATUS;
+    }
+    if (!encoding) {
+      status = beam_get_int32(env, props, "skip_top", &codec->skip_top);
+      PASS_STATUS;
+      status = beam_get_int32(env, props, "skip_bottom", &codec->skip_bottom);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "mb_lmin", &codec->mb_lmin);
+      PASS_STATUS;
+      status = beam_get_int32(env, props, "mb_lmax", &codec->mb_lmax);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "bidir_refine", &codec->bidir_refine);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "keyint_min", &codec->keyint_min);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "refs", &codec->refs);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "mv0_threshold", &codec->mv0_threshold);
+      PASS_STATUS;
+    }
+
   } // Video-only parameters
 
   return napi_ok;
@@ -1151,7 +1347,7 @@ napi_status beam_get_enum(napi_env env, napi_value target, char* name,
 
 std::unordered_map<int, std::string> beam_field_order_fmap = {
   { AV_FIELD_PROGRESSIVE, "progressive" },
-  { AV_FIELD_TT, "top coded_first, top displayed first" },
+  { AV_FIELD_TT, "top coded first, top displayed first" },
   { AV_FIELD_BB, "bottom coded first, bottom displayed first" },
   { AV_FIELD_TB, "top coded first, bottom displayed first" },
   { AV_FIELD_BT, "bottom coded first, top displayed first" },

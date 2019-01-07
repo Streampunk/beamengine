@@ -166,6 +166,7 @@ napi_status beam_get_enum(napi_env env, napi_value target, char* name,
 
 extern beamEnum* beam_field_order;
 extern beamEnum* beam_ff_cmp;
+extern beamEnum* beam_ff_mb_decision;
 
 
 #endif // BEAMCODER_UTIL_H
