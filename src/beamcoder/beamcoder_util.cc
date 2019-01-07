@@ -563,6 +563,9 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
       status = beam_set_int32(env, target, "mv0_threshold", codec->mv0_threshold);
       PASS_STATUS;
     }
+    status = beam_set_string_utf8(env, target, "color_primaries",
+      (char*) av_color_primaries_name(codec->color_primaries));
+    PASS_STATUS;
   } // Video-only parameters
 
   return napi_ok;
@@ -1106,7 +1109,12 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       status = beam_get_int32(env, props, "mv0_threshold", &codec->mv0_threshold);
       PASS_STATUS;
     }
-
+    if (encoding) {
+      char* colorPrimariesName;
+      status = beam_get_string_utf8(env, props, "color_primaries", &colorPrimariesName);
+      PASS_STATUS;
+      codec->color_primaries = (AVColorPrimaries) av_color_primaries_from_name(colorPrimariesName);
+    }
   } // Video-only parameters
 
   return napi_ok;
