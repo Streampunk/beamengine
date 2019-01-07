@@ -33,6 +33,7 @@ extern "C" {
 
 #include "beamcoder_util.h"
 #include "node_api.h"
+#include "Adaptor.h"
 
 void formatExecute(napi_env env, void* data);
 void formatComplete(napi_env env, napi_status asyncStatus, void* data);
@@ -52,6 +53,7 @@ void readBufferFinalizer(napi_env env, void* data, void* hint);
 
 struct formatCarrier : carrier {
   const char* filename = nullptr;
+  Adaptor *adaptor = nullptr;
   AVFormatContext* format = nullptr;
   ~formatCarrier() {
     if (format != nullptr) { avformat_close_input(&format); }}
@@ -59,6 +61,7 @@ struct formatCarrier : carrier {
 
 struct readFrameCarrier : carrier {
   AVFormatContext* format = nullptr;
+  Adaptor *adaptor = nullptr;
   AVPacket* packet = av_packet_alloc();
   ~readFrameCarrier() {
     if (packet != nullptr) av_packet_free(&packet);

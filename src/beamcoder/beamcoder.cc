@@ -21,6 +21,7 @@
 
 #include "node_api.h"
 #include "beamcoder_util.h"
+#include "governor.h"
 #include "format.h"
 #include "decode.h"
 #include "encode.h"
@@ -284,6 +285,7 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("versionStrings", versionStrings),
     DECLARE_NAPI_METHOD("configurations", configurations),
     DECLARE_NAPI_METHOD("licenses", licenses),
+    DECLARE_NAPI_METHOD("governor", governor),
     DECLARE_NAPI_METHOD("format", format),
     DECLARE_NAPI_METHOD("decoder", decoder),
     DECLARE_NAPI_METHOD("encoder", encoder),

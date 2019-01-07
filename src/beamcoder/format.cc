@@ -38,10 +38,32 @@
 
 #include "format.h"
 
+int read_packet(void *opaque, uint8_t *buf, int buf_size)
+{
+  Adaptor *adaptor = (Adaptor *)opaque;
+  return adaptor->read(buf, buf_size);  
+}
+
 void formatExecute(napi_env env, void* data) {
   formatCarrier* c = (formatCarrier*) data;
 
   int ret;
+
+  if (!(c->format = avformat_alloc_context())) {
+    c->status = BEAMCODER_ERROR_START;
+    c->errorMsg = avErrorMsg("Problem allocating format context: ", AVERROR(ENOMEM));
+    return;
+  }
+
+  if (c->adaptor && !c->filename) {
+    AVIOContext* avio_ctx = avio_alloc_context(nullptr, 0, 0, c->adaptor, &read_packet, nullptr, nullptr);
+    if (!avio_ctx) {
+      c->status = BEAMCODER_ERROR_START;
+      c->errorMsg = avErrorMsg("Problem allocating context: ", AVERROR(ENOMEM));
+      return;
+    }
+    c->format->pb = avio_ctx;
+  }
 
   if ((ret = avformat_open_input(&c->format, c->filename, nullptr, nullptr))) {
     c->status = BEAMCODER_ERROR_START;
@@ -50,7 +72,7 @@ void formatExecute(napi_env env, void* data) {
   }
 
   if ((ret = avformat_find_stream_info(c->format, nullptr))) {
-    printf("DEBUG: Counld not find stream info for file %s, return value %i.",
+    printf("DEBUG: Could not find stream info for file %s, return value %i.",
       c->filename, ret);
   }
 }
@@ -65,6 +87,12 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
     c->errorMsg = "Format creator failed to complete.";
   }
   REJECT_STATUS;
+
+  // tidy up adaptor chunks if required
+  if (c->adaptor) {
+    c->status = c->adaptor->finaliseBufs(env);
+    REJECT_STATUS;
+  }
 
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
@@ -317,6 +345,11 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "_formatContext", prop);
   REJECT_STATUS;
 
+  c->status = napi_create_external(env, c->adaptor, nullptr, nullptr, &prop);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "adaptor", prop);
+  REJECT_STATUS;
+
   c->status = napi_create_function(env, "readFrame", NAPI_AUTO_LENGTH, readFrame,
     nullptr, &prop);
   REJECT_STATUS;
@@ -365,6 +398,13 @@ napi_value format(napi_env env, napi_callback_info info) {
     c->filename = (const char *) malloc((strLen + 1) * sizeof(char));
     c->status = napi_get_value_string_utf8(env, args[0], (char *) c->filename, strLen + 1, &strLen);
     REJECT_RETURN;
+  } else if (type == napi_object) {
+    napi_value adaptorValue;
+    c->status = napi_get_named_property(env, args[0], "adaptor", &adaptorValue);
+    REJECT_RETURN;
+
+    c->status = napi_get_value_external(env, adaptorValue, (void**)&c->adaptor);
+    REJECT_RETURN;
   }
 
   c->status = napi_create_string_utf8(env, "Format", NAPI_AUTO_LENGTH, &resourceName);
@@ -405,6 +445,12 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
     c->errorMsg = "Read frame failed to complete.";
   }
   REJECT_STATUS;
+
+  // tidy up adaptor chunks if required
+  if (c->adaptor) {
+    c->status = c->adaptor->finaliseBufs(env);
+    REJECT_STATUS;
+  }
 
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
@@ -482,7 +528,7 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
 }
 
 napi_value readFrame(napi_env env, napi_callback_info info) {
-  napi_value resourceName, promise, formatJS, formatExt;
+  napi_value resourceName, promise, formatJS, formatExt, adaptorExt;
   readFrameCarrier* c = new readFrameCarrier;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
@@ -494,6 +540,11 @@ napi_value readFrame(napi_env env, napi_callback_info info) {
   c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, formatExt, (void**) &c->format);
+  REJECT_RETURN;
+
+  c->status = napi_get_named_property(env, formatJS, "adaptor", &adaptorExt);
+  REJECT_RETURN;
+  c->status = napi_get_value_external(env, adaptorExt, (void**)&c->adaptor);
   REJECT_RETURN;
 
   c->status = napi_create_reference(env, formatJS, 1, &c->passthru);
@@ -540,7 +591,7 @@ void seekFrameExecute(napi_env env, void *data) {
 
 void seekFrameComplete(napi_env env, napi_status asyncStatus, void *data) {
   seekFrameCarrier* c = (seekFrameCarrier*) data;
-  napi_value result, value;
+  napi_value result;
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
     c->errorMsg = "Seek frame failed to complete.";
