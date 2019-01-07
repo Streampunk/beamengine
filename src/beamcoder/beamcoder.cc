@@ -265,7 +265,7 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
     // If it fails, PA!
   }
 
-  codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+  codec = avcodec_find_decoder(AV_CODEC_ID_PCM_S16LE);
   codecCtx = avcodec_alloc_context3(codec);
   status = setCodecFromProps(env, codecCtx, args[0], encoding);
   CHECK_STATUS;

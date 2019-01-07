@@ -566,7 +566,38 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     status = beam_set_string_utf8(env, target, "color_primaries",
       (char*) av_color_primaries_name(codec->color_primaries));
     PASS_STATUS;
+    status = beam_set_string_utf8(env, target, "color_trc",
+      (char*) av_color_transfer_name(codec->color_trc));
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, target, "colorspace",
+      (char*) av_color_space_name(codec->colorspace));
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, target, "color_range",
+      (char*) av_color_range_name(codec->color_range));
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, target, "chroma_sample_location",
+      (char*) av_chroma_location_name(codec->chroma_sample_location));
+    PASS_STATUS;
+
+    if (encoding) {
+      status = beam_set_int32(env, target, "slices", codec->slices);
+      PASS_STATUS;
+    }
+    status = beam_set_enum(env, target, "field_order", beam_field_order,
+      codec->field_order);
+    PASS_STATUS;
   } // Video-only parameters
+
+  if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+    status = beam_set_int32(env, target, "sample_rate", codec->sample_rate);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "channels", codec->channels);
+    PASS_STATUS;
+
+    status = beam_set_string_utf8(env, target, "sample_fmt",
+      (char*) av_get_sample_fmt_name(codec->sample_fmt));
+    PASS_STATUS;
+  }
 
   return napi_ok;
 };
@@ -1115,7 +1146,53 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       PASS_STATUS;
       codec->color_primaries = (AVColorPrimaries) av_color_primaries_from_name(colorPrimariesName);
     }
+    if (encoding) {
+      char* trcName;
+      status = beam_get_string_utf8(env, props, "colour_trc", &trcName);
+      PASS_STATUS;
+      codec->color_trc = (AVColorTransferCharacteristic) av_color_transfer_from_name(trcName);
+    }
+    if (encoding) {
+      char* colorspaceName;
+      status = beam_get_string_utf8(env, props, "colorspace", &colorspaceName);
+      PASS_STATUS;
+      codec->colorspace = (AVColorSpace) av_color_space_from_name(colorspaceName);
+    }
+    if (encoding) {
+      char* colorRangeName;
+      status = beam_get_string_utf8(env, props, "color_range", &colorRangeName);
+      PASS_STATUS;
+      codec->color_range = (AVColorRange) av_color_range_from_name(colorRangeName);
+    }
+    if (encoding) {
+      char* chromaLocName;
+      status = beam_get_string_utf8(env, props, "chroma_sample_location", &chromaLocName);
+      PASS_STATUS;
+      codec->chroma_sample_location = (AVChromaLocation) av_chroma_location_from_name(chromaLocName);
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "slices", &codec->slices);
+      PASS_STATUS;
+    }
+    status = beam_get_enum(env, props, "field_order", beam_field_order,
+      (int*) &codec->field_order);
+    PASS_STATUS;
+
   } // Video-only parameters
+
+  if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+    status = beam_get_int32(env, props, "sample_rate", &codec->sample_rate);
+    PASS_STATUS;
+    status = beam_get_int32(env, props, "channels", &codec->channels);
+    PASS_STATUS;
+
+    if (encoding) {
+      char* sampleFormatName;
+      status = beam_get_string_utf8(env, props, "sample_fmt", &sampleFormatName);
+      PASS_STATUS;
+      codec->sample_fmt = av_get_sample_fmt(sampleFormatName);
+    }
+  } // Audio-only parameters
 
   return napi_ok;
 };
