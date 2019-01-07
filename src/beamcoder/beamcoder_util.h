@@ -26,6 +26,8 @@
 #include <chrono>
 #include <stdio.h>
 #include <string>
+#include <unordered_map>
+#include <algorithm>
 #include "node_api.h"
 
 extern "C" {
@@ -131,6 +133,39 @@ napi_status beam_get_bool(napi_env env, napi_value target, char* name, bool* pre
 napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRational value);
 napi_status beam_get_rational(napi_env env, napi_value target, char* name, AVRational* value);
 
-const char* beam_field_order_name(AVFieldOrder field_order);
+#define BEAM_ENUM_UNKNOWN -42
+
+template<typename K, typename V>
+std::unordered_map<V,K> inverse_map(std::unordered_map<K,V> &map)
+{
+	std::unordered_map<V,K> inv;
+	std::for_each(map.begin(), map.end(),
+				[&inv] (const std::pair<K,V> &p)
+				{
+					inv.insert(std::make_pair(p.second, p.first));
+				});
+	return inv;
+}
+
+const char* beam_lookup_name(std::unordered_map<int, std::string> m, int value);
+int beam_lookup_enum(std::unordered_map<std::string, int> m, char* value);
+
+struct beamEnum {
+  std::unordered_map<int, std::string> forward;
+  std::unordered_map<std::string, int> inverse;
+  beamEnum(std::unordered_map<int, std::string> fwd) {
+    forward = fwd;
+    inverse = inverse_map(fwd);
+  };
+};
+
+napi_status beam_set_enum(napi_env env, napi_value target, char* name,
+  beamEnum* enumDesc, int value);
+napi_status beam_get_enum(napi_env env, napi_value target, char* name,
+  beamEnum* enumDesc, int* value);
+
+extern beamEnum* beam_field_order;
+extern beamEnum* beam_ff_cmp;
+
 
 #endif // BEAMCODER_UTIL_H

@@ -182,6 +182,7 @@ char* avErrorMsg(const char* base, int avError) {
 napi_status getPropsFromCodec(napi_env env, napi_value target,
     AVCodecContext* codec, bool encoding) {
   napi_status status;
+  napi_value array, element;
 
   status = beam_set_int32(env, target, "codec_id", codec->codec_id);
   PASS_STATUS;
@@ -400,6 +401,91 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
       status = beam_set_double(env, target, "b_quant_offset", codec->b_quant_offset);
       PASS_STATUS;
     }
+    status = beam_set_int32(env, target, "has_b_frames", codec->has_b_frames);
+    PASS_STATUS;
+    if (encoding) {
+      status = beam_set_double(env, target, "i_quant_factor", codec->i_quant_factor);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "i_quant_offset", codec->i_quant_offset);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "lumi_masking", codec->lumi_masking);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "temporal_cplx_masking", codec->temporal_cplx_masking);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "spatial_cplx_masking", codec->spatial_cplx_masking);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "p_masking", codec->p_masking);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_double(env, target, "dask_masking", codec->dark_masking);
+      PASS_STATUS;
+    }
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    for ( int x = 0 ; x < codec->slice_count ; x++ ) {
+      status = napi_create_int32(env, codec->slice_offset[x], &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, x, element);
+      PASS_STATUS;
+    }
+    status = napi_set_named_property(env, target, "slice_offset", array);
+    PASS_STATUS;
+
+    status = beam_set_rational(env, target, "sample_aspect_ratio", codec->sample_aspect_ratio);
+    PASS_STATUS;
+    // TODO get enum strings to work
+    if (encoding) {
+      status = beam_set_enum(env, target, "me_cmp", beam_ff_cmp, codec->me_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_enum(env, target, "me_sub_cmp", beam_ff_cmp, codec->me_sub_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_enum(env, target, "mb_cmp", beam_ff_cmp, codec->mb_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_enum(env, target, "ildct_cmp", beam_ff_cmp, codec->ildct_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "dia_size", codec->dia_size);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "last_predictor_count",
+        codec->last_predictor_count);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_enum(env, target, "me_pre_cmp", beam_ff_cmp, codec->me_pre_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "pre_dia_size", codec->pre_dia_size);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "me_subpel_quality", codec->me_subpel_quality);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_set_int32(env, target, "me_range", codec->me_range);
+      PASS_STATUS;
+    }
   } // Video-only parameters
 
   return napi_ok;
@@ -408,8 +494,9 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
 napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     napi_value props, bool encoding) {
   napi_status status;
-  napi_value value;
-  bool present, flag;
+  napi_value value, element;
+  bool present, flag, isArray;
+  double dValue;
 
   status = beam_get_int64(env, props, "bit_rate", &codec->bit_rate);
   PASS_STATUS;
@@ -674,26 +761,155 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     char* pixFmtName;
     status = beam_get_string_utf8(env, props, "pix_fmt", &pixFmtName);
     PASS_STATUS;
+    printf("Trying to get pix format for %s\n", pixFmtName);
     codec->pix_fmt = av_get_pix_fmt((const char *) pixFmtName);
     if (encoding) {
       status = beam_get_int32(env, props, "max_b_frames", &codec->max_b_frames);
       PASS_STATUS;
     }
     if (encoding) {
-      double bQuantFactor = -87654321.0;
-      status = beam_get_double(env, props, "b_quant_factor", &bQuantFactor);
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "b_quant_factor", &dValue);
       PASS_STATUS;
-      if (bQuantFactor != -87654321.0) {
-        codec->b_quant_factor = (float) bQuantFactor;
+      if (dValue != -87654321.0) {
+        codec->b_quant_factor = (float) dValue;
       }
     }
     if (encoding) {
-      double bQuantOffset = -87654321.0;
-      status = beam_get_double(env, props, "b_quant_offset", &bQuantOffset);
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "b_quant_offset", &dValue);
       PASS_STATUS;
-      if (bQuantOffset != -87654321.0) {
-        codec->b_quant_offset = (float) bQuantOffset;
+      if (dValue != -87654321.0) {
+        codec->b_quant_offset = (float) dValue;
       }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "i_quant_factor", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->i_quant_factor = (float) dValue;
+      }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "i_quant_offset", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->i_quant_offset = (float) dValue;
+      }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "lumi_masking", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->lumi_masking = (float) dValue;
+      }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "temporal_cplx_masking", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->temporal_cplx_masking = (float) dValue;
+      }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "spatial_cplx_masking", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->spatial_cplx_masking = (float) dValue;
+      }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "p_masking", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->p_masking = (float) dValue;
+      }
+    }
+    if (encoding) {
+      dValue = -87654321.0;
+      status = beam_get_double(env, props, "dark_masking", &dValue);
+      PASS_STATUS;
+      if (dValue != -87654321.0) {
+        codec->dark_masking = (float) dValue;
+      }
+    }
+    if (!encoding) {
+      status = napi_get_named_property(env, props, "slice_offset", &value);
+      PASS_STATUS;
+      status = napi_is_array(env, value, &isArray);
+      PASS_STATUS;
+      if (isArray) {
+        status = napi_get_array_length(env, value, (uint32_t*) &codec->slice_count);
+        PASS_STATUS;
+        codec->slice_offset = (int*) malloc(sizeof(int) * codec->slice_count);
+        for ( int x = 0 ; x < codec->slice_count ; x++ ) {
+          int sliceOff = 0;
+          status = napi_get_element(env, value, x, &element);
+          PASS_STATUS;
+          status = napi_get_value_int32(env, element, &sliceOff);
+          PASS_STATUS;
+          codec->slice_offset[x] = sliceOff;
+        }
+      }
+      else {
+        status = napi_has_named_property(env, props, "slice_offset", &present);
+        PASS_STATUS;
+        if (present) {
+          codec->slice_count = 0;
+          codec->slice_offset = nullptr;
+        }
+      }
+    }
+    if (encoding) {
+      status = beam_get_rational(env, props, "sample_aspect_ratio", &codec->sample_aspect_ratio);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "me_cmp", beam_ff_cmp, &codec->me_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "me_sub_cmp", beam_ff_cmp, &codec->me_sub_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "mb_cmp", beam_ff_cmp, &codec->mb_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "mb_cmp", beam_ff_cmp, &codec->mb_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "ildct_cmp", beam_ff_cmp, &codec->dia_size);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "last_predictor_count",
+        &codec->last_predictor_count);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "me_pre_cmp", beam_ff_cmp, &codec->me_pre_cmp);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "pre_dia_size", &codec->pre_dia_size);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "me_subpel_quality", &codec->me_subpel_quality);
+      PASS_STATUS;
+    }
+    if (encoding) {
+      status = beam_get_int32(env, props, "me_range", &codec->me_range);
+      PASS_STATUS;
     }
   } // Video-only parameters
 
@@ -798,7 +1014,8 @@ napi_status beam_get_string_utf8(napi_env env, napi_value target, char* name, ch
   str = (char*) malloc((len + 1) * sizeof(char));
   status = napi_get_value_string_utf8(env, prop, str, len + 1, &len);
   PASS_STATUS;
-  *value = str;
+  *value = strdup(str);
+  free(str);
   return napi_ok;
 }
 
@@ -867,20 +1084,105 @@ napi_status beam_get_rational(napi_env env, napi_value target, char* name, AVRat
   return napi_ok;
 }
 
-const char* beam_field_order_name(AVFieldOrder field_order) {
-  switch (field_order) {
-    case AV_FIELD_PROGRESSIVE:
-      return "progressive";
-    case AV_FIELD_TT:
-      return "top coded_first, top displayed first";
-    case AV_FIELD_BB:
-      return "bottom coded first, bottom displayed first";
-    case AV_FIELD_TB:
-      return "top coded first, bottom displayed first";
-    case AV_FIELD_BT:
-      return "bottom coded first, top displayed first";
-    default:
-    case AV_FIELD_UNKNOWN:
-      return "unknown";
+const char* beam_lookup_name(std::unordered_map<int, std::string> m, int value) {
+  auto search = m.find(value);
+  if (search != m.end()) {
+    return strdup(search->second.c_str());
+  } else {
+    return "unknown";
   }
+}
+
+int beam_lookup_enum(std::unordered_map<std::string, int> m, char* value) {
+  auto search = m.find(std::string(value));
+  if (search != m.end()) {
+    return search->second;
+  } else {
+    return BEAM_ENUM_UNKNOWN;
+  }
+}
+
+napi_status beam_set_enum(napi_env env, napi_value target, char* name,
+    beamEnum* enumDesc, int value) {
+  napi_status status;
+  napi_value prop;
+  auto search = enumDesc->forward.find(value);
+  if (search != enumDesc->forward.end()) {
+    status = napi_create_string_utf8(env, search->second.data(), NAPI_AUTO_LENGTH, &prop);
+  } else {
+    status = napi_create_string_utf8(env, "unknown", NAPI_AUTO_LENGTH, &prop);
+  }
+  PASS_STATUS;
+  return napi_set_named_property(env, target, name, prop);
 };
+
+napi_status beam_get_enum(napi_env env, napi_value target, char* name,
+    beamEnum* enumDesc, int* value) {
+  napi_status status;
+  napi_value prop;
+  napi_valuetype type;
+  char* enumStr;
+  size_t len;
+
+  status = napi_get_named_property(env, target, name, &prop);
+  PASS_STATUS;
+  status = napi_typeof(env, prop, &type);
+  PASS_STATUS;
+  if (type == napi_number) {
+    status = napi_get_value_int32(env, prop, value);
+    PASS_STATUS;
+    return napi_ok;
+  }
+  if (type == napi_string) {
+    status = napi_get_value_string_utf8(env, prop, nullptr, 0, &len);
+    PASS_STATUS;
+    enumStr = (char*) malloc((len + 1) * sizeof(char));
+    status = napi_get_value_string_utf8(env, prop, enumStr, len + 1, &len);
+    PASS_STATUS;
+    auto search = enumDesc->inverse.find(std::string(enumStr));
+    if (search != enumDesc->inverse.end()) {
+      *value = search->second;
+    } else {
+      *value = BEAM_ENUM_UNKNOWN;
+    }
+  }
+  return napi_ok;
+};
+
+std::unordered_map<int, std::string> beam_field_order_fmap = {
+  { AV_FIELD_PROGRESSIVE, "progressive" },
+  { AV_FIELD_TT, "top coded_first, top displayed first" },
+  { AV_FIELD_BB, "bottom coded first, bottom displayed first" },
+  { AV_FIELD_TB, "top coded first, bottom displayed first" },
+  { AV_FIELD_BT, "bottom coded first, top displayed first" },
+  { AV_FIELD_UNKNOWN, "unknown" }
+};
+beamEnum* beam_field_order = new beamEnum(beam_field_order_fmap);
+
+std::unordered_map<int, std::string> beam_ff_cmp_fmap = {
+  { FF_CMP_SAD, "sad" },
+  { FF_CMP_SSE, "sse" },
+  { FF_CMP_SATD, "satd" },
+  { FF_CMP_DCT, "dct" },
+  { FF_CMP_PSNR, "psnr" },
+  { FF_CMP_BIT, "bit" },
+  { FF_CMP_RD, "rd" },
+  { FF_CMP_ZERO, "zero" },
+  { FF_CMP_VSAD, "vsad" },
+  { FF_CMP_VSSE, "vsse" },
+  { FF_CMP_NSSE, "nsse" },
+  { FF_CMP_W53, "w53" },
+  { FF_CMP_W97, "w97" },
+  { FF_CMP_DCTMAX, "dctmax" },
+  { FF_CMP_DCT264, "dct264" },
+  { FF_CMP_MEDIAN_SAD, "median_sad" },
+  { FF_CMP_CHROMA, "chroma" },
+};
+beamEnum* beam_ff_cmp = new beamEnum(beam_ff_cmp_fmap);
+
+std::unordered_map<int, std::string> beam_ff_mb_decision_fmap = {
+  { FF_MB_DECISION_SIMPLE, "simple" }, //  uses mb_cmp
+  { FF_MB_DECISION_BITS, "bits" }, // chooses the one which needs the fewest bits
+  { FF_MB_DECISION_RD, "rd" } // rate distortion
+};
+beamEnum* beam_ff_mb_decision = new beamEnum(beam_ff_mb_decision_fmap);

@@ -250,23 +250,29 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
   napi_value result;
   AVCodec* codec;
   AVCodecContext* codecCtx;
+  bool encoding = false;
 
-  size_t argc = 1;
-  napi_value args[1];
+  size_t argc = 2;
+  napi_value args[2];
   status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   CHECK_STATUS;
 
-  if (argc != 1) NAPI_THROW_ERROR("Arguments object must be provided.");
+  if (argc < 1) NAPI_THROW_ERROR("Arguments object must be provided.");
+
+  if (argc == 2) {
+    status = napi_get_value_bool(env, args[1], &encoding);
+    // If it fails, PA!
+  }
 
   codec = avcodec_find_decoder(AV_CODEC_ID_H264);
   codecCtx = avcodec_alloc_context3(codec);
-  status = setCodecFromProps(env, codecCtx, args[0], true);
+  status = setCodecFromProps(env, codecCtx, args[0], encoding);
   CHECK_STATUS;
 
   status = napi_create_object(env, &result);
   CHECK_STATUS;
 
-  status = getPropsFromCodec(env, result, codecCtx, true);
+  status = getPropsFromCodec(env, result, codecCtx, encoding);
   return result;
 }
 

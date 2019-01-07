@@ -195,8 +195,8 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
       c->status = beam_set_int32(env, prop, "height", codec->height);
       REJECT_STATUS;
 
-      c->status = beam_set_string_utf8(env, prop, "field_order",
-        (char*) beam_field_order_name(codec->field_order));
+      c->status = beam_set_enum(env, prop, "field_order",
+        beam_field_order, codec->field_order);
       REJECT_STATUS;
 
       c->status = napi_create_string_utf8(env,
