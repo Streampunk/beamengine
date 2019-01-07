@@ -33,6 +33,29 @@ https://github.com/Streampunk/aerostat/blob/master/LICENSE`;
 
 console.log(splash);
 
+const { Writable } = require('stream');
+
+function createBeamStream(params) {
+  const governor = new beamcoder.governor(params);
+
+  const beamStream = new Writable({
+    decodeStrings: params.decodeStrings || false,
+    highWaterMark: params.highwaterMark || 16384,
+    objectMode: false,
+    write: async (chunk, encoding, cb) => {
+      await governor.write(chunk);
+      cb();
+    },
+    final: cb => {
+      governor.finish();
+      cb();
+    }
+  });
+  beamStream.governor = governor;
+  return beamStream;
+}
+
 module.exports = {
-  beamcoder
+  beamcoder,
+  createBeamStream
 };

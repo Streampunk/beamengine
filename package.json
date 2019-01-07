@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
   "main": "index.js",
-  "engines": "^8.0.0",
+  "engines": {
+    "node": "^8.0.0"
+  },
   "gypfile": true,
   "scripts": {
     "test": "npm test",
