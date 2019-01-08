@@ -168,6 +168,8 @@ extern beamEnum* beam_field_order;
 extern beamEnum* beam_ff_cmp;
 extern beamEnum* beam_ff_mb_decision;
 extern beamEnum* beam_av_audio_service_type;
+extern beamEnum* beam_ff_compliance;
+
 
 
 #endif // BEAMCODER_UTIL_H
