@@ -160,16 +160,17 @@ struct beamEnum {
 };
 
 napi_status beam_set_enum(napi_env env, napi_value target, char* name,
-  beamEnum* enumDesc, int value);
+  const beamEnum* enumDesc, int value);
 napi_status beam_get_enum(napi_env env, napi_value target, char* name,
-  beamEnum* enumDesc, int* value);
+  const beamEnum* enumDesc, int* value);
 
-extern beamEnum* beam_field_order;
-extern beamEnum* beam_ff_cmp;
-extern beamEnum* beam_ff_mb_decision;
-extern beamEnum* beam_av_audio_service_type;
-extern beamEnum* beam_ff_compliance;
-
-
+extern const beamEnum* beam_field_order;
+extern const beamEnum* beam_ff_cmp;
+extern const beamEnum* beam_ff_mb_decision;
+extern const beamEnum* beam_av_audio_service_type;
+extern const beamEnum* beam_ff_compliance;
+extern const beamEnum* beam_ff_dct;
+extern const beamEnum* beam_ff_idct;
+extern const beamEnum* beam_avdiscard;
 
 #endif // BEAMCODER_UTIL_H

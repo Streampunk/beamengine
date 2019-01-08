@@ -755,6 +755,147 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     PASS_STATUS;
   }
 
+  status = napi_create_object(env, &sub);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "PICT_INFO", (codec->debug & FF_DEBUG_PICT_INFO) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "RC", (codec->debug & FF_DEBUG_RC) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "BITSTREAM", (codec->debug & FF_DEBUG_BITSTREAM) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "MB_TYPE", (codec->debug & FF_DEBUG_MB_TYPE) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "QP", (codec->debug & FF_DEBUG_QP) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "DCT_COEFF", (codec->debug & FF_DEBUG_DCT_COEFF) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "SKIP", (codec->debug & FF_DEBUG_SKIP) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "STARTCODE", (codec->debug & FF_DEBUG_STARTCODE) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "ER", (codec->debug & FF_DEBUG_ER) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "MMCO", (codec->debug & FF_DEBUG_MMCO) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "BUGS", (codec->debug & FF_DEBUG_BUGS) != 0);
+  PASS_STATUS;
+  #if FF_API_DEBUG_MV
+  status = beam_set_bool(env, sub, "VIS_QP", (codec->debug & FF_DEBUG_VIS_QP) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "VIS_MB_TYPE", (codec->debug & FF_DEBUG_VIS_MB_TYPE) != 0);
+  PASS_STATUS;
+  #endif
+  status = beam_set_bool(env, sub, "BUFFERS", (codec->debug & FF_DEBUG_BUFFERS) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "THREADS", (codec->debug & FF_DEBUG_THREADS) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "GREEN_MD", (codec->debug & FF_DEBUG_GREEN_MD) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "NOMC", (codec->debug & FF_DEBUG_NOMC) != 0);
+  PASS_STATUS;
+  status = napi_set_named_property(env, target, "debug", sub);
+  PASS_STATUS;
+
+  if (!encoding) {
+    status = napi_create_object(env, &sub);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "CRCCHECK", (codec->err_recognition & AV_EF_CRCCHECK) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "BITSTREAM", (codec->err_recognition & AV_EF_BITSTREAM) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "BUFFER", (codec->err_recognition & AV_EF_BUFFER) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "EXPLODE", (codec->err_recognition & AV_EF_EXPLODE) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "IGNORE_ERR", (codec->err_recognition & AV_EF_IGNORE_ERR) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "CAREFUL", (codec->err_recognition & AV_EF_CAREFUL) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "COMPLIANT", (codec->err_recognition & AV_EF_COMPLIANT) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "AGGRESSIVE", (codec->err_recognition & AV_EF_AGGRESSIVE) != 0);
+    PASS_STATUS;
+    status = napi_set_named_property(env, target, "err_recognition", sub);
+    PASS_STATUS;
+  } // err_recognition
+
+  if (!encoding) {
+    status = beam_set_int64(env, target, "reordered_opaque", codec->reordered_opaque);
+    PASS_STATUS;
+  }
+
+  // TODO hardware accelerator Fields hwaccel and heaccel_context
+
+  if (encoding && (codec->flags & AV_CODEC_FLAG_PSNR)) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+      // TODO consider using JS BigInt when not experimental
+      status = napi_create_int64(env, (int64_t) codec->error[x], &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, x, element);
+      PASS_STATUS;
+    }
+    status = napi_set_named_property(env, target, "error", array);
+    PASS_STATUS;
+  }
+
+  if (encoding) {
+    status = beam_set_enum(env, target, "dct_algo", beam_ff_dct, codec->dct_algo);
+    PASS_STATUS;
+  }
+  status = beam_set_enum(env, target, "idct_algo", beam_ff_idct, codec->idct_algo);
+  PASS_STATUS;
+  status = beam_set_int32(env, target, "bits_per_coded_sample", codec->bits_per_coded_sample);
+  PASS_STATUS;
+  status = beam_set_int32(env, target, "bits_per_raw_sample", codec->bits_per_raw_sample);
+  PASS_STATUS;
+  status = beam_set_int32(env, target, "thread_count", codec->thread_count);
+  PASS_STATUS;
+
+  status = napi_create_object(env, &sub);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "FRAME", (codec->thread_type & FF_THREAD_FRAME) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "SLICE", (codec->thread_type & FF_THREAD_SLICE) != 0);
+  PASS_STATUS;
+  status = napi_set_named_property(env, target, "thread_type", sub);
+  PASS_STATUS;
+
+  status = napi_create_object(env, &sub);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "FRAME", (codec->active_thread_type & FF_THREAD_FRAME) != 0);
+  PASS_STATUS;
+  status = beam_set_bool(env, sub, "SLICE", (codec->active_thread_type & FF_THREAD_SLICE) != 0);
+  PASS_STATUS;
+  status = napi_set_named_property(env, target, "active_thread_type", sub);
+  PASS_STATUS;
+
+  // TODO not doing thread_safe_callbacks for now as not exposing custom get_buffer()
+
+  if (encoding) {
+    status = beam_set_int32(env, target, "nsse_weight", codec->nsse_weight);
+    PASS_STATUS;
+  }
+  status = beam_set_string_utf8(env, target, "profile",
+    (char*) av_get_profile_name(codec->codec, codec->profile));
+  PASS_STATUS;
+
+  status = beam_set_int32(env, target, "level", codec->level);
+  PASS_STATUS;
+  if (!encoding) {
+    status = beam_set_enum(env, target, "skip_loop_filter", beam_avdiscard, codec->skip_loop_filter);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_set_enum(env, target, "skip_idct", beam_avdiscard, codec->skip_idct);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_set_enum(env, target, "skip_frame", beam_avdiscard, codec->skip_frame);
+    PASS_STATUS;
+  }
+
   return napi_ok;
 };
 
@@ -1495,104 +1636,311 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_AUTODETECT :
-      codec -> workaround_bugs & ~FF_BUG_AUTODETECT; }
+      codec->workaround_bugs & ~FF_BUG_AUTODETECT; }
     status = beam_get_bool(env, value, "XVID_ILACE", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_XVID_ILACE :
-      codec -> workaround_bugs & ~FF_BUG_XVID_ILACE; }
+      codec->workaround_bugs & ~FF_BUG_XVID_ILACE; }
     status = beam_get_bool(env, value, "UMP4", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_UMP4 :
-      codec -> workaround_bugs & ~FF_BUG_UMP4; }
+      codec->workaround_bugs & ~FF_BUG_UMP4; }
     status = beam_get_bool(env, value, "NO_PADDING", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_NO_PADDING :
-      codec -> workaround_bugs & ~FF_BUG_NO_PADDING; }
+      codec->workaround_bugs & ~FF_BUG_NO_PADDING; }
     status = beam_get_bool(env, value, "AMV", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_AMV :
-      codec -> workaround_bugs & ~FF_BUG_AMV; }
+      codec->workaround_bugs & ~FF_BUG_AMV; }
     status = beam_get_bool(env, value, "QPEL_CHROMA", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_QPEL_CHROMA :
-      codec -> workaround_bugs & ~FF_BUG_QPEL_CHROMA; }
+      codec->workaround_bugs & ~FF_BUG_QPEL_CHROMA; }
     status = beam_get_bool(env, value, "STD_QPEL", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_STD_QPEL :
-      codec -> workaround_bugs & ~FF_BUG_STD_QPEL; }
+      codec->workaround_bugs & ~FF_BUG_STD_QPEL; }
     status = beam_get_bool(env, value, "QPEL_CHROMA2", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_QPEL_CHROMA2 :
-      codec -> workaround_bugs & ~FF_BUG_QPEL_CHROMA2; }
+      codec->workaround_bugs & ~FF_BUG_QPEL_CHROMA2; }
     status = beam_get_bool(env, value, "DIRECT_BLOCKSIZE", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_DIRECT_BLOCKSIZE :
-      codec -> workaround_bugs & ~FF_BUG_DIRECT_BLOCKSIZE; }
+      codec->workaround_bugs & ~FF_BUG_DIRECT_BLOCKSIZE; }
     status = beam_get_bool(env, value, "EDGE", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_EDGE :
-      codec -> workaround_bugs & ~FF_BUG_EDGE; }
+      codec->workaround_bugs & ~FF_BUG_EDGE; }
     status = beam_get_bool(env, value, "HPEL_CHROMA", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_HPEL_CHROMA :
-      codec -> workaround_bugs & ~FF_BUG_HPEL_CHROMA; }
+      codec->workaround_bugs & ~FF_BUG_HPEL_CHROMA; }
     status = beam_get_bool(env, value, "DC_CLIP", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_DC_CLIP :
-      codec -> workaround_bugs & ~FF_BUG_DC_CLIP; }
+      codec->workaround_bugs & ~FF_BUG_DC_CLIP; }
     status = beam_get_bool(env, value, "MS", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_MS :
-      codec -> workaround_bugs & ~FF_BUG_MS; }
+      codec->workaround_bugs & ~FF_BUG_MS; }
     status = beam_get_bool(env, value, "TRUNCATED", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_TRUNCATED :
-      codec -> workaround_bugs & ~FF_BUG_TRUNCATED; }
+      codec->workaround_bugs & ~FF_BUG_TRUNCATED; }
     status = beam_get_bool(env, value, "IEDGE", &present, &flag);
     PASS_STATUS;
     if (present) { codec->workaround_bugs = (flag) ?
       codec->workaround_bugs | FF_BUG_IEDGE :
-      codec -> workaround_bugs & ~FF_BUG_IEDGE; }
+      codec->workaround_bugs & ~FF_BUG_IEDGE; }
   } // workaround_bugs sub object
 
   status = beam_get_enum(env, props, "strict_std_compliance", beam_ff_compliance,
     &codec->strict_std_compliance);
   PASS_STATUS;
 
-  status = napi_get_named_property(env, props, "error_concealment", &value);
+  if (!encoding) {
+    status = napi_get_named_property(env, props, "error_concealment", &value);
+    PASS_STATUS;
+    status = napi_typeof(env, value, &type);
+    PASS_STATUS;
+    if (type == napi_object) {
+      status = beam_get_bool(env, value, "GUESS_MVS", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->error_concealment = (flag) ?
+        codec->error_concealment | FF_EC_GUESS_MVS :
+        codec->error_concealment & ~FF_EC_GUESS_MVS; }
+      status = beam_get_bool(env, value, "DEBLOCK", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->error_concealment = (flag) ?
+        codec->error_concealment | FF_EC_DEBLOCK :
+        codec->error_concealment & ~FF_EC_DEBLOCK; }
+      status = beam_get_bool(env, value, "FAVOR_INTER", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->error_concealment = (flag) ?
+        codec->error_concealment | FF_EC_FAVOR_INTER :
+        codec->error_concealment & ~FF_EC_FAVOR_INTER; }
+    }
+  } // error-concealment
+
+  status = napi_get_named_property(env, props, "debug", &value);
   PASS_STATUS;
   status = napi_typeof(env, value, &type);
   PASS_STATUS;
   if (type == napi_object) {
-    status = beam_get_bool(env, value, "GUESS_MVS", &present, &flag);
+    status = beam_get_bool(env, value, "PICT_INFO", &present, &flag);
     PASS_STATUS;
-    if (present) { codec->error_concealment = (flag) ?
-      codec->error_concealment | FF_EC_GUESS_MVS :
-      codec->error_concealment & ~FF_EC_GUESS_MVS; }
-    status = beam_get_bool(env, value, "DEBLOCK", &present, &flag);
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_PICT_INFO :
+      codec->debug & ~FF_DEBUG_PICT_INFO; }
+    status = beam_get_bool(env, value, "RC", &present, &flag);
     PASS_STATUS;
-    if (present) { codec->error_concealment = (flag) ?
-      codec->error_concealment | FF_EC_DEBLOCK :
-      codec->error_concealment & ~FF_EC_DEBLOCK; }
-    status = beam_get_bool(env, value, "FAVOR_INTER", &present, &flag);
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_RC :
+      codec->debug & ~FF_DEBUG_RC; }
+    status = beam_get_bool(env, value, "BITSTREAM", &present, &flag);
     PASS_STATUS;
-    if (present) { codec->error_concealment = (flag) ?
-      codec->error_concealment | FF_EC_FAVOR_INTER :
-      codec->error_concealment & ~FF_EC_FAVOR_INTER; }
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_BITSTREAM :
+      codec->debug & ~FF_DEBUG_BITSTREAM; }
+    status = beam_get_bool(env, value, "MB_TYPE", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_MB_TYPE :
+      codec->debug & ~FF_DEBUG_MB_TYPE; }
+    status = beam_get_bool(env, value, "QP", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_QP :
+      codec->debug & ~FF_DEBUG_QP; }
+    status = beam_get_bool(env, value, "DCT_COEFF", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_DCT_COEFF :
+      codec->debug & ~FF_DEBUG_DCT_COEFF; }
+    status = beam_get_bool(env, value, "SKIP", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_SKIP :
+      codec->debug & ~FF_DEBUG_SKIP; }
+    status = beam_get_bool(env, value, "STARTCODE", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_STARTCODE :
+      codec->debug & ~FF_DEBUG_STARTCODE; }
+    status = beam_get_bool(env, value, "ER", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_ER :
+      codec->debug & ~FF_DEBUG_ER; }
+    status = beam_get_bool(env, value, "MMCO", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_MMCO :
+      codec->debug & ~FF_DEBUG_MMCO; }
+    status = beam_get_bool(env, value, "BUGS", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_BUGS :
+      codec->debug & ~FF_DEBUG_BUGS; }
+  #if FF_API_DEBUG_MV
+    status = beam_get_bool(env, value, "VIS_QP", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_VIS_QP :
+      codec->debug & ~FF_DEBUG_VIS_QP; }
+    status = beam_get_bool(env, value, "VIS_MB_TYPE", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_VIS_MB_TYPE :
+      codec->debug & ~FF_DEBUG_VIS_MB_TYPE; }
+  #endif
+    status = beam_get_bool(env, value, "BUFFERS", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_BUFFERS :
+      codec->debug & ~FF_DEBUG_BUFFERS; }
+    status = beam_get_bool(env, value, "THREADS", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_THREADS :
+      codec->debug & ~FF_DEBUG_THREADS; }
+    status = beam_get_bool(env, value, "GREEN_MD", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_GREEN_MD :
+      codec->debug & ~FF_DEBUG_GREEN_MD; }
+    status = beam_get_bool(env, value, "NOMC", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->debug = (flag) ?
+      codec->debug | FF_DEBUG_NOMC :
+      codec->debug & ~FF_DEBUG_NOMC; }
+  } // debug flags
+
+  if (!encoding) {
+    status = napi_get_named_property(env, props, "err_recognition", &value);
+    PASS_STATUS;
+    status = napi_typeof(env, value, &type);
+    PASS_STATUS;
+    if (type == napi_object) {
+      status = beam_get_bool(env, value, "CRCCHECK", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_CRCCHECK :
+        codec->err_recognition & ~AV_EF_CRCCHECK; }
+      status = beam_get_bool(env, value, "BITSTREAM", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_BITSTREAM :
+        codec->err_recognition & ~AV_EF_BITSTREAM; }
+      status = beam_get_bool(env, value, "BUFFER", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_BUFFER :
+        codec->err_recognition & ~AV_EF_BUFFER; }
+      status = beam_get_bool(env, value, "EXPLODE", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_EXPLODE :
+        codec->err_recognition & ~AV_EF_EXPLODE; }
+
+      status = beam_get_bool(env, value, "IGNORE_ERR", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_IGNORE_ERR :
+        codec->err_recognition & ~AV_EF_IGNORE_ERR; }
+      status = beam_get_bool(env, value, "CAREFUL", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_CAREFUL :
+        codec->err_recognition & ~AV_EF_CAREFUL; }
+      status = beam_get_bool(env, value, "COMPLIANT", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_COMPLIANT :
+        codec->err_recognition & ~AV_EF_COMPLIANT; }
+      status = beam_get_bool(env, value, "AGGRESSIVE", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->err_recognition = (flag) ?
+        codec->err_recognition | AV_EF_AGGRESSIVE :
+        codec->err_recognition & ~AV_EF_AGGRESSIVE; }
+    }
+  } // err_recognition
+
+  if (!encoding) {
+    status = beam_get_int64(env, props, "reordered_opaque", &codec->reordered_opaque);
+    PASS_STATUS;
   }
+  if (encoding) {
+    status = beam_get_enum(env, props, "dct_algo", beam_ff_dct, &codec->dct_algo);
+    PASS_STATUS;
+  }
+  status = beam_get_enum(env, props, "idct_algo", beam_ff_idct, &codec->idct_algo);
+  PASS_STATUS;
+  if (!encoding) {
+    status = beam_get_int32(env, props, "bits_per_coded_sample", &codec->bits_per_coded_sample);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_get_int32(env, props, "bits_per_raw_sample", &codec->bits_per_raw_sample);
+    PASS_STATUS;
+  }
+  status = beam_get_int32(env, props, "thread_count", &codec->thread_count);
+  PASS_STATUS;
+
+  status = napi_get_named_property(env, props, "thread_type", &value);
+  PASS_STATUS;
+  status = napi_typeof(env, value, &type);
+  PASS_STATUS;
+  if (type == napi_object) {
+    status = beam_get_bool(env, value, "FRAME", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->thread_type = (flag) ?
+      codec->thread_type | FF_THREAD_FRAME :
+      codec->thread_type & ~FF_THREAD_FRAME; }
+    status = beam_get_bool(env, value, "SLICE", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->thread_type = (flag) ?
+      codec->thread_type | FF_THREAD_SLICE :
+      codec->thread_type & ~FF_THREAD_SLICE; }
+  }
+
+  if (encoding) {
+    status = beam_get_int32(env, props, "nsse_weight", &codec->nsse_weight);
+    PASS_STATUS;
+  }
+  // FIXME profile
+  if (encoding) {
+    status = beam_get_int32(env, props, "level", &codec->level);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_get_enum(env, props, "skip_loop_filter", beam_avdiscard, (int*) &codec->skip_loop_filter);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_get_enum(env, props, "skip_idct", beam_avdiscard, (int*) &codec->skip_idct);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_get_enum(env, props, "skip_frame", beam_avdiscard, (int*) &codec->skip_frame);
+    PASS_STATUS;
+  }
+
   return napi_ok;
 };
 
@@ -1786,7 +2134,7 @@ int beam_lookup_enum(std::unordered_map<std::string, int> m, char* value) {
 }
 
 napi_status beam_set_enum(napi_env env, napi_value target, char* name,
-    beamEnum* enumDesc, int value) {
+    const beamEnum* enumDesc, int value) {
   napi_status status;
   napi_value prop;
   auto search = enumDesc->forward.find(value);
@@ -1800,7 +2148,7 @@ napi_status beam_set_enum(napi_env env, napi_value target, char* name,
 };
 
 napi_status beam_get_enum(napi_env env, napi_value target, char* name,
-    beamEnum* enumDesc, int* value) {
+    const beamEnum* enumDesc, int* value) {
   napi_status status;
   napi_value prop;
   napi_valuetype type;
@@ -1840,7 +2188,7 @@ std::unordered_map<int, std::string> beam_field_order_fmap = {
   { AV_FIELD_BT, "bottom coded first, top displayed first" },
   { AV_FIELD_UNKNOWN, "unknown" }
 };
-beamEnum* beam_field_order = new beamEnum(beam_field_order_fmap);
+const beamEnum* beam_field_order = new beamEnum(beam_field_order_fmap);
 
 std::unordered_map<int, std::string> beam_ff_cmp_fmap = {
   { FF_CMP_SAD, "sad" },
@@ -1861,14 +2209,14 @@ std::unordered_map<int, std::string> beam_ff_cmp_fmap = {
   { FF_CMP_MEDIAN_SAD, "median_sad" },
   { FF_CMP_CHROMA, "chroma" },
 };
-beamEnum* beam_ff_cmp = new beamEnum(beam_ff_cmp_fmap);
+const beamEnum* beam_ff_cmp = new beamEnum(beam_ff_cmp_fmap);
 
 std::unordered_map<int, std::string> beam_ff_mb_decision_fmap = {
   { FF_MB_DECISION_SIMPLE, "simple" }, //  uses mb_cmp
   { FF_MB_DECISION_BITS, "bits" }, // chooses the one which needs the fewest bits
   { FF_MB_DECISION_RD, "rd" } // rate distortion
 };
-beamEnum* beam_ff_mb_decision = new beamEnum(beam_ff_mb_decision_fmap);
+const beamEnum* beam_ff_mb_decision = new beamEnum(beam_ff_mb_decision_fmap);
 
 std::unordered_map<int, std::string> beam_av_audio_service_type_fmap = {
   { AV_AUDIO_SERVICE_TYPE_MAIN, "main" },
@@ -1882,7 +2230,7 @@ std::unordered_map<int, std::string> beam_av_audio_service_type_fmap = {
   { AV_AUDIO_SERVICE_TYPE_KARAOKE, "karaoke" },
   { AV_AUDIO_SERVICE_TYPE_NB, "nb" }
 };
-beamEnum* beam_av_audio_service_type = new beamEnum(beam_av_audio_service_type_fmap);
+const beamEnum* beam_av_audio_service_type = new beamEnum(beam_av_audio_service_type_fmap);
 
 std::unordered_map<int, std::string> beam_ff_compliance_fmap = {
   { FF_COMPLIANCE_VERY_STRICT, "very-strict" },
@@ -1891,4 +2239,43 @@ std::unordered_map<int, std::string> beam_ff_compliance_fmap = {
   { FF_COMPLIANCE_UNOFFICIAL, "unofficial" },
   { FF_COMPLIANCE_EXPERIMENTAL, "experimental" }
 };
-beamEnum* beam_ff_compliance = new beamEnum(beam_ff_compliance_fmap);
+const beamEnum* beam_ff_compliance = new beamEnum(beam_ff_compliance_fmap);
+
+std::unordered_map<int, std::string> beam_ff_dct_fmap = {
+  { FF_DCT_AUTO, "auto" },
+  { FF_DCT_FASTINT, "fastint "},
+  { FF_DCT_INT, "int" },
+  { FF_DCT_MMX, "mmx" },
+  { FF_DCT_ALTIVEC, "altivec" },
+  { FF_DCT_FAAN, "faan" }
+};
+const beamEnum* beam_ff_dct = new beamEnum(beam_ff_dct_fmap);
+
+std::unordered_map<int, std::string> beam_ff_idct_fmap = {
+  { FF_IDCT_AUTO, "auto" },
+  { FF_IDCT_INT, "int" },
+  { FF_IDCT_SIMPLE, "simple" },
+  { FF_IDCT_SIMPLEMMX, "simplemmx" },
+  { FF_IDCT_ARM, "arm" },
+  { FF_IDCT_ALTIVEC, "altivec" },
+  { FF_IDCT_SIMPLEARM, "simplearm" },
+  { FF_IDCT_XVID, "xvid" },
+  { FF_IDCT_SIMPLEARMV5TE, "simplearmv5te" },
+  { FF_IDCT_SIMPLEARMV6, "simplearmv6" },
+  { FF_IDCT_FAAN, "faan" },
+  { FF_IDCT_SIMPLENEON, "simpleneon" },
+  { FF_IDCT_NONE, "none" },
+  { FF_IDCT_SIMPLEAUTO, "simpleauto" },
+};
+const beamEnum* beam_ff_idct = new beamEnum(beam_ff_idct_fmap);
+
+std::unordered_map<int, std::string> beam_avdiscard_fmap = {
+  { AVDISCARD_NONE, "none" },
+  { AVDISCARD_DEFAULT, "default" },
+  { AVDISCARD_NONREF, "nonref" },
+  { AVDISCARD_BIDIR, "bidir" },
+  { AVDISCARD_NONINTRA, "nonintra" },
+  { AVDISCARD_NONKEY, "nonkey" },
+  { AVDISCARD_ALL, "all" }
+};
+const beamEnum* beam_avdiscard = new beamEnum(beam_avdiscard_fmap);
