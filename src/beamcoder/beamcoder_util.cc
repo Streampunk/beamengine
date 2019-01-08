@@ -628,6 +628,63 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
         (char*) av_get_sample_fmt_name(codec->request_sample_fmt));
       PASS_STATUS;
     }
+  } // Audio-only Parameters
+
+  // Encoding parameters
+  if (encoding) {
+    status = beam_set_double(env, target, "qcompress", codec->qcompress);
+    PASS_STATUS;
+    status = beam_set_double(env, target, "qblur", codec->qblur);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_set_int32(env, target, "qmin", codec->qmin);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "qmax", codec->qmax);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "max_qdiff", codec->max_qdiff);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_set_int32(env, target, "rc_buffer_size", codec->rc_buffer_size);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    for ( int x = 0 ; x < codec->rc_override_count ; x++) {
+      status = napi_create_object(env, &element);
+      PASS_STATUS;
+      status = beam_set_string_utf8(env, element, "type", "RcOverride");
+      PASS_STATUS;
+      status = beam_set_int32(env, element, "start_frame", codec->rc_override[x].start_frame);
+      PASS_STATUS;
+      status = beam_set_int32(env, element, "end_frame", codec->rc_override[x].end_frame);
+      PASS_STATUS;
+      status = beam_set_int32(env, element, "qscale", codec->rc_override[x].qscale);
+      PASS_STATUS;
+      status = beam_set_double(env, element, "quality_factor", codec->rc_override[x].quality_factor);
+      PASS_STATUS;
+      status = napi_set_element(env, array, x, element);
+      PASS_STATUS;
+    }
+    status = napi_set_named_property(env, target, "rc_override", array);
+    PASS_STATUS;
+  }
+  status = beam_set_int64(env, target, "rc_max_rate", codec->rc_max_rate);
+  PASS_STATUS;
+  if (encoding) {
+    status = beam_set_int64(env, target, "rc_min_rate", codec->rc_min_rate);
+    PASS_STATUS;
+    status = beam_set_double(env, target, "rc_max_available_vbv_use",
+      codec->rc_max_available_vbv_use);
+    PASS_STATUS;
+    status = beam_set_double(env, target, "rc_min_vbv_overflow_use",
+      codec->rc_min_vbv_overflow_use);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "rc_initial_buffer_occupancy",
+      codec->rc_initial_buffer_occupancy);
+    PASS_STATUS;
   }
 
   return napi_ok;
@@ -1252,6 +1309,86 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     }
   } // Audio-only parameters
 
+  // Encoding Parameters
+  if (encoding) {
+    dValue = 8765432.1;
+    status = beam_get_double(env, props, "qcompress", &dValue);
+    PASS_STATUS;
+    if (dValue != 8765432.1) {
+      codec->qcompress = (float) dValue;
+    }
+    dValue = 8765432.1;
+    status = beam_get_double(env, props, "qblur", &dValue);
+    PASS_STATUS;
+    if (dValue != 8765432.1) {
+      codec->qblur = (float) dValue;
+    }
+  }
+  if (encoding) {
+    status = beam_get_int32(env, props, "qmin", &codec->qmin);
+    PASS_STATUS;
+    status = beam_get_int32(env, props, "qmax", &codec->qmax);
+    PASS_STATUS;
+    status = beam_get_int32(env, props, "max_qdiff", &codec->max_qdiff);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_get_int32(env, props, "rc_buffer_size", &codec->rc_buffer_size);
+    PASS_STATUS;
+  }
+  status = beam_get_int64(env, props, "rc_max_rate", &codec->rc_max_rate);
+  PASS_STATUS;
+  if (encoding) {
+    status = beam_get_int64(env, props, "rc_min_rate", &codec->rc_min_rate);
+    PASS_STATUS;
+    dValue = 8765432.1;
+    status = beam_get_double(env, props, "rc_max_available_vbv_use", &dValue);
+    PASS_STATUS;
+    if (dValue != 8765432.1) {
+      codec->rc_max_available_vbv_use = (float) dValue;
+    }
+    dValue = 8765432.1;
+    status = beam_get_double(env, props, "rc_min_vbv_overflow_use", &dValue);
+    PASS_STATUS;
+    if (dValue != 8765432.1) {
+      codec->rc_min_vbv_overflow_use = (float) dValue;
+    }
+    status = beam_get_int32(env, props, "rc_initial_buffer_occupancy",
+      &codec->rc_initial_buffer_occupancy);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = napi_get_named_property(env, props, "rc_override", &value);
+    PASS_STATUS;
+    status = napi_is_array(env, value, &isArray);
+    PASS_STATUS;
+    if (isArray) {
+      status = napi_get_array_length(env, value, (uint32_t*) &codec->rc_override_count);
+      PASS_STATUS;
+      // TODO should find a way to free this
+      codec->rc_override = (RcOverride *) av_realloc(codec->rc_override,
+          sizeof(RcOverride) * codec->rc_override_count);
+      for ( int x = 0 ; x < codec->rc_override_count ; x++ ) {
+        status = napi_get_element(env, value, x, &element);
+        PASS_STATUS;
+        status = beam_get_int32(env, element, "start_frame",
+          &codec->rc_override[x].start_frame);
+        PASS_STATUS;
+        status = beam_get_int32(env, element, "end_frame",
+          &codec->rc_override[x].end_frame);
+        PASS_STATUS;
+        status = beam_get_int32(env, element, "qscale",
+          &codec->rc_override[x].qscale);
+        PASS_STATUS;
+        dValue = 8765432.1;
+        status = beam_get_double(env, element, "quality_factor", &dValue);
+        PASS_STATUS;
+        if (dValue != 8765432.1) {
+          codec->rc_override[x].quality_factor = (float) dValue;
+        }
+      } // rc_override array
+    } // encoding
+  }
   return napi_ok;
 };
 
