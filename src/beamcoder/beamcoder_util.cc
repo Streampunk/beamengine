@@ -597,6 +597,37 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     status = beam_set_string_utf8(env, target, "sample_fmt",
       (char*) av_get_sample_fmt_name(codec->sample_fmt));
     PASS_STATUS;
+    status = beam_set_int32(env, target, "frame_size", codec->frame_size);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "frame_number", codec->frame_number);
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "block_align", codec->block_align);
+    PASS_STATUS;
+    if (encoding) {
+      status = beam_set_int32(env, target, "cutoff", codec->cutoff);
+      PASS_STATUS;
+    }
+    char channelLayoutName[64];
+    av_get_channel_layout_string(channelLayoutName, 64, codec->channels,
+      codec->channel_layout);
+    status = beam_set_string_utf8(env, target, "channel_layout", channelLayoutName);
+    PASS_STATUS;
+    if (!encoding) {
+      char reqChanLayoutName[64];
+      av_get_channel_layout_string(reqChanLayoutName, 64, codec->channels,
+        codec->request_channel_layout);
+      status = beam_set_string_utf8(env, target, "request_channel_layout",
+        reqChanLayoutName);
+      PASS_STATUS;
+    }
+    status = beam_set_enum(env, target, "audio_service_type",
+      beam_av_audio_service_type, codec->audio_service_type);
+    PASS_STATUS;
+    if (!encoding) {
+      status = beam_set_string_utf8(env, target, "request_sample_fmt",
+        (char*) av_get_sample_fmt_name(codec->request_sample_fmt));
+      PASS_STATUS;
+    }
   }
 
   return napi_ok;
@@ -1192,6 +1223,33 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       PASS_STATUS;
       codec->sample_fmt = av_get_sample_fmt(sampleFormatName);
     }
+    status = beam_get_int32(env, props, "block_align", &codec->block_align);
+    PASS_STATUS;
+    if (encoding) {
+      status = beam_get_int32(env, props, "cutoff", &codec->cutoff);
+      PASS_STATUS;
+    }
+    char* channelLayoutName;
+    status = beam_get_string_utf8(env, props, "channel_layout", &channelLayoutName);
+    PASS_STATUS;
+    codec->channel_layout = av_get_channel_layout(channelLayoutName);
+    if (!encoding) {
+      char* reqChanLayoutName;
+      status = beam_get_string_utf8(env, props, "request_channel_layout", &reqChanLayoutName);
+      PASS_STATUS;
+      codec->request_channel_layout = av_get_channel_layout(reqChanLayoutName);
+    }
+    if (encoding) {
+      status = beam_get_enum(env, props, "audio_service_type",
+        beam_av_audio_service_type, (int*) &codec->audio_service_type);
+      PASS_STATUS;
+    }
+    if (!encoding) {
+      char* reqSampleFmtName;
+      status = beam_get_string_utf8(env, props, "request_sample_fmt", &reqSampleFmtName);
+      PASS_STATUS;
+      codec->request_sample_fmt = av_get_sample_fmt(reqSampleFmtName);
+    }
   } // Audio-only parameters
 
   return napi_ok;
@@ -1467,3 +1525,17 @@ std::unordered_map<int, std::string> beam_ff_mb_decision_fmap = {
   { FF_MB_DECISION_RD, "rd" } // rate distortion
 };
 beamEnum* beam_ff_mb_decision = new beamEnum(beam_ff_mb_decision_fmap);
+
+std::unordered_map<int, std::string> beam_av_audio_service_type_fmap = {
+  { AV_AUDIO_SERVICE_TYPE_MAIN, "main" },
+  { AV_AUDIO_SERVICE_TYPE_EFFECTS, "effects" },
+  { AV_AUDIO_SERVICE_TYPE_VISUALLY_IMPAIRED, "visually-impaired" },
+  { AV_AUDIO_SERVICE_TYPE_HEARING_IMPAIRED, "hearing-impaired" },
+  { AV_AUDIO_SERVICE_TYPE_DIALOGUE, "dialogue" },
+  { AV_AUDIO_SERVICE_TYPE_COMMENTARY, "commentary" },
+  { AV_AUDIO_SERVICE_TYPE_EMERGENCY, "emergency" },
+  { AV_AUDIO_SERVICE_TYPE_VOICE_OVER, "voice-over" },
+  { AV_AUDIO_SERVICE_TYPE_KARAOKE, "karaoke" },
+  { AV_AUDIO_SERVICE_TYPE_NB, "nb" }
+};
+beamEnum* beam_av_audio_service_type = new beamEnum(beam_av_audio_service_type_fmap);
