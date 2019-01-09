@@ -183,6 +183,13 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     AVCodecContext* codec, bool encoding) {
   napi_status status;
   napi_value array, element, sub;
+  int64_t iValue;
+  double dValue;
+  uint8_t* data;
+  AVRational qValue;
+  int ret;
+  const AVOption* option = nullptr;
+  const AVOption* prev = nullptr;
 
   status = beam_set_int32(env, target, "codec_id", codec->codec_id);
   PASS_STATUS;
@@ -197,7 +204,120 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
   av_get_codec_tag_string(codecTag, 64, codec->codec_tag);
   status = beam_set_string_utf8(env, target, "codec_tag", codecTag);
   PASS_STATUS;
-  // TODO consider priv_data
+
+  if (codec->codec->priv_class != nullptr) {
+    status = napi_create_object(env, &sub);
+    PASS_STATUS;
+    while ((option = av_opt_next(codec->priv_data, option))) {
+      switch (option->type) {
+        case AV_OPT_TYPE_FLAGS:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: flags");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_INT: // based on x264 definitions
+          ret = av_opt_get_int(codec->priv_data, option->name, 0, &iValue);
+          if (option->unit == nullptr) {
+            printf("For %s, return is %i value %i\n", option->name, ret, iValue);
+            status = beam_set_int32(env, sub, (char*) option->name, iValue);
+            PASS_STATUS;
+          } else {
+            if (iValue < 0) {
+              status = beam_set_string_utf8(env, sub, (char*) option->name, "unknown");
+              PASS_STATUS;
+            } else {
+              data = (uint8_t*) option->name;
+              prev = option;
+              option = av_opt_next(codec->priv_data, option);
+              while (option->type == AV_OPT_TYPE_CONST) {
+                if (option->default_val.i64 == iValue) {
+                  status = beam_set_string_utf8(env, sub, (char*) data, (char*) option->name);
+                  PASS_STATUS;
+                }
+                prev = option;
+                option = av_opt_next(codec->priv_data, option);
+              }
+              option = prev;
+            }
+          }
+          break;
+        case AV_OPT_TYPE_INT64:
+        case AV_OPT_TYPE_UINT64:
+          ret = av_opt_get_int(codec->priv_data, option->name, 0, &iValue);
+          printf("For %s, return is %i value %i\n", option->name, ret, iValue);
+          status = beam_set_int64(env, sub, (char*) option->name, iValue);
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_DOUBLE:
+        case AV_OPT_TYPE_FLOAT:
+          av_opt_get_double(codec->priv_data, option->name, 0, &dValue);
+          status = beam_set_double(env, sub, (char*) option->name, dValue);
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_STRING:
+          av_opt_get(codec->priv_data, option->name, 0, &data);
+          status = beam_set_string_utf8(env, sub, (char*) option->name, (char*) data);
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_RATIONAL:
+          av_opt_get_q(codec->priv_data, option->name, 0, &qValue);
+          status = beam_set_rational(env, sub, (char*) option->name, qValue);
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_BINARY:  ///< offset must point to a pointer immediately followed by an int for the length
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: binary");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_DICT:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: dict");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_CONST:
+          // status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: const");
+          // PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_IMAGE_SIZE: ///< offset must point to two consecutive integers
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: image_size");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_PIXEL_FMT:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: pixel_fmt");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_SAMPLE_FMT:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: sample_fmt");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_VIDEO_RATE: ///< offset must point to AVRational
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: AVRational");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_DURATION:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: duration");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_COLOR:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: color");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_CHANNEL_LAYOUT:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unmapped type: channel_layout");
+          PASS_STATUS;
+          break;
+        case AV_OPT_TYPE_BOOL:
+          av_opt_get_int(codec->priv_data, option->name, 0, &iValue);
+          status = beam_set_bool(env, sub, (char*) option->name, iValue);
+          PASS_STATUS;
+          break;
+        default:
+          status = beam_set_string_utf8(env, sub, (char*) option->name, "unknown type");
+          PASS_STATUS;
+          break;
+      }
+
+    }
+    status = napi_set_named_property(env, target, "priv_data", sub);
+    PASS_STATUS;
+  }
   // Choosing to ignore internal
   // Choosing to ignore opaque
   status = beam_set_int64(env, target, "bit_rate", codec->bit_rate);

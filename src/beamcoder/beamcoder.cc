@@ -265,8 +265,28 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
     // If it fails, PA!
   }
 
-  codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+  codec = avcodec_find_encoder(AV_CODEC_ID_H264);
   codecCtx = avcodec_alloc_context3(codec);
+
+  const AVOption* option;
+
+  printf("Codec private data class name %s\n", codec->priv_class->class_name);
+  printf("First option: %s\n", codec->priv_class->option->name);
+
+  option = codec->priv_class->option;
+  while (option != nullptr) {
+    printf("Hello %s %i\n", option->name, option->type);
+    option = av_opt_next(codecCtx->priv_data, option);
+  }
+
+  /* option = codecCtx->av_class->option;
+  while (option != nullptr) {
+    printf("Bye %s %i\n", option->name, option->type);
+    option = av_opt_next(codecCtx, option);
+  } */
+
+  av_opt_set_int(codecCtx->priv_data, "motion-est", 1, 0);
+
   status = setCodecFromProps(env, codecCtx, args[0], encoding);
   CHECK_STATUS;
 
