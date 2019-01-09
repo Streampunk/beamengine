@@ -1923,7 +1923,20 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     status = beam_get_int32(env, props, "nsse_weight", &codec->nsse_weight);
     PASS_STATUS;
   }
-  // FIXME profile
+
+  status = beam_get_string_utf8(env, props, "profile", &sValue);
+  PASS_STATUS;
+  if (sValue != nullptr) {
+    const AVProfile* profile = codec->codec->profiles;
+    while (profile->profile != FF_PROFILE_UNKNOWN) {
+      if (strcmp(sValue, profile->name) == 0) {
+        codec->profile = profile->profile;
+        break;
+      }
+      profile = profile + 1;
+    }
+  }
+
   if (encoding) {
     status = beam_get_int32(env, props, "level", &codec->level);
     PASS_STATUS;

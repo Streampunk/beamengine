@@ -266,11 +266,6 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
   }
 
   codec = avcodec_find_decoder(AV_CODEC_ID_H264);
-  const AVProfile* profile = codec->profiles;
-  while (profile->profile != FF_PROFILE_UNKNOWN) {
-    printf("Profile %i is '%s'\n", profile->profile, profile->name);
-    profile = profile + 1;
-  }
   codecCtx = avcodec_alloc_context3(codec);
   status = setCodecFromProps(env, codecCtx, args[0], encoding);
   CHECK_STATUS;
