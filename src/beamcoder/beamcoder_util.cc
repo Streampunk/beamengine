@@ -896,6 +896,106 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     PASS_STATUS;
   }
 
+  // TODO skipping subtitle header for NOW
+
+  if (encoding && (codec->codec_type == AVMEDIA_TYPE_AUDIO)) {
+    status = beam_set_int32(env, target, "initial_padding", codec->initial_padding);
+    PASS_STATUS;
+  }
+  status = beam_set_rational(env, target, "framerate", codec->framerate);
+  PASS_STATUS;
+  if (!encoding) {
+    status = beam_set_string_utf8(env, target, "sw_pix_fmt",
+      (char*) av_get_pix_fmt_name(codec->sw_pix_fmt));
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_set_rational(env, target, "pkt_timebase", codec->pkt_timebase);
+    PASS_STATUS;
+  }
+  // TODO not supporing codec descriptor - yet
+  if (!encoding) {
+    status = beam_set_string_utf8(env, target, "sub_charenc", codec->sub_charenc);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_set_enum(env, target, "sub_charenc_mode",
+      beam_ff_sub_charenc_mode, codec->sub_charenc_mode);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_set_int32(env, target, "skip_alpha", codec->skip_alpha);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    status = beam_set_int32(env, target, "seek_preroll", codec->seek_preroll);
+    PASS_STATUS;
+  }
+  if (encoding) {
+    if (codec->chroma_intra_matrix != nullptr) {
+      status = napi_create_array(env, &array);
+      PASS_STATUS;
+      for ( int x = 0 ; x < 64 ; x++ ) {
+        status = napi_create_uint32(env, codec->chroma_intra_matrix[x], &element);
+        PASS_STATUS;
+        status = napi_set_element(env, array, x, element);
+        PASS_STATUS;
+      }
+      status = napi_set_named_property(env, target, "chroma_intra_matrix", array);
+      PASS_STATUS;
+    }
+  }
+
+  status = beam_set_string_utf8(env, target, "dump_separator", (char*) codec->dump_separator);
+  PASS_STATUS;
+  if (!encoding) {
+    status = napi_create_object(env, &sub);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "LOSSLESS", (codec->properties & FF_CODEC_PROPERTY_LOSSLESS) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "CLOSED_CAPTIONS", (codec->properties & FF_CODEC_PROPERTY_CLOSED_CAPTIONS) != 0);
+    PASS_STATUS;
+    status = napi_set_named_property(env, target, "properties", sub);
+    PASS_STATUS;
+  }
+
+  // TODO hw_frames_ctx
+  if (!encoding) { // Exposing as an integer - perhpas change to enum
+    status = beam_set_int32(env, target, "sub_text_format", codec->sub_text_format);
+    PASS_STATUS;
+  }
+
+  if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+    status = beam_set_int32(env, target, "trailing_padding", codec->trailing_padding);
+    PASS_STATUS;
+  }
+  status = beam_set_int64(env, target, "max_pixels", codec->max_pixels);
+  PASS_STATUS;
+  // TODO hw_device_ctx
+
+  if (!encoding) {
+    status = napi_create_object(env, &sub);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "IGNORE_LEVEL",
+      (codec->hwaccel_flags & AV_HWACCEL_FLAG_IGNORE_LEVEL) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "ALLOW_HIGH_DEPTH",
+      (codec->hwaccel_flags & AV_HWACCEL_FLAG_ALLOW_HIGH_DEPTH) != 0);
+    PASS_STATUS;
+    status = beam_set_bool(env, sub, "ALLOW_PROFILE_MISMATCH",
+      (codec->hwaccel_flags & AV_HWACCEL_FLAG_ALLOW_PROFILE_MISMATCH) != 0);
+    PASS_STATUS;
+    status = napi_set_named_property(env, target, "hwaccel_flags", sub);
+    PASS_STATUS;
+  }
+
+  if ((!encoding) && (codec->codec_type == AVMEDIA_TYPE_VIDEO)) {
+    status = beam_set_bool(env, target, "apply_cropping", (codec->apply_cropping == 1));
+    PASS_STATUS;
+    status = beam_set_int32(env, target, "extra_hw_frames", codec->extra_hw_frames);
+    PASS_STATUS;
+  }
+
   return napi_ok;
 };
 
@@ -1954,6 +2054,92 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     PASS_STATUS;
   }
 
+  // TODO skipping subtitle header for NOW
+  status = beam_get_rational(env, props, "framerate", &codec->framerate);
+  PASS_STATUS;
+  if (!encoding) {
+    status = beam_get_rational(env, props, "pkt_format", &codec->pkt_timebase);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_get_string_utf8(env, props, "sub_charenc", &codec->sub_charenc);
+    PASS_STATUS;
+  }
+  if (!encoding) {
+    status = beam_get_int32(env, props, "skip_alpha", &codec->skip_alpha);
+    PASS_STATUS;
+  }
+
+  if (encoding) {
+    status = napi_get_named_property(env, props, "chroma_intra_matrix", &value);
+    PASS_STATUS;
+    status = napi_is_array(env, value, &isArray);
+    PASS_STATUS;
+    if (isArray) {
+      codec->chroma_intra_matrix = (uint16_t*) av_mallocz(sizeof(uint16_t) * 64);
+      for ( int x = 0 ; x < 64 ; x++ ) {
+        status = napi_get_element(env, value, x, &element);
+        PASS_STATUS;
+        status = napi_typeof(env, element, &type);
+        PASS_STATUS;
+        if (type == napi_number) {
+          status = napi_get_value_uint32(env, element, &uThirtwo);
+          PASS_STATUS;
+          codec->chroma_intra_matrix[x] = (uint16_t) uThirtwo;
+        } else {
+          codec->chroma_intra_matrix[x] = 0;
+        }
+      }
+    }
+  }
+
+  status = beam_get_string_utf8(env, props, "dump_separator", (char**) &codec->dump_separator);
+  PASS_STATUS;
+  // TODO hw_frames_ctx
+  if (!encoding) { // Exposing as an integer - perhpas change to enum
+    status = beam_get_int32(env, props, "sub_text_format", &codec->sub_text_format);
+    PASS_STATUS;
+  }
+  if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+    status = beam_get_int32(env, props, "trailing_padding", &codec->trailing_padding);
+    PASS_STATUS;
+  }
+  status = beam_get_int64(env, props, "max_pixels", &codec->max_pixels);
+  PASS_STATUS;
+  // TODO hw_device_ctx
+
+  if (!encoding) {
+    status = napi_get_named_property(env, props, "hwaccel_flags", &value);
+    PASS_STATUS;
+    status = napi_typeof(env, value, &type);
+    PASS_STATUS;
+    if (type == napi_object) {
+      status = beam_get_bool(env, value, "IGNORE_LEVEL", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->hwaccel_flags = (flag) ?
+        codec->hwaccel_flags | AV_HWACCEL_FLAG_IGNORE_LEVEL :
+        codec->hwaccel_flags & ~AV_HWACCEL_FLAG_IGNORE_LEVEL; }
+      status = beam_get_bool(env, value, "ALLOW_HIGH_DEPTH", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->hwaccel_flags = (flag) ?
+        codec->hwaccel_flags | AV_HWACCEL_FLAG_ALLOW_HIGH_DEPTH :
+        codec->hwaccel_flags & ~AV_HWACCEL_FLAG_ALLOW_HIGH_DEPTH; }
+      status = beam_get_bool(env, value, "ALLOW_PROFILE_MISMATCH", &present, &flag);
+      PASS_STATUS;
+      if (present) { codec->hwaccel_flags = (flag) ?
+        codec->hwaccel_flags | AV_HWACCEL_FLAG_ALLOW_PROFILE_MISMATCH :
+        codec->hwaccel_flags & ~AV_HWACCEL_FLAG_ALLOW_PROFILE_MISMATCH; }
+    }
+  } // hwaccel_flags
+
+  if ((!encoding) && (codec->codec_type == AVMEDIA_TYPE_VIDEO)) {
+    status = beam_get_bool(env, props, "apply_cropping", &present, &flag);
+    PASS_STATUS;
+    if (present) { codec->apply_cropping = (flag) ? 1 : 0; }
+    status = beam_get_int32(env, props, "extra_hw_frames", &codec->extra_hw_frames);
+    PASS_STATUS;
+  }
+
   return napi_ok;
 };
 
@@ -2292,3 +2478,15 @@ std::unordered_map<int, std::string> beam_avdiscard_fmap = {
   { AVDISCARD_ALL, "all" }
 };
 const beamEnum* beam_avdiscard = new beamEnum(beam_avdiscard_fmap);
+
+std::unordered_map<int, std::string> beam_ff_sub_charenc_mode_fmap = {
+  // do nothing (demuxer outputs a stream supposed to be already in UTF-8, or the codec is bitmap for instance
+  { FF_SUB_CHARENC_MODE_DO_NOTHING, "do-nothing" },
+  // libavcodec will select the mode itself
+  { FF_SUB_CHARENC_MODE_AUTOMATIC, "automatic" },
+  // the AVPacket data needs to be recoded to UTF-8 before being fed to the decoder, requires iconv
+  { FF_SUB_CHARENC_MODE_PRE_DECODER, "pre-decoder" },
+  // neither convert the subtitles, nor check them for valid UTF-8
+  { FF_SUB_CHARENC_MODE_IGNORE, "ignore" }
+};
+const beamEnum* beam_ff_sub_charenc_mode = new beamEnum(beam_ff_sub_charenc_mode_fmap);

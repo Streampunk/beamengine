@@ -172,5 +172,6 @@ extern const beamEnum* beam_ff_compliance;
 extern const beamEnum* beam_ff_dct;
 extern const beamEnum* beam_ff_idct;
 extern const beamEnum* beam_avdiscard;
+extern const beamEnum* beam_ff_sub_charenc_mode;
 
 #endif // BEAMCODER_UTIL_H
