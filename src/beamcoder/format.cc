@@ -455,7 +455,7 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
-  c->status = beam_set_string_utf8(env,  result, "type", "packet");
+  c->status = beam_set_string_utf8(env,  result, "type", "Packet");
   REJECT_STATUS;
   c->status = beam_set_int32(env, result, "stream", c->packet->stream_index);
   REJECT_STATUS;
@@ -559,11 +559,6 @@ napi_value readFrame(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
 
   return promise;
-}
-
-void packetFinalizer(napi_env env, void* data, void* hint) {
-  AVPacket* pkt = (AVPacket*) data;
-  av_packet_free(&pkt);
 }
 
 void readBufferFinalizer(napi_env env, void* data, void* hint) {

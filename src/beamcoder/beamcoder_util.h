@@ -114,10 +114,14 @@ int32_t rejectStatus(napi_env env, carrier* c, char* file, int32_t line);
 napi_value nop(napi_env env, napi_callback_info info);
 char* avErrorMsg(const char* base, int avErrorCode);
 
-napi_status getPropsFromCodec(napi_env env, napi_value value,
+napi_status getPropsFromCodec(napi_env env, napi_value target,
     AVCodecContext* codec, bool encoding);
 napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
-    napi_value params, bool encoding);
+    napi_value props, bool encoding);
+napi_status getPropsFromPacket(napi_env env, napi_value target, AVPacket* packet);
+napi_status setPacketFromProps(napi_env env, AVPacket* packet, napi_value props);
+napi_status getPropsFromFrame(napi_env env, napi_value target, AVFrame* frame);
+napi_status setFrameFromProps(napi_env env, AVFrame* frame, napi_value props);
 
 napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value);
 napi_status beam_get_uint32(napi_env env, napi_value target, char* name, uint32_t* value);
@@ -133,6 +137,8 @@ napi_status beam_set_bool(napi_env env, napi_value target, char* name, bool valu
 napi_status beam_get_bool(napi_env env, napi_value target, char* name, bool* present, bool* value);
 napi_status beam_set_rational(napi_env env, napi_value target, char* name, AVRational value);
 napi_status beam_get_rational(napi_env env, napi_value target, char* name, AVRational* value);
+napi_status beam_set_null(napi_env env, napi_value target, char* name);
+napi_status beam_is_null(napi_env env, napi_value props, char* name, bool* isNull);
 
 #define BEAM_ENUM_UNKNOWN -42
 
@@ -174,5 +180,10 @@ extern const beamEnum* beam_ff_dct;
 extern const beamEnum* beam_ff_idct;
 extern const beamEnum* beam_avdiscard;
 extern const beamEnum* beam_ff_sub_charenc_mode;
+
+void packetFinalizer(napi_env env, void* data, void* hint);
+
+napi_value makePacket(napi_env env, napi_callback_info info);
+napi_value makeFrame(napi_env env, napi_callback_info info);
 
 #endif // BEAMCODER_UTIL_H
