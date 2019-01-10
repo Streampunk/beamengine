@@ -208,6 +208,8 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
   if (codec->codec->priv_class != nullptr) {
     status = napi_create_object(env, &sub);
     PASS_STATUS;
+    status = beam_set_string_utf8(env, sub, "type", (char*) codec->codec->priv_class->class_name);
+    PASS_STATUS;
     while ((option = av_opt_next(codec->priv_data, option))) {
       switch (option->type) {
         case AV_OPT_TYPE_FLAGS:
@@ -217,7 +219,7 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
         case AV_OPT_TYPE_INT: // based on x264 definitions
           ret = av_opt_get_int(codec->priv_data, option->name, 0, &iValue);
           if (option->unit == nullptr) {
-            printf("For %s, return is %i value %i\n", option->name, ret, iValue);
+            // printf("For %s, return is %i value %i\n", option->name, ret, iValue);
             status = beam_set_int32(env, sub, (char*) option->name, iValue);
             PASS_STATUS;
           } else {
@@ -1122,12 +1124,86 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
 napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     napi_value props, bool encoding) {
   napi_status status;
-  napi_value value, element;
+  napi_value value, element, names;
   napi_valuetype type;
   bool present, flag, isArray;
   double dValue;
   uint32_t uThirtwo;
   char* sValue;
+  const char* strProp;
+  size_t sLen;
+  const AVOption* option;
+  int64_t iValue;
+  int ret;
+
+  if (codec->codec->priv_class != nullptr) {
+    status = napi_get_named_property(env, props, "priv_data", &value);
+    PASS_STATUS;
+    status = napi_typeof(env, value, &type);
+    PASS_STATUS;
+    if (type == napi_object) {
+      status = napi_get_property_names(env, value, &names);
+      PASS_STATUS;
+      status = napi_get_array_length(env, names, &uThirtwo);
+      PASS_STATUS;
+      for ( int x = 0 ; x < uThirtwo ; x++ ) {
+        status = napi_get_element(env, names, x, &element);
+        PASS_STATUS;
+        status = napi_get_value_string_utf8(env, element, nullptr, 0, &sLen);
+        PASS_STATUS;
+        sValue = (char*) malloc(sizeof(char) * (sLen + 1));
+        PASS_STATUS;
+        status = napi_get_value_string_utf8(env, element, sValue, sLen + 1, &sLen);
+        PASS_STATUS;
+        option = av_opt_find(codec->priv_data, sValue, nullptr, 0, 0);
+        if (option != nullptr) {
+          status = napi_get_named_property(env, value, sValue, &element);
+          PASS_STATUS;
+          status = napi_typeof(env, element, &type);
+          PASS_STATUS;
+          switch (type) {
+            case napi_boolean:
+              status = napi_get_value_bool(env, element, &flag);
+              PASS_STATUS;
+              ret = av_opt_set_int(codec->priv_data, sValue, flag, 0);
+              if (ret < 0) printf("DEBUG: Unable to set %s with a boolean value.\n", sValue);
+              break;
+            case napi_number:
+              if ((option->type == AV_OPT_TYPE_DOUBLE) ||
+                  (option->type == AV_OPT_TYPE_FLOAT)) {
+                status = napi_get_value_double(env, element, &dValue);
+                PASS_STATUS;
+                ret = av_opt_set_double(codec->priv_data, sValue, dValue, 0);
+                if (ret < 0) printf("DEBUG: Unable to set %s with a double value %f.\n", sValue, dValue);
+                break;
+              }
+              status = napi_get_value_int64(env, element, &iValue);
+              PASS_STATUS;
+              ret = av_opt_set_int(codec->priv_data, sValue, iValue, 0);
+              if (ret < 0) printf("DEBUG: Unable to set %s with an integer value %i.\n", sValue, iValue);
+              break;
+            case napi_string:
+              status = napi_get_value_string_utf8(env, element, nullptr, 0, &sLen);
+              PASS_STATUS;
+              strProp = (const char*) malloc(sizeof(char) * (sLen + 1));
+              PASS_STATUS;
+              status = napi_get_value_string_utf8(env, element, (char*) strProp, sLen + 1, &sLen);
+              PASS_STATUS;
+              ret = av_opt_set(codec->priv_data, sValue, strProp, 0);
+              if (ret < 0) printf("DEBUG: Uable to set %s with a string value %s.\n", sValue, strProp);
+              // TODO where does strProp get freed
+              break;
+            default:
+              printf("DEBUG: Failed to set a private data value %s\n", sValue);
+              break;
+          }
+        } else {
+          printf("DEBUG: Option %s not found.\n", sValue);
+        }
+        free(sValue);
+      }
+    }
+  }
 
   status = beam_get_int64(env, props, "bit_rate", &codec->bit_rate);
   PASS_STATUS;
