@@ -200,9 +200,9 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
   status = beam_set_string_utf8(env, target, "codec_type",
     (char*) av_get_media_type_string(codec->codec_type));
   PASS_STATUS;
-  char codecTag[64];
-  av_get_codec_tag_string(codecTag, 64, codec->codec_tag);
-  status = beam_set_string_utf8(env, target, "codec_tag", codecTag);
+  char codecTag[AV_FOURCC_MAX_STRING_SIZE];
+  status = beam_set_string_utf8(env, target, "codec_tag",
+    av_fourcc_make_string(codecTag, codec->codec_tag));
   PASS_STATUS;
 
   if (codec->codec->priv_class != nullptr) {
@@ -245,7 +245,7 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
         case AV_OPT_TYPE_INT64:
         case AV_OPT_TYPE_UINT64:
           ret = av_opt_get_int(codec->priv_data, option->name, 0, &iValue);
-          printf("For %s, return is %i value %i\n", option->name, ret, iValue);
+          // printf("For %s, return is %i value %i\n", option->name, ret, iValue);
           status = beam_set_int64(env, sub, (char*) option->name, iValue);
           PASS_STATUS;
           break;
@@ -491,7 +491,13 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
   status = napi_set_named_property(env, target, "flags2", sub);
   PASS_STATUS;
 
-  // TODO ignoring extradata (for now)
+  if (codec->extradata_size > 0) {
+    status = napi_create_external_buffer(env, codec->extradata_size, codec->extradata,
+      nullptr, nullptr, &sub);
+    PASS_STATUS;
+    status = napi_set_named_property(env, target, "extradata", sub);
+    PASS_STATUS;
+  }
 
   if (encoding) {
     status = beam_set_rational(env, target, "time_base", codec->time_base);
@@ -574,7 +580,7 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
 
     status = beam_set_rational(env, target, "sample_aspect_ratio", codec->sample_aspect_ratio);
     PASS_STATUS;
-    // TODO get enum strings to work
+
     if (encoding) {
       status = beam_set_enum(env, target, "me_cmp", beam_ff_cmp, codec->me_cmp);
       PASS_STATUS;
@@ -946,7 +952,7 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     PASS_STATUS;
   }
 
-  // TODO hardware accelerator Fields hwaccel and heaccel_context
+  // TODO hardware accelerator Fields hwaccel and hwaccel_context - do when working on HW in general
 
   if (encoding && (codec->flags & AV_CODEC_FLAG_PSNR)) {
     status = napi_create_array(env, &array);
@@ -1018,7 +1024,13 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     PASS_STATUS;
   }
 
-  // TODO skipping subtitle header for NOW
+  if (codec->subtitle_header_size > 0) {
+    status = napi_create_external_buffer(env, codec->subtitle_header_size,
+      codec->subtitle_header, nullptr, nullptr, &sub);
+    PASS_STATUS;
+    status = napi_set_named_property(env, target, "subtitle_header", sub);
+    PASS_STATUS;
+  }
 
   if (encoding && (codec->codec_type == AVMEDIA_TYPE_AUDIO)) {
     status = beam_set_int32(env, target, "initial_padding", codec->initial_padding);
@@ -1111,6 +1123,8 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     PASS_STATUS;
   }
 
+  // TODO coded side data
+
   if ((!encoding) && (codec->codec_type == AVMEDIA_TYPE_VIDEO)) {
     status = beam_set_bool(env, target, "apply_cropping", (codec->apply_cropping == 1));
     PASS_STATUS;
@@ -1134,6 +1148,7 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
   size_t sLen;
   const AVOption* option;
   int64_t iValue;
+  uint8_t* data;
   int ret;
 
   if (codec->codec->priv_class != nullptr) {
@@ -1146,7 +1161,7 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       PASS_STATUS;
       status = napi_get_array_length(env, names, &uThirtwo);
       PASS_STATUS;
-      for ( int x = 0 ; x < uThirtwo ; x++ ) {
+      for ( uint32_t x = 0 ; x < uThirtwo ; x++ ) {
         status = napi_get_element(env, names, x, &element);
         PASS_STATUS;
         status = napi_get_value_string_utf8(env, element, nullptr, 0, &sLen);
@@ -1180,7 +1195,7 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
               status = napi_get_value_int64(env, element, &iValue);
               PASS_STATUS;
               ret = av_opt_set_int(codec->priv_data, sValue, iValue, 0);
-              if (ret < 0) printf("DEBUG: Unable to set %s with an integer value %i.\n", sValue, iValue);
+              if (ret < 0) printf("DEBUG: Unable to set %s with an integer value %" PRId64 ".\n", sValue, iValue);
               break;
             case napi_string:
               status = napi_get_value_string_utf8(env, element, nullptr, 0, &sLen);
@@ -1459,6 +1474,20 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
       codec->flags2 | AV_CODEC_FLAG2_RO_FLUSH_NOOP :
       codec->flags2 & ~AV_CODEC_FLAG2_RO_FLUSH_NOOP; }
   } // flags2
+
+  if (!encoding) { // TODO memory leak
+    status = napi_get_named_property(env, props, "extradata", &value);
+    PASS_STATUS;
+    status = napi_is_buffer(env, value, &isArray);
+    PASS_STATUS;
+    if (isArray) {
+      status = napi_get_buffer_info(env, value, (void**) &data, &sLen);
+      PASS_STATUS;
+      codec->extradata_size = sLen;
+      codec->extradata = (uint8_t*) malloc(sLen);
+      memcpy(codec->extradata, data, sLen);
+    }
+  }
 
   if (encoding) {
     status = beam_get_rational(env, props, "time_base", &codec->time_base);
@@ -2250,7 +2279,20 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     PASS_STATUS;
   }
 
-  // TODO skipping subtitle header for NOW
+  if (encoding) { // TODO memory leak - freeing the allocated header block
+    status = napi_get_named_property(env, props, "subtitle_header", &value);
+    PASS_STATUS;
+    status = napi_is_buffer(env, value, &isArray);
+    PASS_STATUS;
+    if (isArray) {
+      status = napi_get_buffer_info(env, value, (void**) &data, &sLen);
+      PASS_STATUS;
+      codec->subtitle_header_size = sLen;
+      codec->subtitle_header = (uint8_t*) malloc(sLen);
+      memcpy(codec->subtitle_header, data, sLen);
+    }
+  }
+
   status = beam_get_rational(env, props, "framerate", &codec->framerate);
   PASS_STATUS;
   if (!encoding) {
@@ -2327,6 +2369,7 @@ napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
         codec->hwaccel_flags & ~AV_HWACCEL_FLAG_ALLOW_PROFILE_MISMATCH; }
     }
   } // hwaccel_flags
+  // TODO coded side data
 
   if ((!encoding) && (codec->codec_type == AVMEDIA_TYPE_VIDEO)) {
     status = beam_get_bool(env, props, "apply_cropping", &present, &flag);
@@ -2424,7 +2467,7 @@ napi_status beam_set_string_utf8(napi_env env, napi_value target, char* name, ch
   return napi_set_named_property(env, target, name, prop);
 }
 
-// TODO improce memory management
+// TODO improve memory management
 napi_status beam_get_string_utf8(napi_env env, napi_value target, char* name, char** value) {
   napi_status status;
   napi_value prop;

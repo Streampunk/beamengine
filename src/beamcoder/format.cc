@@ -41,7 +41,7 @@
 int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
   Adaptor *adaptor = (Adaptor *)opaque;
-  return adaptor->read(buf, buf_size);  
+  return adaptor->read(buf, buf_size);
 }
 
 void formatExecute(napi_env env, void* data) {
@@ -206,9 +206,9 @@ void formatComplete(napi_env env,  napi_status asyncStatus, void* data) {
     c->status = beam_set_int32(env, prop, "codec_id", codec->codec_id);
     REJECT_STATUS;
 
-    char codecTag[64];
-    av_get_codec_tag_string(codecTag, 64, codec->codec_tag);
-    c->status = beam_set_string_utf8(env, prop, "codec_tag", codecTag);
+    char codecTag[AV_FOURCC_MAX_STRING_SIZE];
+    c->status = beam_set_string_utf8(env, prop, "codec_tag",
+      av_fourcc_make_string(codecTag, codec->codec_tag));
     REJECT_STATUS;
 
     if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {
