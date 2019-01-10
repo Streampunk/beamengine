@@ -40,6 +40,9 @@ void decodeExecute(napi_env env, void* data);
 void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decode(napi_env env, napi_callback_info info);
 
+napi_value getProperties(napi_env env, napi_callback_info info);
+napi_value setProperties(napi_env env, napi_callback_info info);
+
 void decoderFinalizer(napi_env env, void* data, void* hint);
 void frameFinalizer(napi_env env, void* data, void* hint);
 void frameBufferFinalize(napi_env env, void* data, void* hint);

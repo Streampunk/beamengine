@@ -89,6 +89,18 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "decode", value);
   REJECT_STATUS;
 
+  c->status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
+    getProperties, nullptr, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "getProperties", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
+    setProperties, nullptr, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "setProperties", value);
+  REJECT_STATUS;
+
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
   FLOATING_STATUS;
@@ -553,3 +565,67 @@ AVPacket* getPacket(napi_env env, napi_value packet) {
 
   return result;
 }
+
+napi_value getProperties(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, decoderJS, decoderExt;
+  napi_valuetype type;
+  AVCodecContext* decoder;
+
+  size_t argc = 0;
+  napi_value* args = nullptr;
+
+  status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
+  CHECK_STATUS;
+  status = napi_typeof(env, decoderJS, &type);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  CHECK_STATUS;
+  status = napi_get_value_external(env, decoderExt, (void**) &decoder);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = beam_set_string_utf8(env, result, "type", "CodecContext");
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "encoding", false);
+  CHECK_STATUS;
+  status = getPropsFromCodec(env, result, decoder, false);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setProperties(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, decoderJS, decoderExt;
+  napi_valuetype type;
+  AVCodecContext* decoder;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
+  CHECK_STATUS;
+  status = napi_typeof(env, decoderJS, &type);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  CHECK_STATUS;
+  status = napi_get_value_external(env, decoderExt, (void**) &decoder);
+  CHECK_STATUS;
+
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Cannot set decoder properties with no values.");
+  }
+
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Set properties must be provided as a single object.");
+  }
+  setCodecFromProps(env, decoder, args[0], false);
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+};
