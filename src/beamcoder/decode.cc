@@ -60,9 +60,12 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
-  // setCodecFromProps(env, c->decoder, result);
-
   c->status = beam_set_string_utf8(env, result, "type", "decoder");
+  REJECT_STATUS;
+
+  c->status = napi_get_reference_value(env, c->passthru, &value);
+  REJECT_STATUS;
+  c->status = setCodecFromProps(env, c->decoder, value, false);
   REJECT_STATUS;
 
   c->status = napi_create_string_utf8(env, avcodec_get_name(c->decoder->codec_id),
@@ -160,7 +163,7 @@ napi_value decoder(napi_env env, napi_callback_info info) {
     REJECT_RETURN;
     c->status = napi_get_value_int32(env, value, &c->streamIdx);
     REJECT_RETURN;
-    if (c->streamIdx < 0 || c->streamIdx >= format->nb_streams) {
+    if (c->streamIdx < 0 || c->streamIdx >= (int) format->nb_streams) {
       REJECT_ERROR_RETURN("Stream index is out of bounds for the given format.",
         BEAMCODER_ERROR_OUT_OF_BOUNDS);
     }
@@ -193,6 +196,9 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   }
 
 create:
+  c->status = napi_create_reference(env, args[0], 1, &c->passthru);
+  REJECT_RETURN;
+
   c->status = napi_create_string_utf8(env, "Decoder", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;
   c->status = napi_create_async_work(env, nullptr, resourceName, decoderExecute,
@@ -266,7 +272,7 @@ void decodeExecute(napi_env env, void* data) {
 
 void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   decodeCarrier* c = (decodeCarrier*) data;
-  napi_value result, value, frames, frame, prop, el;
+  napi_value result, frames, frame, prop, el;
   int64_t totalMem;
 
   if (asyncStatus != napi_ok) {
@@ -511,7 +517,7 @@ void frameBufferFinalize(napi_env env, void* data, void* hint) {
   napi_status status;
   int64_t externalMemory;
   status = napi_adjust_external_memory(env, -hintRef->size, &externalMemory);
-  printf("External memory is %i\n", externalMemory);
+  // printf("External memory is %i\n", externalMemory);
   if (status != napi_ok) {
     printf("DEBUG: Napi failure to adjust external memory. In beamcoder decode.cc frameBufferFinalizer.");
   }
