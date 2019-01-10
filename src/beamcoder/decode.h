@@ -40,8 +40,8 @@ void decodeExecute(napi_env env, void* data);
 void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decode(napi_env env, napi_callback_info info);
 
-napi_value getProperties(napi_env env, napi_callback_info info);
-napi_value setProperties(napi_env env, napi_callback_info info);
+napi_value getDecProperties(napi_env env, napi_callback_info info);
+napi_value setDecProperties(napi_env env, napi_callback_info info);
 
 void decoderFinalizer(napi_env env, void* data, void* hint);
 void frameFinalizer(napi_env env, void* data, void* hint);
@@ -53,6 +53,7 @@ struct decoderCarrier : carrier {
   int streamIdx = -1;
   char* codecName;
   size_t codecNameLen = 0;
+  int32_t codecID = -1;
   ~decoderCarrier() {
     if (decoder != nullptr) {
       avcodec_close(decoder);

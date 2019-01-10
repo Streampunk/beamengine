@@ -39,12 +39,17 @@ void encodeExecute(napi_env env, void* data);
 void encodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value encode(napi_env env, napi_callback_info info);
 
+napi_value getEncProperties(napi_env env, napi_callback_info info);
+napi_value setEncProperties(napi_env env, napi_callback_info info);
+
 void encoderFinalizer(napi_env env, void* data, void* hint);
 
 struct encoderCarrier : carrier {
   AVCodecContext* encoder;
+  // AVCodecParameters* params = nullptr;
   char* codecName;
   size_t codecNameLen = 0;
+  int32_t codecID = -1;
   ~encoderCarrier() {
     if (encoder != nullptr) {
       avcodec_close(encoder);

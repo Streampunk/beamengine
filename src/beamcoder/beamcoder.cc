@@ -265,7 +265,7 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
     // If it fails, PA!
   }
 
-  codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+  codec = avcodec_find_encoder_by_name("libx264");
   codecCtx = avcodec_alloc_context3(codec);
 
   // av_opt_set_int(codecCtx->priv_data, "motion-est", 1, 0);
@@ -277,6 +277,93 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   status = getPropsFromCodec(env, result, codecCtx, encoding);
+  return result;
+}
+
+napi_value codecs(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, value, array, element;
+  void* opaque = nullptr;
+  const AVCodec* codec;
+  const AVProfile* profile;
+  const AVCodecDescriptor* codecDesc;
+  int32_t index = 0;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  codec = av_codec_iterate(&opaque);
+  while (codec != nullptr) {
+    status = napi_create_object(env, &value);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "type", "Codec");
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "name", (char*) codec->name);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "long_name", (char*) codec->long_name);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "codec_type",
+      (char*) av_get_media_type_string(codec->type));
+    CHECK_STATUS;
+    status = beam_set_int32(env, value, "id", (int32_t) codec->id);
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "decoder", av_codec_is_decoder(codec));
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "encoder", av_codec_is_encoder(codec));
+    CHECK_STATUS;
+
+    if (codec->profiles != nullptr) {
+      status = napi_create_array(env, &array);
+      CHECK_STATUS;
+      profile = codec->profiles;
+      index = 0;
+      printf("Profiles for %s %s\n", codec->name, profile->name);
+      while (profile->profile != FF_PROFILE_UNKNOWN) {
+        status = napi_create_string_utf8(env, profile->name, NAPI_AUTO_LENGTH, &element);
+        CHECK_STATUS;
+        status = napi_set_element(env, array, index++, element);
+        CHECK_STATUS;
+        profile = profile + 1;
+      }
+      status = napi_set_named_property(env, value, "profiles", array);
+      CHECK_STATUS;
+    }
+
+    status = beam_set_bool(env, value, "frame-level_multithreading",
+      codec->capabilities & AV_CODEC_CAP_FRAME_THREADS);
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "slice-level_multithreading",
+      codec->capabilities & AV_CODEC_CAP_SLICE_THREADS);
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "experimental",
+      codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL);
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "supports_draw-horiz-band",
+      codec->capabilities & AV_CODEC_CAP_DRAW_HORIZ_BAND);
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "supports_direct_rendering_1",
+      codec->capabilities & AV_CODEC_CAP_DR1);
+    CHECK_STATUS;
+
+    codecDesc = avcodec_descriptor_get(codec->id);
+    if (codecDesc != nullptr) {
+      status = beam_set_string_utf8(env, value, "descriptor_name", (char*) codecDesc->name);
+      CHECK_STATUS;
+      status = beam_set_bool(env, value, "intra-frame_only",
+        codecDesc->props & AV_CODEC_PROP_INTRA_ONLY);
+      CHECK_STATUS;
+      status = beam_set_bool(env, value, "lossy",
+        codecDesc->props & AV_CODEC_PROP_LOSSY);
+      CHECK_STATUS;
+      status = beam_set_bool(env, value, "lossless",
+        codecDesc->props & AV_CODEC_PROP_LOSSLESS);
+      CHECK_STATUS;
+    }
+
+    status = napi_set_named_property(env, result, codec->name, value);
+    CHECK_STATUS;
+    codec = av_codec_iterate(&opaque);
+  }
+
   return result;
 }
 
@@ -292,10 +379,19 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("format", format),
     DECLARE_NAPI_METHOD("decoder", decoder),
     DECLARE_NAPI_METHOD("encoder", encoder),
-    DECLARE_NAPI_METHOD("testSetProps", testSetProps)
+    DECLARE_NAPI_METHOD("testSetProps", testSetProps),
+    DECLARE_NAPI_METHOD("codecs", codecs)
    };
-  status = napi_define_properties(env, exports, 10, desc);
+  status = napi_define_properties(env, exports, 11, desc);
   CHECK_STATUS;
+
+  // Iterate over all codecs to makes sure they are registered
+  void* opaque = nullptr;
+  const AVCodec* codec;
+  do {
+    codec = av_codec_iterate(&opaque);
+    // printf("Registered '%s'\n", (codec != nullptr) ? codec->name : "(null)");
+  } while (codec != nullptr);
   return exports;
 }
 

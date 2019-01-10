@@ -25,10 +25,17 @@ void decoderExecute(napi_env env, void* data) {
   decoderCarrier* c = (decoderCarrier*) data;
   const AVCodec* codec = nullptr;
   int ret;
-  AVDictionary* dict = nullptr;
-  // AVDictionaryEntry* entry = nullptr;
+  const AVCodecDescriptor* codecDesc = nullptr;
 
-  codec = avcodec_find_decoder_by_name(c->codecName);
+  codec = (c->codecID == -1) ?
+    avcodec_find_decoder_by_name(c->codecName) :
+    avcodec_find_decoder((AVCodecID) c->codecID);
+  if ((codec == nullptr) && (c->codecID == -1)) { // one more go via codec descriptor
+    codecDesc = avcodec_descriptor_get_by_name(c->codecName);
+    if (codecDesc != nullptr) {
+      codec = avcodec_find_decoder(codecDesc->id);
+    }
+  }
   if (codec == nullptr) {
     c->status = BEAMCODER_ERROR_ALLOC_DECODER;
     c->errorMsg = "Failed to find a decoder from it's name.";
@@ -62,16 +69,13 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   c->status = beam_set_string_utf8(env, result, "type", "decoder");
   REJECT_STATUS;
+  c->status = beam_set_string_utf8(env, result, "name",
+    (char*) avcodec_get_name(c->decoder->codec_id));
+  REJECT_STATUS;
 
   c->status = napi_get_reference_value(env, c->passthru, &value);
   REJECT_STATUS;
   c->status = setCodecFromProps(env, c->decoder, value, false);
-  REJECT_STATUS;
-
-  c->status = napi_create_string_utf8(env, avcodec_get_name(c->decoder->codec_id),
-    NAPI_AUTO_LENGTH, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "name", value);
   REJECT_STATUS;
 
   if (c->streamIdx != -1) {
@@ -93,13 +97,13 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   REJECT_STATUS;
 
   c->status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
-    getProperties, nullptr, &value);
+    getDecProperties, nullptr, &value);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "getProperties", value);
   REJECT_STATUS;
 
   c->status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
-    setProperties, nullptr, &value);
+    setDecProperties, nullptr, &value);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "setProperties", value);
   REJECT_STATUS;
@@ -181,6 +185,7 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   if (hasName) {
     c->status = napi_get_named_property(env, args[0], "name", &value);
     REJECT_RETURN;
+    c->codecNameLen = 64;
     c->codecName = (char*) malloc(sizeof(char) * (c->codecNameLen + 1));
     c->status = napi_get_value_string_utf8(env, value, c->codecName,
       64, &c->codecNameLen);
@@ -189,10 +194,8 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   else {
     c->status = napi_get_named_property(env, args[0], "codecID", &value);
     REJECT_RETURN;
-    c->status = napi_get_value_int32(env, value, (int32_t*) &id);
+    c->status = napi_get_value_int32(env, value, (int32_t*) &c->codecID);
     REJECT_RETURN;
-    c->codecName = (char*) avcodec_get_name(id);
-    c->codecNameLen = strlen(c->codecName);
   }
 
 create:
@@ -438,7 +441,7 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
 napi_value decode(napi_env env, napi_callback_info info) {
   napi_value resourceName, promise, decoderJS, decoderExt, value;
-  napi_valuetype type;
+  // napi_valuetype type;
   decodeCarrier* c = new decodeCarrier;
   bool isArray;
   uint32_t packetsLength;
@@ -450,8 +453,6 @@ napi_value decode(napi_env env, napi_callback_info info) {
   napi_value* args = nullptr;
 
   c->status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
-  REJECT_RETURN;
-  c->status = napi_typeof(env, decoderJS, &type);
   REJECT_RETURN;
   c->status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
   REJECT_RETURN;
@@ -572,18 +573,15 @@ AVPacket* getPacket(napi_env env, napi_value packet) {
   return result;
 }
 
-napi_value getProperties(napi_env env, napi_callback_info info) {
+napi_value getDecProperties(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, decoderJS, decoderExt;
-  napi_valuetype type;
   AVCodecContext* decoder;
 
   size_t argc = 0;
   napi_value* args = nullptr;
 
   status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
-  CHECK_STATUS;
-  status = napi_typeof(env, decoderJS, &type);
   CHECK_STATUS;
   status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
   CHECK_STATUS;
@@ -602,7 +600,7 @@ napi_value getProperties(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_value setProperties(napi_env env, napi_callback_info info) {
+napi_value setDecProperties(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, decoderJS, decoderExt;
   napi_valuetype type;
@@ -612,8 +610,6 @@ napi_value setProperties(napi_env env, napi_callback_info info) {
   napi_value args[1];
 
   status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
-  CHECK_STATUS;
-  status = napi_typeof(env, decoderJS, &type);
   CHECK_STATUS;
   status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
   CHECK_STATUS;
