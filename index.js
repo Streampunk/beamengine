@@ -1,6 +1,6 @@
 /*
   Aerostat Beam Engine - Redis-backed highly-scale-able and cloud-fit media beam engine.
-  Copyright (C) 2018  Streampunk Media Ltd.
+  Copyright (C) 2019 Streampunk Media Ltd.
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ const beamcoder = require('bindings')('beamcoder');
 const SegfaultHandler = require('segfault-handler');
 SegfaultHandler.registerHandler('crash.log');
 
-const splash = `Aerostat Beamengine  Copyright (C) 2018  Streampunk Media Ltd
+const splash = `Aerostat Beam Engine  Copyright (C) 2019  Streampunk Media Ltd
 GPL v3.0 or later license. This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. Conditions and warranty at:
