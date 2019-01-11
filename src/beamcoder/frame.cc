@@ -335,7 +335,6 @@ napi_value setFramePictType(napi_env env, napi_callback_info info) {
   napi_value result;
   napi_valuetype type;
   frameData* f;
-  bool keyFrame;
   char* name;
   size_t len;
 
@@ -465,6 +464,463 @@ done:
   return result;
 }
 
+napi_value getFramePTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, f->frame->pts, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFramePTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame PTS must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame PTS property must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &f->frame->pts);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFramePktDTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, f->frame->pkt_dts, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFramePktDTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame pkt_dts must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame pkt_dts property must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &f->frame->pkt_dts);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameCodecPicNum(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->coded_picture_number, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameCodecPicNum(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame coded_picture_number must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame coded_picture_number property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &f->frame->coded_picture_number);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameDispPicNum(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->display_picture_number, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameDispPicNum(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame display_picture_number must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame display_picture_number property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &f->frame->display_picture_number);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameQuality(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->quality, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameQuality(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame quality must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame quality property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &f->frame->quality);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameRepeatPict(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->repeat_pict, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameRepeatPict(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame repeat_pict must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame repeat_pict property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &f->frame->repeat_pict);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameInterlaced(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_get_boolean(env, f->frame->interlaced_frame == 1, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameInterlaced(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  bool interlaced;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame interlaced_frame must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_boolean) {
+    NAPI_THROW_ERROR("Frame interlaced_frame property must be set with a Boolean.");
+  }
+  status = napi_get_value_bool(env, args[0], &interlaced);
+  CHECK_STATUS;
+  f->frame->interlaced_frame = (interlaced) ? 1 : 0;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameTopFieldFirst(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_get_boolean(env, f->frame->top_field_first == 1, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameTopFieldFirst(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  bool topFieldFirst;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame top_field_first must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_boolean) {
+    NAPI_THROW_ERROR("Frame top_field_first property must be set with a Boolean.");
+  }
+  status = napi_get_value_bool(env, args[0], &topFieldFirst);
+  CHECK_STATUS;
+  f->frame->top_field_first = (topFieldFirst) ? 1 : 0;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFramePalHasChanged(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_get_boolean(env, f->frame->palette_has_changed == 1, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFramePalHasChanged(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  bool palHasChanged;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame palette_has_changed must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_boolean) {
+    NAPI_THROW_ERROR("Frame palette_has_changed property must be set with a Boolean.");
+  }
+  status = napi_get_value_bool(env, args[0], &palHasChanged);
+  CHECK_STATUS;
+  f->frame->palette_has_changed = (palHasChanged) ? 1 : 0;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameSampleRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->sample_rate, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameSampleRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame sample_rate must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame sample_rate property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &f->frame->sample_rate);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+
+napi_value getFrameChanLayout(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  char channelLayoutName[64];
+  av_get_channel_layout_string(channelLayoutName, 64, -1, f->frame->channel_layout);
+
+  status = napi_create_string_utf8(env, channelLayoutName, NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameChanLayout(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  char* name;
+  size_t len;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame sample_rate must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame sample_rate property must be set with a number.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (len + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, len + 1, &len);
+  CHECK_STATUS;
+
+  f->frame->channel_layout = av_get_channel_layout(name);
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value makeFrame(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, global, jsObject, assign;
@@ -539,9 +995,31 @@ napi_status frameFromAVFrame(napi_env env, frameData* f, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "sample_aspect_ratio", nullptr, nullptr, getFrameSampleAR, setFrameSampleAR, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "pts", nullptr, nullptr, getFramePTS, setFramePTS, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 10
+    { "pkt_dts", nullptr, nullptr, getFramePktDTS, setFramePktDTS, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "codec_picture_number", nullptr, nullptr, getFrameCodecPicNum, setFrameCodecPicNum, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "display_picture_number", nullptr, nullptr, getFrameDispPicNum, setFrameDispPicNum, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "quality", nullptr, nullptr, getFrameQuality, setFrameQuality, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "repeat_pict", nullptr, nullptr, getFrameRepeatPict, setFrameRepeatPict, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "interlaced_frame", nullptr, nullptr, getFrameInterlaced, setFrameInterlaced, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "top_field_first", nullptr, nullptr, getFrameTopFieldFirst, setFrameTopFieldFirst, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "palette_has_changed", nullptr, nullptr, getFramePalHasChanged, setFramePalHasChanged, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "sample_rate", nullptr, nullptr, getFrameSampleRate, setFrameSampleRate, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "channel_layout", nullptr, nullptr, getFrameChanLayout, setFrameChanLayout, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 20
     { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFrame, 10, desc);
+  status = napi_define_properties(env, jsFrame, 21, desc);
   PASS_STATUS;
 
   // Add in external memory usage
