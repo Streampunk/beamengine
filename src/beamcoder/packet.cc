@@ -373,6 +373,7 @@ napi_value makePacket(napi_env env, napi_callback_info info) {
 napi_status packetFromAVPacket(napi_env env, packetData* p, napi_value* result) {
   napi_status status;
   napi_value jsPacket, extPacket, typeName;
+  int64_t externalMemory;
 
   status = napi_create_object(env, &jsPacket);
   PASS_STATUS;
@@ -404,7 +405,8 @@ napi_status packetFromAVPacket(napi_env env, packetData* p, napi_value* result) 
 
   if (p->packet->buf != nullptr) {
     p->extSize = p->packet->buf->size;
-    status = napi_adjust_external_memory(env, p->extSize, nullptr);
+    // printf("Size of buffer is %i\n", p->extSize);
+    status = napi_adjust_external_memory(env, p->extSize, &externalMemory);
     PASS_STATUS;
   }
 
@@ -420,11 +422,12 @@ void packetFinalizer(napi_env env, void* data, void* hint) {
 void packetDataFinalizer(napi_env env, void* data, void* hint) {
   napi_status status;
   napi_ref dataRef;
+  int64_t externalMemory;
   packetData* p = (packetData*) data;
   dataRef = p->dataRef;
-  status = napi_adjust_external_memory(env, -p->extSize, nullptr);
+  status = napi_adjust_external_memory(env, -p->extSize, &externalMemory);
   if (status != napi_ok) {
-    printf("DEBUG: Failed to adjust external memory downwards on packet delete.");
+    printf("DEBUG: Failed to adjust external memory downwards on packet delete.\n");
   }
   delete p;
   if (dataRef != nullptr) {

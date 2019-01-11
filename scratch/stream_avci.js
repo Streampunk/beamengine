@@ -23,7 +23,7 @@ const { beamcoder, createBeamStream } = require('../index.js');
 const fs = require('fs');
 
 async function run() {
-  const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
+  const srcStream = fs.createReadStream('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
   const beamStream = createBeamStream({});
   srcStream.pipe(beamStream);
 
