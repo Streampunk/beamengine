@@ -118,8 +118,6 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     AVCodecContext* codec, bool encoding);
 napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     napi_value props, bool encoding);
-napi_status getPropsFromPacket(napi_env env, napi_value target, AVPacket* packet);
-napi_status setPacketFromProps(napi_env env, AVPacket* packet, napi_value props);
 napi_status getPropsFromFrame(napi_env env, napi_value target, AVFrame* frame);
 napi_status setFrameFromProps(napi_env env, AVFrame* frame, napi_value props);
 
@@ -181,9 +179,6 @@ extern const beamEnum* beam_ff_idct;
 extern const beamEnum* beam_avdiscard;
 extern const beamEnum* beam_ff_sub_charenc_mode;
 
-void packetFinalizer(napi_env env, void* data, void* hint);
-
-napi_value makePacket(napi_env env, napi_callback_info info);
 napi_value makeFrame(napi_env env, napi_callback_info info);
 
 #endif // BEAMCODER_UTIL_H

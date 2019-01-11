@@ -25,6 +25,7 @@
 #include "format.h"
 #include "decode.h"
 #include "encode.h"
+#include "packet.h"
 #include <stdio.h>
 
 extern "C" {
