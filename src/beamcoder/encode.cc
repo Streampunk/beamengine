@@ -107,7 +107,6 @@ napi_value encoder(napi_env env, napi_callback_info info) {
   napi_valuetype type;
   encoderCarrier* c = new encoderCarrier;
   bool isArray, hasName, hasID;
-  AVCodecID id;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;

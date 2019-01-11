@@ -549,7 +549,7 @@ napi_status isPacket(napi_env env, napi_value packet) {
   if (status != napi_ok) return status;
   status = napi_get_value_string_utf8(env, value, objType, 10, &typeLen);
   if (status != napi_ok) return status;
-  cmp = strcmp("packet", objType);
+  cmp = strcmp("Packet", objType);
   if (cmp != 0) return napi_invalid_arg;
 
   status = napi_get_named_property(env, packet, "_packet", &value);
@@ -564,13 +564,13 @@ napi_status isPacket(napi_env env, napi_value packet) {
 AVPacket* getPacket(napi_env env, napi_value packet) {
   napi_status status;
   napi_value value;
-  AVPacket* result = nullptr;
+  packetData* result = nullptr;
   status = napi_get_named_property(env, packet, "_packet", &value);
   if (status != napi_ok) return nullptr;
   status = napi_get_value_external(env, value, (void**) &result);
   if (status != napi_ok) return nullptr;
 
-  return result;
+  return result->packet;
 }
 
 napi_value getDecProperties(napi_env env, napi_callback_info info) {

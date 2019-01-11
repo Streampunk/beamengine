@@ -33,7 +33,7 @@ async function run() {
   console.log(decoder);
   for ( let x = 0 ; x < 1000 ; x++ ) {
     let packet = await format.readFrame();
-    if (packet.stream == 0) {
+    if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
       console.log(frames.frames[0]);

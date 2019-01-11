@@ -23,6 +23,7 @@
 #define DECODE_H
 
 #include "beamcoder_util.h"
+#include "packet.h"
 #include <vector>
 
 extern "C" {

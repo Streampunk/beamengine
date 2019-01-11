@@ -29,20 +29,29 @@ extern "C" {
   #include <libavcodec/avcodec.h>
 }
 
-napi_status getPropsFromPacket(napi_env env, napi_value target, AVPacket* packet);
-napi_status setPacketFromProps(napi_env env, AVPacket* packet, napi_value props);
+// napi_status getPropsFromPacket(napi_env env, napi_value target, AVPacket* packet);
+// napi_status setPacketFromProps(napi_env env, AVPacket* packet, napi_value props);
 
 void packetFinalizer(napi_env env, void* data, void* hint);
 void packetDataFinalizer(napi_env env, void* data, void* hint);
-
-napi_value makePacket(napi_env env, napi_callback_info info);
+void packetBufferFinalizer(napi_env env, void* data, void* hint);
+void packetBufferFree(void* opaque, uint8_t* data);
 
 struct packetData {
-  AVPacket* packet = av_packet_alloc();
+  AVPacket* packet = nullptr;
   napi_ref dataRef = nullptr;
+  int32_t extSize = 0;
   ~packetData() {
     av_packet_free(&packet);
   }
 };
+
+struct avBufRef {
+  napi_env env;
+  napi_ref ref;
+};
+
+napi_value makePacket(napi_env env, napi_callback_info info);
+napi_status packetFromAVPacket(napi_env env, packetData* packet, napi_value* result);
 
 #endif // PACKET_H

@@ -118,8 +118,6 @@ napi_status getPropsFromCodec(napi_env env, napi_value target,
     AVCodecContext* codec, bool encoding);
 napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
     napi_value props, bool encoding);
-napi_status getPropsFromFrame(napi_env env, napi_value target, AVFrame* frame);
-napi_status setFrameFromProps(napi_env env, AVFrame* frame, napi_value props);
 
 napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value);
 napi_status beam_get_uint32(napi_env env, napi_value target, char* name, uint32_t* value);

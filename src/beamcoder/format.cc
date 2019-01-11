@@ -436,9 +436,8 @@ void readFrameExecute(napi_env env, void* data) {
 
 void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
   readFrameCarrier* c = (readFrameCarrier*) data;
-  napi_value result, value;
-  AVBufferRef* hintRef;
-  int64_t externalMemory;
+  napi_value result;
+  packetData* p;
 
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
@@ -452,73 +451,11 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
     REJECT_STATUS;
   }
 
-  c->status = napi_create_object(env, &result);
-  REJECT_STATUS;
-
-  c->status = beam_set_string_utf8(env,  result, "type", "Packet");
-  REJECT_STATUS;
-  c->status = beam_set_int32(env, result, "stream", c->packet->stream_index);
-  REJECT_STATUS;
-
-  // TODO convert to use BigInts when more stable in Javascript
-  if (c->packet->pts == AV_NOPTS_VALUE) {
-    c->status = napi_get_null(env, &value);
-  }
-  else {
-    c->status = napi_create_int64(env, c->packet->pts, &value);
-  }
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "pts", value);
-  REJECT_STATUS;
-
-  c->status = beam_set_int64(env, result, "dts", c->packet->dts);
-  REJECT_STATUS;
-  c->status = beam_set_int32(env, result, "size", c->packet->size);
-  REJECT_STATUS;
-  c->status = beam_set_int64(env, result, "duration", c->packet->duration);
-  REJECT_STATUS;
-
-  if (c->packet->pos >= 0) {
-    c->status = napi_create_int64(env, c->packet->pos, &value);
-  }
-  else {
-    c->status = napi_get_null(env, &value);
-  }
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "pos", value);
-  REJECT_STATUS;
-
-  c->status = beam_set_bool(env, result, "key", (c->packet->flags & AV_PKT_FLAG_KEY) != 0);
-  REJECT_STATUS;
-
-  if ((c->packet->flags & AV_PKT_FLAG_CORRUPT) != 0) {
-    c->status = napi_get_boolean(env, true, &value);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, result, "corrupt", value);
-    REJECT_STATUS;
-  }
-
-  if ((c->packet->flags & AV_PKT_FLAG_DISCARD) != 0) {
-    c->status = napi_get_boolean(env, true, &value);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, result, "discard", value);
-    REJECT_STATUS;
-  }
-
-  hintRef = av_buffer_ref(c->packet->buf);
-  c->status = napi_create_external_buffer(env, hintRef->size, hintRef->data,
-    readBufferFinalizer, hintRef, &value);
-  REJECT_STATUS;
-  c->status = napi_adjust_external_memory(env, hintRef->size, &externalMemory);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "data", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_external(env, c->packet, packetFinalizer, nullptr, &value);
+  p = new packetData;
+  p->packet = c->packet;
+  c->status = packetFromAVPacket(env, p, &result);
   REJECT_STATUS;
   c->packet = nullptr;
-  c->status = napi_set_named_property(env, result, "_packet", value);
-  REJECT_STATUS;
 
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
