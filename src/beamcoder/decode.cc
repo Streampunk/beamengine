@@ -296,8 +296,13 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   uint32_t frameCount = 0;
   for ( auto it = c->frames.begin() ; it != c->frames.end() ; it++ ) {
-    AVFrame* item = *it;
-    c->status = napi_create_object(env, &frame);
+    frameData* f = new frameData;
+    f->frame = *it;
+
+    c->status = frameFromAVFrame(env, f, &frame);
+    REJECT_STATUS;
+
+    /* c->status = napi_create_object(env, &frame);
     REJECT_STATUS;
 
     c->status = beam_set_string_utf8(env, frame, "type", "frame");
@@ -408,7 +413,7 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
       if (item->buf[x] == nullptr) break;
       AVBufferRef* mybuf = av_buffer_ref(item->buf[x]);
       c->status = napi_create_external_buffer(env, mybuf->size, mybuf->data,
-        frameBufferFinalize, mybuf, &el);
+        frameBufferFinalizer, mybuf, &el);
       REJECT_STATUS;
       c->status = napi_set_element(env, prop, x, el);
       REJECT_STATUS;
@@ -421,7 +426,7 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
     c->status = napi_create_external(env, item, frameFinalizer, nullptr, &prop);
     REJECT_STATUS;
     c->status = napi_set_named_property(env, frame, "_frame", prop);
-    REJECT_STATUS;
+    REJECT_STATUS; */
 
     c->status = napi_set_element(env, frames, frameCount++, frame);
     REJECT_STATUS;
@@ -505,25 +510,6 @@ napi_value decode(napi_env env, napi_callback_info info) {
 
   return promise;
 };
-
-void frameFinalizer(napi_env env, void* data, void* hint) {
-  AVFrame* frame = (AVFrame*) data;
-  // printf("Frame finalizer called.\n");
-  av_frame_free(&frame);
-}
-
-void frameBufferFinalize(napi_env env, void* data, void* hint) {
-  AVBufferRef* hintRef = (AVBufferRef*) hint;
-  // printf("Frame buffer finalizer called with %p.\n", hint);
-  napi_status status;
-  int64_t externalMemory;
-  status = napi_adjust_external_memory(env, -hintRef->size, &externalMemory);
-  // printf("External memory is %i\n", externalMemory);
-  if (status != napi_ok) {
-    printf("DEBUG: Napi failure to adjust external memory. In beamcoder decode.cc frameBufferFinalizer.");
-  }
-  av_buffer_unref(&hintRef);
-}
 
 napi_status isPacket(napi_env env, napi_value packet) {
   napi_status status;

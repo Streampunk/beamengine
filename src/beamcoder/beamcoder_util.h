@@ -179,4 +179,9 @@ extern const beamEnum* beam_ff_sub_charenc_mode;
 
 napi_value makeFrame(napi_env env, napi_callback_info info);
 
+struct avBufRef {
+  napi_env env;
+  napi_ref ref;
+};
+
 #endif // BEAMCODER_UTIL_H

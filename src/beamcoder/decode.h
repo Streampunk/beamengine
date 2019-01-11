@@ -24,6 +24,7 @@
 
 #include "beamcoder_util.h"
 #include "packet.h"
+#include "frame.h"
 #include <vector>
 
 extern "C" {
@@ -45,8 +46,6 @@ napi_value getDecProperties(napi_env env, napi_callback_info info);
 napi_value setDecProperties(napi_env env, napi_callback_info info);
 
 void decoderFinalizer(napi_env env, void* data, void* hint);
-void frameFinalizer(napi_env env, void* data, void* hint);
-void frameBufferFinalize(napi_env env, void* data, void* hint);
 
 struct decoderCarrier : carrier {
   AVCodecContext* decoder = nullptr;

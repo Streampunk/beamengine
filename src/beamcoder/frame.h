@@ -1,5 +1,5 @@
 /*
-  Aerostat Beam Engine - Redis-backed highly-scale-able and cloud-fit media beam engine.
+  Aerostat Beam Coder - Node.JS native mappings for FFmpeg.
   Copyright (C) 2019  Streampunk Media Ltd.
 
   This program is free software: you can redistribute it and/or modify
@@ -19,8 +19,8 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-#ifndef PACKET_H
-#define PACKET_H
+#ifndef FRAME_H
+#define FRAME_H
 
 #include "node_api.h"
 #include "beamcoder_util.h"
@@ -29,21 +29,21 @@ extern "C" {
   #include <libavcodec/avcodec.h>
 }
 
-void packetFinalizer(napi_env env, void* data, void* hint);
-void packetDataFinalizer(napi_env env, void* data, void* hint);
-void packetBufferFinalizer(napi_env env, void* data, void* hint);
-void packetBufferFree(void* opaque, uint8_t* data);
+void frameFinalizer(napi_env env, void* data, void* hint);
+void frameDataFinalizer(napi_env env, void* data, void* hint);
+void frameBufferFinalizer(napi_env env, void* data, void* hint);
+void frameBufferFree(void* opaque, uint8_t* data);
 
-struct packetData {
-  AVPacket* packet = nullptr;
+struct frameData {
+  AVFrame* frame = nullptr;
   napi_ref dataRef = nullptr;
   int32_t extSize = 0;
-  ~packetData() {
-    av_packet_free(&packet);
+  ~frameData() {
+    av_frame_free(&frame);
   }
 };
 
-napi_value makePacket(napi_env env, napi_callback_info info);
-napi_status packetFromAVPacket(napi_env env, packetData* packet, napi_value* result);
+napi_value makeFrame(napi_env env, napi_callback_info info);
+napi_status frameFromAVFrame(napi_env env, frameData* frame, napi_value* result);
 
-#endif // PACKET_H
+#endif // FRAME_H

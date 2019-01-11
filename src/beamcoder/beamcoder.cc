@@ -380,9 +380,9 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("format", format),
     DECLARE_NAPI_METHOD("decoder", decoder),
     DECLARE_NAPI_METHOD("encoder", encoder),
-    DECLARE_NAPI_METHOD("testSetProps", testSetProps),
     DECLARE_NAPI_METHOD("codecs", codecs),
-    DECLARE_NAPI_METHOD("makePacket", makePacket)
+    DECLARE_NAPI_METHOD("makePacket", makePacket),
+    DECLARE_NAPI_METHOD("makeFrame", makeFrame)
    };
   status = napi_define_properties(env, exports, 12, desc);
   CHECK_STATUS;

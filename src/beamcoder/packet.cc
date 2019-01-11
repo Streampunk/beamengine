@@ -342,14 +342,16 @@ napi_value makePacket(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   CHECK_STATUS;
   if (argc > 1) {
-    NAPI_THROW_ERROR("Packet may be created with exactly one options object.");
+    NAPI_THROW_ERROR("Packet may be created with zero or one options object argument.");
   }
-  status = napi_typeof(env, args[0], &type);
-  CHECK_STATUS;
-  status = napi_is_array(env, args[0], &isArray);
-  CHECK_STATUS;
-  if (isArray || (type != napi_object)) {
-    NAPI_THROW_ERROR("Cannot create a packet without an options object.");
+  if (argc == 1) {
+    status = napi_typeof(env, args[0], &type);
+    CHECK_STATUS;
+    status = napi_is_array(env, args[0], &isArray);
+    CHECK_STATUS;
+    if (isArray || (type != napi_object)) {
+      NAPI_THROW_ERROR("Cannot create a packet unless argument is an object.");
+    }
   }
 
   status = packetFromAVPacket(env, p, &result);
