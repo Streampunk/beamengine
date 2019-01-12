@@ -24,6 +24,7 @@
 
 #include "node_api.h"
 #include "beamcoder_util.h"
+#include <vector>
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -36,7 +37,7 @@ void frameBufferFree(void* opaque, uint8_t* data);
 
 struct frameData {
   AVFrame* frame = nullptr;
-  napi_ref dataRef = nullptr;
+  std::vector<napi_ref> dataRefs;
   int32_t extSize = 0;
   ~frameData() {
     av_frame_free(&frame);

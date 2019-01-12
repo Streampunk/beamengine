@@ -26,7 +26,7 @@ async function run() {
   console.log(format.streams);
   let decoder = await beamcoder.decoder({ name: 'h264' });
   console.log(decoder);
-  for ( let x = 0 ; x < 100 ; x++ ) {
+  for ( let x = 0 ; x < 100000 ; x++ ) {
     let packet = await format.readFrame();
     if (packet.stream_index == 0) {
       console.log(packet);

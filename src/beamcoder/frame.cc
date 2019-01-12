@@ -830,6 +830,46 @@ napi_value setFramePalHasChanged(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFrameReorderOpq(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, f->frame->reordered_opaque, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameReorderOpq(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame reordered_opaque must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame reordered_opaque property must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &f->frame->reordered_opaque);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value getFrameSampleRate(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -870,7 +910,6 @@ napi_value setFrameSampleRate(napi_env env, napi_callback_info info) {
   return result;
 }
 
-
 napi_value getFrameChanLayout(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -901,12 +940,12 @@ napi_value setFrameChanLayout(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
   CHECK_STATUS;
   if (argc < 1) {
-    NAPI_THROW_ERROR("Set frame sample_rate must be provided with a value.");
+    NAPI_THROW_ERROR("Set frame channel_layout must be provided with a value.");
   }
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
-  if (type != napi_number) {
-    NAPI_THROW_ERROR("Frame sample_rate property must be set with a number.");
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Frame channel_layout property must be set with a string.");
   }
   status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
   CHECK_STATUS;
@@ -915,6 +954,589 @@ napi_value setFrameChanLayout(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   f->frame->channel_layout = av_get_channel_layout(name);
+  free(name);
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  frameData* f;
+  AVBufferRef* hintRef;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  if (f->frame->buf == nullptr) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+      if (f->frame->buf[x] == nullptr) break;
+      hintRef = av_buffer_ref(f->frame->buf[x]);
+      status = napi_create_external_buffer(env, hintRef->size, hintRef->data,
+        frameBufferFinalizer, hintRef, &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, x, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value setFrameData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  bool isArray, isBuffer;
+  frameData* f;
+  uint8_t* data;
+  size_t length;
+  avBufRef* avr;
+  uint32_t bufCount;
+  napi_ref dataRef;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set packet data must be provided with an array of buffer values.");
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("Packet data property must be set with an array of buffer values.");
+  }
+  status = napi_get_array_length(env, args[0], &bufCount);
+  CHECK_STATUS;
+  for ( uint32_t x = 0 ; x < bufCount ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_is_buffer(env, element, &isBuffer);
+    CHECK_STATUS;
+    if (!isBuffer) {
+      NAPI_THROW_ERROR("All elements of the packet data array must be buffers.");
+    }
+  }
+
+  for ( auto it = f->dataRefs.cbegin() ; it != f->dataRefs.cend() ; it++ ) {
+    status = napi_delete_reference(env, *it);
+    CHECK_STATUS;
+  }
+  f->dataRefs.clear();
+  for ( uint32_t x = 0 ; x < AV_NUM_DATA_POINTERS ; x++) {
+    if (x >= bufCount) {
+      if (f->frame->buf[x] != nullptr) {
+        av_buffer_unref(&f->frame->buf[x]);
+      }
+      f->frame->buf[x] = nullptr;
+      continue;
+    }
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_create_reference(env, element, 1, &dataRef);
+    CHECK_STATUS;
+    f->dataRefs.push_back(dataRef);
+    avr = new avBufRef;
+    status = napi_create_reference(env, element, 1, &avr->ref);
+    CHECK_STATUS;
+    avr->env = env;
+    status = napi_get_buffer_info(env, element, (void**) &data, &length);
+    CHECK_STATUS;
+    if (f->frame->buf[x] != nullptr) {
+      av_buffer_unref(&f->frame->buf[x]);
+    }
+    f->frame->buf[x] = av_buffer_create(data, length, frameBufferFree, avr, 0);
+    CHECK_STATUS;
+  }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "CORRUPT", (f->frame->flags & AV_FRAME_FLAG_CORRUPT) != 0);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFrameFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  bool present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame flags must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Frame flags property must be set with an object of Boolean flags.");
+  }
+  status = beam_get_bool(env, args[0], "CORRUPT", &present, &flag);
+  CHECK_STATUS;
+  if (present) { f->frame->flags = (flag) ?
+    f->frame->flags | AV_FRAME_FLAG_CORRUPT :
+    f->frame->flags & ~AV_FRAME_FLAG_CORRUPT; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameColorRange(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env, (char*) av_color_range_name(f->frame->color_range),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameColorRange(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  char* name;
+  size_t len;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame color_range must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Frame color_range property must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (len + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, len + 1, &len);
+  CHECK_STATUS;
+
+  ret = av_color_range_from_name(name);
+  free(name);
+  if (ret < 0) {
+    NAPI_THROW_ERROR("Color range was not recognised. Try one of 'tv' (MPEG), 'pc' (JPEG) or 'unknown'.");
+  }
+  f->frame->color_range = (AVColorRange) ret;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameColorPrimaries(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) av_color_primaries_name(f->frame->color_primaries),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameColorPrimaries(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  char* name;
+  size_t len;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame color_primaries must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Frame color_primaries property must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (len + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, len + 1, &len);
+  CHECK_STATUS;
+
+  ret = av_color_primaries_from_name(name);
+  free(name);
+  if (ret < 0) {
+    NAPI_THROW_ERROR("Color primaries not recognised. Did you mean e.g. 'bt709'?");
+  }
+  f->frame->color_primaries = (AVColorPrimaries) ret;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameColorTrc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) av_color_transfer_name(f->frame->color_trc),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameColorTrc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  char* name;
+  size_t len;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame color_trc must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Frame color_trc property must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (len + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, len + 1, &len);
+  CHECK_STATUS;
+
+  ret = av_color_transfer_from_name(name);
+  free(name);
+  if (ret < 0) {
+    NAPI_THROW_ERROR("Color transfer characteristic not recognised. Did you mean e.g. 'bt709'?");
+  }
+  f->frame->color_trc = (AVColorTransferCharacteristic) ret;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameColorspace(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) av_color_space_name(f->frame->colorspace),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameColorspace(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  char* name;
+  size_t len;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame colorspace must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Frame colorspace property must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (len + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, len + 1, &len);
+  CHECK_STATUS;
+
+  ret = av_color_space_from_name(name);
+  free(name);
+  if (ret < 0) {
+    NAPI_THROW_ERROR("Colorspace not recognised. Did you mean e.g. 'bt709'?");
+  }
+  f->frame->colorspace = (AVColorSpace) ret;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameChromaLoc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) av_chroma_location_name(f->frame->chroma_location),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameChromaLoc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  char* name;
+  size_t len;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame chroma_location must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Frame chroma_location property must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &len);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (len + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, len + 1, &len);
+  CHECK_STATUS;
+
+  ret = av_chroma_location_from_name(name);
+  free(name);
+  if (ret < 0) {
+    NAPI_THROW_ERROR("Chroma location not recognised.");
+  }
+  f->frame->chroma_location = (AVChromaLocation) ret;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameCropTop(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->crop_top, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameCropTop(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame crop_top must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame crop_top property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], (int32_t*) &f->frame->crop_top);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameCropBottom(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->crop_bottom, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameCropBottom(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame crop_bottom must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame crop_bottom property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], (int32_t*) &f->frame->crop_bottom);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameCropLeft(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->crop_left, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameCropLeft(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame crop_left must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame crop_left property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], (int32_t*) &f->frame->crop_left);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameCropRight(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->crop_right, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameCropRight(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame crop_right must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame crop_right property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], (int32_t*) &f->frame->crop_right);
+  CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
@@ -1013,16 +1635,45 @@ napi_status frameFromAVFrame(napi_env env, frameData* f, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "palette_has_changed", nullptr, nullptr, getFramePalHasChanged, setFramePalHasChanged, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
-    { "sample_rate", nullptr, nullptr, getFrameSampleRate, setFrameSampleRate, nullptr,
+    { "reordered_opaque", nullptr, nullptr, getFrameReorderOpq, setFrameReorderOpq, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
-    { "channel_layout", nullptr, nullptr, getFrameChanLayout, setFrameChanLayout, nullptr,
+    { "sample_rate", nullptr, nullptr, getFrameSampleRate, setFrameSampleRate, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 20
+    { "channel_layout", nullptr, nullptr, getFrameChanLayout, setFrameChanLayout, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "data", nullptr, nullptr, getFrameData, setFrameData, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "flags", nullptr, nullptr, getFrameFlags, setFrameFlags, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "color_range", nullptr, nullptr, getFrameColorRange, setFrameColorRange, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "color_primaries", nullptr, nullptr, getFrameColorPrimaries, setFrameColorPrimaries, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "color_trc", nullptr, nullptr, getFrameColorTrc, setFrameColorTrc, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "colorspace", nullptr, nullptr, getFrameColorspace, setFrameColorspace, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "chroma_location", nullptr, nullptr, getFrameChromaLoc, setFrameChromaLoc, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "crop_top", nullptr, nullptr, getFrameCropTop, setFrameCropTop, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "crop_bottom", nullptr, nullptr, getFrameCropBottom, setFrameCropBottom, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 30
+    { "crop_left", nullptr, nullptr, getFrameCropLeft, setFrameCropLeft, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "crop_right", nullptr, nullptr, getFrameCropRight, setFrameCropRight, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFrame, 21, desc);
+  status = napi_define_properties(env, jsFrame, 33, desc);
   PASS_STATUS;
 
-  // Add in external memory usage
+  for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+    if (f->frame->buf[x] == nullptr) break;
+    f->extSize += f->frame->buf[x]->size;
+  }
+  status = napi_adjust_external_memory(env, f->extSize, &externalMemory);
+  PASS_STATUS;
 
   *result = jsFrame;
   return napi_ok;
@@ -1034,22 +1685,32 @@ void frameFinalizer(napi_env env, void* data, void* hint) {
 }
 
 void frameDataFinalizer(napi_env env, void* data, void* hint) {
-
+  napi_status status;
+  int64_t externalMemory;
+  frameData* f = (frameData*) data;
+  status = napi_adjust_external_memory(env, -f->extSize, &externalMemory);
+  if (status != napi_ok) {
+    printf("DEBUG: Failed to adjust external memory downwards on frame delete.\n");
+  }
+  for ( auto it = f->dataRefs.cbegin() ; it != f->dataRefs.cend() ; it++) {
+    status = napi_delete_reference(env, *it);
+    if (status != napi_ok) {
+      printf("DEBUG: Failed to delete data reference for frame data, status %i.\n", status);
+    }
+  }
+  delete f;
 }
 
 void frameBufferFinalizer(napi_env env, void* data, void* hint) {
   AVBufferRef* hintRef = (AVBufferRef*) hint;
-  // printf("Frame buffer finalizer called with %p.\n", hint);
-  napi_status status;
-  int64_t externalMemory;
-  status = napi_adjust_external_memory(env, -hintRef->size, &externalMemory);
-  // printf("External memory is %i\n", externalMemory);
-  if (status != napi_ok) {
-    printf("DEBUG: Napi failure to adjust external memory. In beamcoder decode.cc frameBufferFinalizer.");
-  }
   av_buffer_unref(&hintRef);
 }
 
 void frameBufferFree(void* opaque, uint8_t* data) {
-
+  napi_status status;
+  avBufRef* avr = (avBufRef*) opaque;
+  status = napi_delete_reference(avr->env, (napi_ref) avr->ref);
+  if (status != napi_ok)
+    printf("DEBUG: Failed to delete buffer reference associated with an AVBufferRef.");
+  delete avr;
 }

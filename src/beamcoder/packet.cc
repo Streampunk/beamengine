@@ -248,6 +248,82 @@ napi_value setPacketStreamIndex(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getPacketFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  packetData* p;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &p);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "KEY", (p->packet->flags & AV_PKT_FLAG_KEY) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "CORRUPT", (p->packet->flags & AV_PKT_FLAG_CORRUPT) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DISCARD", (p->packet->flags & AV_PKT_FLAG_DISCARD) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "TRUSTED", (p->packet->flags & AV_PKT_FLAG_TRUSTED) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DISPOSABLE", (p->packet->flags & AV_PKT_FLAG_DISPOSABLE) != 0);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setPacketFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  packetData* p;
+  bool present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &p);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame flags must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Frame sample_rate property must be set with a number.");
+  }
+  status = beam_get_bool(env, args[0], "KEY", &present, &flag);
+  CHECK_STATUS;
+  if (present) { p->packet->flags = (flag) ?
+    p->packet->flags | AV_PKT_FLAG_KEY :
+    p->packet->flags & ~AV_PKT_FLAG_KEY; }
+  status = beam_get_bool(env, args[0], "CORRUPT", &present, &flag);
+  CHECK_STATUS;
+  if (present) { p->packet->flags = (flag) ?
+    p->packet->flags | AV_PKT_FLAG_CORRUPT :
+    p->packet->flags & ~AV_PKT_FLAG_CORRUPT; }
+  status = beam_get_bool(env, args[0], "DISCARD", &present, &flag);
+  CHECK_STATUS;
+  if (present) { p->packet->flags = (flag) ?
+    p->packet->flags | AV_PKT_FLAG_DISCARD :
+    p->packet->flags & ~AV_PKT_FLAG_DISCARD; }
+  status = beam_get_bool(env, args[0], "TRUSTED", &present, &flag);
+  CHECK_STATUS;
+  if (present) { p->packet->flags = (flag) ?
+    p->packet->flags | AV_PKT_FLAG_TRUSTED :
+    p->packet->flags & ~AV_PKT_FLAG_TRUSTED; }
+  status = beam_get_bool(env, args[0], "DISPOSABLE", &present, &flag);
+  CHECK_STATUS;
+  if (present) { p->packet->flags = (flag) ?
+    p->packet->flags | AV_PKT_FLAG_DISPOSABLE :
+    p->packet->flags & ~AV_PKT_FLAG_DISPOSABLE; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+
 napi_value getPacketDuration(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -396,13 +472,15 @@ napi_status packetFromAVPacket(napi_env env, packetData* p, napi_value* result) 
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "stream_index", nullptr, nullptr, getPacketStreamIndex, setPacketStreamIndex, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
+    { "flags", nullptr, nullptr, getPacketFlags, setPacketFlags, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "duration", nullptr, nullptr, getPacketDuration, setPacketDuration, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "pos", nullptr, nullptr, getPacketPos, setPacketPos, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "_packet", nullptr, nullptr, nullptr, nullptr, extPacket, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsPacket, 9, desc);
+  status = napi_define_properties(env, jsPacket, 10, desc);
   PASS_STATUS;
 
   if (p->packet->buf != nullptr) {
