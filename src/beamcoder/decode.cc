@@ -277,6 +277,11 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   decodeCarrier* c = (decodeCarrier*) data;
   napi_value result, frames, frame, prop;
 
+  for ( auto it = c->packetRefs.cbegin() ; it != c->packetRefs.cend() ; it++ ) {
+    c->status = napi_delete_reference(env, *it);
+    REJECT_STATUS;
+  }
+
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
     c->errorMsg = "Decoder allocator failed to complete.";
@@ -319,10 +324,10 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
 napi_value decode(napi_env env, napi_callback_info info) {
   napi_value resourceName, promise, decoderJS, decoderExt, value;
-  // napi_valuetype type;
   decodeCarrier* c = new decodeCarrier;
   bool isArray;
   uint32_t packetsLength;
+  napi_ref packetRef;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
@@ -356,9 +361,16 @@ napi_value decode(napi_env env, napi_callback_info info) {
       REJECT_RETURN;
       c->status = isPacket(env, value);
       if (c->status != napi_ok) {
-        REJECT_ERROR_RETURN("All passed packets in an array must be of type packet.",
+        REJECT_ERROR_RETURN("All passed values in an array must be of type packet.",
           BEAMCODER_INVALID_ARGS);
       }
+    }
+    for ( uint32_t x = 0 ; x < packetsLength ; x++ ) {
+      c->status = napi_get_element(env, args[0], x, &value);
+      REJECT_RETURN;
+      c->status = napi_create_reference(env, value, 1, &packetRef);
+      REJECT_RETURN;
+      c->packetRefs.push_back(packetRef);
       c->packets.push_back(getPacket(env, value));
     }
   }
@@ -369,6 +381,11 @@ napi_value decode(napi_env env, napi_callback_info info) {
         REJECT_ERROR_RETURN("All passed packets as arguments must be of type packet.",
           BEAMCODER_INVALID_ARGS);
       }
+    }
+    for ( uint32_t x = 0 ; x < argc ; x++ ) {
+      c->status = napi_create_reference(env, args[x], 1, &packetRef);
+      REJECT_RETURN;
+      c->packetRefs.push_back(packetRef);
       c->packets.push_back(getPacket(env, args[x]));
     }
   }
@@ -380,6 +397,8 @@ napi_value decode(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
   c->status = napi_queue_async_work(env, c->_request);
   REJECT_RETURN;
+
+  free(args);
 
   return promise;
 };

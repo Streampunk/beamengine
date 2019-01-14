@@ -188,6 +188,11 @@ void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   encodeCarrier* c = (encodeCarrier*) data;
   napi_value result, value;
 
+  for ( auto it = c->frameRefs.cbegin() ; it != c->frameRefs.cend() ; it++ ) {
+    c->status = napi_delete_reference(env, *it);
+    REJECT_STATUS;
+  }
+
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
     c->errorMsg = "Encode operation failed to complete.";
@@ -210,12 +215,70 @@ void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 };
 
 napi_value encode(napi_env env, napi_callback_info info) {
-  napi_value resourceName, promise;
-  // napi_valuetype type;
+  napi_value resourceName, promise, encoderJS, encoderExt, value;
   encodeCarrier* c = new encodeCarrier;
-  // bool isArray;
+  bool isArray;
+  uint32_t framesLength;
+  napi_ref frameRef;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
+  REJECT_RETURN;
+
+  size_t argc = 0;
+  napi_value* args = nullptr;
+
+  c->status = napi_get_cb_info(env, info, &argc, args, &encoderJS, nullptr);
+  REJECT_RETURN;
+  c->status = napi_get_named_property(env, encoderJS, "_encoder", &encoderExt);
+  REJECT_RETURN;
+  c->status = napi_get_value_external(env, encoderExt, (void**) &c->encoder);
+  REJECT_RETURN;
+
+  if (argc == 0) {
+    REJECT_ERROR_RETURN("Encode call requires one or more frames.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->status = napi_is_array(env, args[0], &isArray);
+  REJECT_RETURN;
+  if (isArray) {
+    c->status = napi_get_array_length(env, args[0], &framesLength);
+    REJECT_RETURN;
+    for ( uint32_t x = 0 ; x < framesLength ; x++ ) {
+      c->status = napi_get_element(env, args[0], x, &value);
+      REJECT_RETURN;
+      c->status = isFrame(env,value);
+      if (c->status == napi_ok) {
+        REJECT_ERROR_RETURN("Add passed values is an array must by of type frame.",
+          BEAMCODER_INVALID_ARGS);
+      }
+    }
+    for ( uint32_t x = 0 ; x < framesLength ; x++ ) {
+      c->status = napi_get_element(env, args[0], x, &value);
+      REJECT_RETURN;
+      c->status = napi_create_reference(env, value, 1, &frameRef);
+      REJECT_RETURN;
+      c->frameRefs.push_back(frameRef);
+      c->frames.push_back(getFrame(env, value));
+    }
+  } else {
+    for ( uint32_t x = 0 ; x < argc ; x++ ) {
+      c->status = isFrame(env, args[x]);
+      if (c->status != napi_ok) {
+        REJECT_ERROR_RETURN("All passed values as arguments must be of type frame.",
+          BEAMCODER_INVALID_ARGS);
+      }
+    }
+    for ( uint32_t x = 0 ; x < argc ; x++ ) {
+      c->status = napi_create_reference(env, args[x], 1, &frameRef);
+      REJECT_RETURN;
+      c->frameRefs.push_back(frameRef);
+      c->frames.push_back(getFrame(env, args[x]));
+    }
+  }
+
+  args = (napi_value*) malloc(sizeof(napi_value) * argc);
+  c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   REJECT_RETURN;
 
   c->status = napi_create_string_utf8(env, "Encode", NAPI_AUTO_LENGTH, &resourceName);
@@ -225,6 +288,8 @@ napi_value encode(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
   c->status = napi_queue_async_work(env, c->_request);
   REJECT_RETURN;
+
+  free(args);
 
   return promise;
 };
@@ -286,4 +351,53 @@ napi_value setEncProperties(napi_env env, napi_callback_info info) {
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
+};
+
+
+napi_status isFrame(napi_env env, napi_value packet) {
+  napi_status status;
+  napi_value value;
+  bool result;
+  char objType[10];
+  size_t typeLen;
+  int cmp;
+  napi_valuetype type;
+
+  status = napi_typeof(env, packet, &type);
+  if ((status != napi_ok) || (type != napi_object)) return napi_invalid_arg;
+  status = napi_is_array(env, packet, &result);
+  if ((status != napi_ok) || (result == true)) return napi_invalid_arg;
+
+  status = napi_has_named_property(env, packet, "type", &result);
+  if ((status != napi_ok) || (result == false)) return napi_invalid_arg;
+
+  status = napi_has_named_property(env, packet, "_frame", &result);
+  if ((status != napi_ok) || (result == false)) return napi_invalid_arg;
+
+  status = napi_get_named_property(env, packet, "type", &value);
+  if (status != napi_ok) return status;
+  status = napi_get_value_string_utf8(env, value, objType, 10, &typeLen);
+  if (status != napi_ok) return status;
+  cmp = strcmp("Frame", objType);
+  if (cmp != 0) return napi_invalid_arg;
+
+  status = napi_get_named_property(env, packet, "_frame", &value);
+  if (status != napi_ok) return status;
+  status = napi_typeof(env, value, &type);
+  if (status != napi_ok) return status;
+  if (type != napi_external) return napi_invalid_arg;
+
+  return napi_ok;
+}
+
+AVFrame* getFrame(napi_env env, napi_value packet) {
+  napi_status status;
+  napi_value value;
+  frameData* result = nullptr;
+  status = napi_get_named_property(env, packet, "_frame", &value);
+  if (status != napi_ok) return nullptr;
+  status = napi_get_value_external(env, value, (void**) &result);
+  if (status != napi_ok) return nullptr;
+
+  return result->frame;
 };

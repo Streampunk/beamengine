@@ -29,9 +29,10 @@ async function run() {
   for ( let x = 0 ; x < 100000 ; x++ ) {
     let packet = await format.readFrame();
     if (packet.stream_index == 0) {
-      console.log(packet);
+      //console.log(packet);
       let frames = await decoder.decode(packet);
-      console.log(frames.frames[0]);
+      // console.log(frames.frames[0]);
+      console.log(x, frames.totalTime);
     }
   }
 }

@@ -23,6 +23,7 @@
 #define ENCODE_H
 
 #include "beamcoder_util.h"
+#include "frame.h"
 #include <vector>
 
 extern "C" {
@@ -62,7 +63,11 @@ struct encodeCarrier : carrier {
   AVCodecContext* encoder;
   std::vector<AVFrame*> frames;
   std::vector<AVPacket*> packets;
+  std::vector<napi_ref> frameRefs;
   ~encodeCarrier() { }
 };
+
+napi_status isFrame(napi_env env, napi_value packet);
+AVFrame* getFrame(napi_env env, napi_value packet);
 
 #endif ENCODE_H
