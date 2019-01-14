@@ -69,6 +69,7 @@ napi_status checkArgs(napi_env env, napi_callback_info info, char* methodName,
 #define BEAMCODER_ERROR_DECODE 5008
 #define BEAMCODER_ERROR_OUT_OF_BOUNDS 5009
 #define BEAMCODER_ERROR_ALLOC_ENCODER 5010
+#define BEAMCODER_ERROR_ENCODE 5011
 #define BEAMCODER_SUCCESS 0
 
 struct carrier {

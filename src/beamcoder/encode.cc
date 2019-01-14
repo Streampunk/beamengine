@@ -179,14 +179,61 @@ void encoderFinalizer(napi_env env, void* data, void* hint) {
 
 void encodeExecute(napi_env env, void* data) {
   encodeCarrier* c = (encodeCarrier*) data;
+  int ret = 0;
+  AVPacket* packet = nullptr;
   HR_TIME_POINT encodeStart = NOW;
+
+  for ( auto it = c->frames.cbegin() ; it != c->frames.cend() ; it++ ) {
+  bump:
+   ret = avcodec_send_frame(c->encoder, *it);
+   switch (ret) {
+     case AVERROR(EAGAIN):
+       // printf("Input is not accepted in the current state - user must read output with avcodec_receive_frame().\n");
+       packet = av_packet_alloc();
+       avcodec_receive_packet(c->encoder, packet);
+       c->packets.push_back(packet);
+       goto bump;
+     case AVERROR_EOF:
+       c->status = BEAMCODER_ERROR_EOF;
+       c->errorMsg = "The encoder has been flushed, and no new frames can be sent to it.";
+       return;
+     case AVERROR(EINVAL):
+       if ((ret = avcodec_open2(c->encoder, c->encoder->codec, nullptr))) {
+         c->status = BEAMCODER_ERROR_ALLOC_DECODER;
+         c->errorMsg = avErrorMsg("Problem opening encoder: ", ret);
+         return;
+       }
+       goto bump;
+     case AVERROR(ENOMEM):
+       c->status = BEAMCODER_ERROR_ENOMEM;
+       c->errorMsg = "Failed to add frame to internal queue.";
+       return;
+     case 0:
+       // printf("Successfully sent frame to codec.\n");
+       break;
+     default:
+       c->status = BEAMCODER_ERROR_ENCODE;
+       c->errorMsg = avErrorMsg("Error sending frame: ", ret);
+       return;
+    }
+  } // loop through input frames
+
+  do {
+    packet = av_packet_alloc();
+    ret = avcodec_receive_packet(c->encoder, packet);
+    if (ret == 0) {
+      c->packets.push_back(packet);
+      packet = av_packet_alloc();
+    }
+  } while (ret == 0);
+  av_packet_free(&packet);
 
   c->totalTime = microTime(encodeStart);
 };
 
 void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   encodeCarrier* c = (encodeCarrier*) data;
-  napi_value result, value;
+  napi_value result, packets, packet, value;
 
   for ( auto it = c->frameRefs.cbegin() ; it != c->frameRefs.cend() ; it++ ) {
     c->status = napi_delete_reference(env, *it);
@@ -201,6 +248,25 @@ void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   c->status = napi_create_object(env, &result);
   REJECT_STATUS;
+  c->status = beam_set_string_utf8(env, result, "type", "packets");
+  REJECT_STATUS;
+
+  c->status = napi_create_array(env, &packets);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "packets", packets);
+  REJECT_STATUS;
+
+  uint32_t packetCount = 0;
+  for ( auto it = c->packets.begin(); it != c->packets.end() ; it++ ) {
+    packetData* p = new packetData;
+    p->packet = *it;
+
+    c->status = packetFromAVPacket(env, p, &packet);
+    REJECT_STATUS;
+
+    c->status = napi_set_element(env, packets, packetCount++, packet);
+    REJECT_STATUS;
+  }
 
   c->status = napi_create_int64(env, c->totalTime, &value);
   REJECT_STATUS;

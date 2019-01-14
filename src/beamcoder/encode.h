@@ -24,6 +24,7 @@
 
 #include "beamcoder_util.h"
 #include "frame.h"
+#include "packet.h"
 #include <vector>
 
 extern "C" {

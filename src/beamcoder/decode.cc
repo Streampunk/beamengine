@@ -258,7 +258,7 @@ void decodeExecute(napi_env env, void* data) {
         c->errorMsg = avErrorMsg("Error sending packet: ", ret);
         return;
     }
-  }
+  } // loop through input packets
 
   do {
     frame = av_frame_alloc();
