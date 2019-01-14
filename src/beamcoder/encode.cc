@@ -95,6 +95,18 @@ void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "setProperties", value);
   REJECT_STATUS;
 
+  c->status = napi_create_function(env, "encode", NAPI_AUTO_LENGTH,
+    encode, nullptr, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "encode", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_function(env, "flush", NAPI_AUTO_LENGTH,
+    flushEnc, nullptr, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "flush", value);
+  REJECT_STATUS;
+
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
   FLOATING_STATUS;
@@ -188,7 +200,7 @@ void encodeExecute(napi_env env, void* data) {
    ret = avcodec_send_frame(c->encoder, *it);
    switch (ret) {
      case AVERROR(EAGAIN):
-       // printf("Input is not accepted in the current state - user must read output with avcodec_receive_frame().\n");
+       //printf("Input is not accepted in the current state - user must read output with avcodec_receive_frame().\n");
        packet = av_packet_alloc();
        avcodec_receive_packet(c->encoder, packet);
        c->packets.push_back(packet);
@@ -209,7 +221,7 @@ void encodeExecute(napi_env env, void* data) {
        c->errorMsg = "Failed to add frame to internal queue.";
        return;
      case 0:
-       // printf("Successfully sent frame to codec.\n");
+       //printf("Successfully sent frame to codec.\n");
        break;
      default:
        c->status = BEAMCODER_ERROR_ENCODE;
@@ -224,6 +236,8 @@ void encodeExecute(napi_env env, void* data) {
     if (ret == 0) {
       c->packets.push_back(packet);
       packet = av_packet_alloc();
+    } else {
+      //printf("Receive packet got status %i\n", ret);
     }
   } while (ret == 0);
   av_packet_free(&packet);
@@ -305,6 +319,10 @@ napi_value encode(napi_env env, napi_callback_info info) {
       BEAMCODER_INVALID_ARGS);
   }
 
+  args = (napi_value*) malloc(sizeof(napi_value) * argc);
+  c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  REJECT_RETURN;
+
   c->status = napi_is_array(env, args[0], &isArray);
   REJECT_RETURN;
   if (isArray) {
@@ -342,10 +360,6 @@ napi_value encode(napi_env env, napi_callback_info info) {
       c->frames.push_back(getFrame(env, args[x]));
     }
   }
-
-  args = (napi_value*) malloc(sizeof(napi_value) * argc);
-  c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  REJECT_RETURN;
 
   c->status = napi_create_string_utf8(env, "Encode", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;
@@ -467,3 +481,38 @@ AVFrame* getFrame(napi_env env, napi_value packet) {
 
   return result->frame;
 };
+
+napi_value flushEnc(napi_env env, napi_callback_info info) {
+  encodeCarrier* c = new encodeCarrier;
+  napi_value encoderJS, encoderExt, promise, resourceName;
+
+  c->status = napi_create_promise(env, &c->_deferred, &promise);
+  REJECT_RETURN;
+
+  size_t argc = 0;
+  napi_value* args = nullptr;
+
+  c->status = napi_get_cb_info(env, info, &argc, args, &encoderJS, nullptr);
+  REJECT_RETURN;
+  c->status = napi_get_named_property(env, encoderJS, "_encoder", &encoderExt);
+  REJECT_RETURN;
+  c->status = napi_get_value_external(env, encoderExt, (void**) &c->encoder);
+  REJECT_RETURN;
+
+  if (argc != 0) {
+    REJECT_ERROR_RETURN("Encode flush takes no arguments.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->frames.push_back(nullptr);
+
+  c->status = napi_create_string_utf8(env, "EncodeFlush", NAPI_AUTO_LENGTH, &resourceName);
+  REJECT_RETURN;
+  c->status = napi_create_async_work(env, nullptr, resourceName, encodeExecute,
+    encodeComplete, c, &c->_request);
+  REJECT_RETURN;
+  c->status = napi_queue_async_work(env, c->_request);
+  REJECT_RETURN;
+
+  return promise;
+}

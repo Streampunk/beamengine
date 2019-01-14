@@ -44,9 +44,53 @@ napi_value getFrameLinesize(napi_env env, napi_callback_info info) {
 }
 
 napi_value setFrameLinesize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  napi_valuetype type;
+  frameData* f;
+  bool isArray;
+  uint32_t lineCount;
 
-  // TODO
-  return nullptr;
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame linesize must be provided with a value.");
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("Set frame linesize must use an array of numbers.");
+  }
+
+  status = napi_get_array_length(env, args[0], &lineCount);
+  CHECK_STATUS;
+  for ( uint32_t x = 0 ; x < lineCount ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_typeof(env, element, &type);
+    CHECK_STATUS;
+    if (type != napi_number) {
+      NAPI_THROW_ERROR("Set frame linesize must use an array of numbers.");
+    }
+  }
+
+  for ( uint32_t x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+    if (x >= lineCount) {
+      f->frame->linesize[x] = 0;
+      continue;
+    }
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_get_value_int32(env, element, &f->frame->linesize[x]);
+    CHECK_STATUS;
+  }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
 }
 
 napi_value getFrameWidth(napi_env env, napi_callback_info info) {
@@ -227,7 +271,7 @@ napi_value setFrameFormat(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   // TODO this may give surprising results
-  format = (int) av_get_pix_fmt((const char *) name);
+  format = (int) av_get_pix_fmt( name);
   if (format == AV_PIX_FMT_NONE) {
     format = (int) av_get_sample_fmt((const char*) name);
     if ((format != AV_SAMPLE_FMT_NONE) && (f->frame->nb_samples == 0)) {
@@ -976,7 +1020,8 @@ napi_value getFrameData(napi_env env, napi_callback_info info) {
     status = napi_create_array(env, &array);
     CHECK_STATUS;
     for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
-      if (f->frame->buf[x] == nullptr) break;
+    //  printf("Buffer %i is %p\n", x, f->frame->buf[x]);
+      if (f->frame->buf[x] == nullptr) continue;
       hintRef = av_buffer_ref(f->frame->buf[x]);
       status = napi_create_external_buffer(env, hintRef->size, hintRef->data,
         frameBufferFinalizer, hintRef, &element);
@@ -1037,6 +1082,7 @@ napi_value setFrameData(napi_env env, napi_callback_info info) {
         av_buffer_unref(&f->frame->buf[x]);
       }
       f->frame->buf[x] = nullptr;
+      f->frame->data[x] = nullptr;
       continue;
     }
     status = napi_get_element(env, args[0], x, &element);
@@ -1055,6 +1101,7 @@ napi_value setFrameData(napi_env env, napi_callback_info info) {
     }
     f->frame->buf[x] = av_buffer_create(data, length, frameBufferFree, avr, 0);
     CHECK_STATUS;
+    f->frame->data[x] = f->frame->buf[x]->data;
   }
 
   status = napi_get_undefined(env, &result);
@@ -1073,6 +1120,8 @@ napi_value getFrameFlags(napi_env env, napi_callback_info info) {
   status = napi_create_object(env, &result);
   CHECK_STATUS;
   status = beam_set_bool(env, result, "CORRUPT", (f->frame->flags & AV_FRAME_FLAG_CORRUPT) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DISCARD", (f->frame->flags & AV_FRAME_FLAG_DISCARD) != 0);
   CHECK_STATUS;
 
   return result;
@@ -1103,6 +1152,11 @@ napi_value setFrameFlags(napi_env env, napi_callback_info info) {
   if (present) { f->frame->flags = (flag) ?
     f->frame->flags | AV_FRAME_FLAG_CORRUPT :
     f->frame->flags & ~AV_FRAME_FLAG_CORRUPT; }
+  status = beam_get_bool(env, args[0], "DISCARD", &present, &flag);
+  CHECK_STATUS;
+  if (present) { f->frame->flags = (flag) ?
+    f->frame->flags | AV_FRAME_FLAG_DISCARD :
+    f->frame->flags & ~AV_FRAME_FLAG_DISCARD; }
 
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
@@ -1383,6 +1437,47 @@ napi_value setFrameChromaLoc(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFrameChannels(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->channels, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameChannels(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame channels must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame channels property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], (int32_t*) &f->frame->channels);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+
+}
+
 napi_value getFrameCropTop(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1550,6 +1645,7 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
   bool isArray;
   frameData* f = new frameData;
   f->frame = av_frame_alloc();
+  int align = 32; // av_cpu_max_align();
 
   size_t argc = 1;
   napi_value args[1];
@@ -1583,6 +1679,51 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
     status = napi_call_function(env, result, assign, 2, fargs, &result);
     CHECK_STATUS;
   }
+
+  // MAINTAIN: needs to track FFmpeg
+  if (f->frame->format >= 0) { // set up some useful line sizes.
+    if (f->frame->width > 0 && f->frame->height > 0) { // video
+      const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get((AVPixelFormat) f->frame->format);
+      int ret, i;
+      if (!desc)
+      NAPI_THROW_ERROR("Could not determine frame descriptor details.");
+
+      if (!f->frame->linesize[0]) {
+        for( i = 1 ; i <= align ; i += i) {
+          ret = av_image_fill_linesizes(f->frame->linesize, (AVPixelFormat) f->frame->format,
+                                            FFALIGN(f->frame->width, i));
+          if (ret < 0)
+            NAPI_THROW_ERROR("Failed to calculate line sizes.");
+          if (!(f->frame->linesize[0] & (align-1)))
+            break;
+        }
+        for ( i = 0 ; i < 4 && f->frame->linesize[i] ; i++) {
+          f->frame->linesize[i] = FFALIGN(f->frame->linesize[i], align);
+        }
+      }
+    }
+    else if (f->frame->nb_samples > 0 && (f->frame->channel_layout || f->frame->channels > 0)) {
+      int channels;
+      int planar = av_sample_fmt_is_planar((AVSampleFormat) f->frame->format);
+      int planes;
+      int ret;
+
+      if (!f->frame->channels)
+        f->frame->channels = av_get_channel_layout_nb_channels(f->frame->channel_layout);
+
+      channels = f->frame->channels;
+      planes = planar ? channels : 1;
+
+      // TODO: is this needed? CHECK_CHANNELS_CONSISTENCY(f->frame);
+      if (!f->frame->linesize[0]) {
+        ret = av_samples_get_buffer_size(&f->frame->linesize[0], channels,
+                                         f->frame->nb_samples, (AVSampleFormat) f->frame->format,
+                                         align);
+        if (ret < 0)
+          NAPI_THROW_ERROR("Unable to determine frame line size.");
+      }
+    }
+  } // Format provided
 
   return result;
 }
@@ -1655,17 +1796,19 @@ napi_status frameFromAVFrame(napi_env env, frameData* f, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "chroma_location", nullptr, nullptr, getFrameChromaLoc, setFrameChromaLoc, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
-    { "crop_top", nullptr, nullptr, getFrameCropTop, setFrameCropTop, nullptr,
+    { "channels", nullptr, nullptr, getFrameChannels, setFrameChannels, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
-    { "crop_bottom", nullptr, nullptr, getFrameCropBottom, setFrameCropBottom, nullptr,
+    { "crop_top", nullptr, nullptr, getFrameCropTop, setFrameCropTop, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 30
+    { "crop_bottom", nullptr, nullptr, getFrameCropBottom, setFrameCropBottom, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_left", nullptr, nullptr, getFrameCropLeft, setFrameCropLeft, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_right", nullptr, nullptr, getFrameCropRight, setFrameCropRight, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFrame, 33, desc);
+  status = napi_define_properties(env, jsFrame, 34, desc);
   PASS_STATUS;
 
   for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {

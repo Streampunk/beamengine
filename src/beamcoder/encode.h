@@ -40,6 +40,7 @@ napi_value encoder(napi_env env, napi_callback_info info);
 void encodeExecute(napi_env env, void* data);
 void encodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value encode(napi_env env, napi_callback_info info);
+napi_value flushEnc(napi_env env, napi_callback_info info);
 
 napi_value getEncProperties(napi_env env, napi_callback_info info);
 napi_value setEncProperties(napi_env env, napi_callback_info info);
