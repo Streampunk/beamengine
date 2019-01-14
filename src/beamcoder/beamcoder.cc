@@ -24,6 +24,7 @@
 #include "governor.h"
 #include "format.h"
 #include "decode.h"
+#include "filter.h"
 #include "encode.h"
 #include "packet.h"
 #include <stdio.h>
@@ -379,6 +380,7 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("governor", governor),
     DECLARE_NAPI_METHOD("format", format),
     DECLARE_NAPI_METHOD("decoder", decoder),
+    DECLARE_NAPI_METHOD("filterer", filterer),
     DECLARE_NAPI_METHOD("encoder", encoder),
     DECLARE_NAPI_METHOD("codecs", codecs),
     DECLARE_NAPI_METHOD("makePacket", makePacket),

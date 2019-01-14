@@ -23,20 +23,23 @@ const { beamcoder, createBeamStream } = require('../index.js');
 const fs = require('fs');
 
 async function run() {
-  const srcStream = fs.createReadStream('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
+  const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
   const beamStream = createBeamStream({});
   srcStream.pipe(beamStream);
 
   let format = await beamcoder.format(beamStream.governor);
-
-  let decoder = await beamcoder.decoder({ name: 'h264' });
+  let decoder = await beamcoder.decoder({ format: format, stream : 0 });
+  let filterer = await beamcoder.filterer({ format: format, decoder: decoder, description: 'scale=78:24,transpose=cclock' });
   console.log(decoder);
-  for ( let x = 0 ; x < 1000 ; x++ ) {
+  console.log(filterer);
+  for ( let x = 0 ; x < 10 ; x++ ) {
     let packet = await format.readFrame();
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
       console.log(frames.frames[0]);
+      let filtFrames = await filterer.filter(frames);
+      console.log(filtFrames.frames[0]);
     }
   }
 }
