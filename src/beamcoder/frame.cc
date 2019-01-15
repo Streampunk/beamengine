@@ -222,7 +222,8 @@ napi_value getFrameFormat(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
   CHECK_STATUS;
 
-  if (f->frame->nb_samples > 0) { // Assume audio data
+  // Assume audio data using FFmpeg's own technique
+  if (f->frame->nb_samples > 0 && (f->frame->channel_layout || f->frame->channels > 0)) {
     name = av_get_sample_fmt_name((AVSampleFormat) f->frame->format);
   }
   if (name == nullptr) { // Assume that it is video data
@@ -276,6 +277,7 @@ napi_value setFrameFormat(napi_env env, napi_callback_info info) {
     format = (int) av_get_sample_fmt((const char*) name);
     if ((format != AV_SAMPLE_FMT_NONE) && (f->frame->nb_samples == 0)) {
       f->frame->nb_samples = 1; // Cludge ... found a sample format ... force audio mode
+      f->frame->channels = 1;
     }
   }
 
@@ -1444,6 +1446,273 @@ napi_value setFrameChromaLoc(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFrameBestEffortTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, f->frame->best_effort_timestamp, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFrameBestEffortTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame best_effort_timestamp must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame best_effort_timestamp property must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &f->frame->best_effort_timestamp);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFramePktPos(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, f->frame->pkt_pos, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFramePktPos(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame pkt_pos must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame pkt_pos property must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &f->frame->pkt_pos);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFramePktDuration(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, f->frame->pkt_duration, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFramePktDuration(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame pkt_duration must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame pkt_duration property must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &f->frame->pkt_duration);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameMetadata(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+  AVDictionaryEntry* tag = nullptr;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  if (f->frame->metadata != nullptr) {
+    status = napi_create_object(env, &result);
+    CHECK_STATUS;
+    while((tag = av_dict_get(f->frame->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+      status = beam_set_string_utf8(env, result, tag->key, tag->value);
+      CHECK_STATUS;
+    }
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFrameMetadata(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, names, name, nValue;
+  napi_valuetype type;
+  frameData* f;
+  uint32_t nameCount;
+  AVDictionary* dict = nullptr;
+  char * key, * value;
+  size_t strLen;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set metadata must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type == napi_null || type == napi_undefined) {
+    f->frame->metadata = nullptr;
+    goto done;
+  }
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Frame metadata property must be set with a object.");
+  }
+
+  status = napi_get_property_names(env, args[0], &names);
+  CHECK_STATUS;
+  status = napi_get_array_length(env, names, &nameCount);
+  CHECK_STATUS;
+  for ( uint32_t x = 0 ; x < nameCount ; x++ ) {
+    status = napi_get_element(env, names, x, &name);
+    CHECK_STATUS;
+    status = napi_get_value_string_utf8(env, name, nullptr, 0, &strLen);
+    CHECK_STATUS;
+    key = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, name, key, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    status = napi_get_property(env, args[0], name, &nValue);
+    CHECK_STATUS;
+    status = napi_coerce_to_string(env, nValue, &nValue);
+    CHECK_STATUS;
+    status = napi_get_value_string_utf8(env, nValue, nullptr, 0, &strLen);
+    CHECK_STATUS;
+    value = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, nValue, value, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    ret = av_dict_set(&dict, (const char *) key, (const char *) value, 0);
+    if (ret < 0) {
+      printf("DEBUG: Error setting metadata value on a frame.");
+    }
+  }
+
+  f->frame->metadata = dict;
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFrameDecodeErrFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  status = beam_set_bool(env, result, "INVALID_BITSTREAM",
+    (f->frame->decode_error_flags & FF_DECODE_ERROR_INVALID_BITSTREAM) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "MISSING_REFERENCE",
+    (f->frame->decode_error_flags & FF_DECODE_ERROR_MISSING_REFERENCE) != 0);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFrameDecodeErrFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+  bool present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set decode_error_flags must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Frame decode_error_flags property must be set with a object of Boolean-valued properties.");
+  }
+
+  status = beam_get_bool(env, args[0], "INVALID_BITSTREAM", &present, &flag);
+  CHECK_STATUS;
+  if (present) { f->frame->decode_error_flags = (flag) ?
+    f->frame->decode_error_flags | FF_DECODE_ERROR_INVALID_BITSTREAM :
+    f->frame->decode_error_flags & ~FF_DECODE_ERROR_INVALID_BITSTREAM; }
+  status = beam_get_bool(env, args[0], "MISSING_REFERENCE", &present, &flag);
+  CHECK_STATUS;
+  if (present) { f->frame->decode_error_flags = (flag) ?
+    f->frame->decode_error_flags | FF_DECODE_ERROR_INVALID_BITSTREAM :
+    f->frame->decode_error_flags & ~FF_DECODE_ERROR_MISSING_REFERENCE; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value getFrameChannels(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1482,7 +1751,46 @@ napi_value setFrameChannels(napi_env env, napi_callback_info info) {
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
+}
 
+napi_value getFramePktSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  frameData* f;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, f->frame->pkt_size, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setFramePktSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  frameData* f;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &f);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Set frame pkt_size must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Frame pkt_size property must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], (int32_t*) &f->frame->pkt_size);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
 }
 
 napi_value getFrameCropTop(napi_env env, napi_callback_info info) {
@@ -1803,19 +2111,31 @@ napi_status frameFromAVFrame(napi_env env, frameData* f, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "chroma_location", nullptr, nullptr, getFrameChromaLoc, setFrameChromaLoc, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "best_effort_timestamp", nullptr, nullptr, getFrameBestEffortTS, setFrameBestEffortTS, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "pkt_pos", nullptr, nullptr, getFramePktPos, setFramePktPos, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 30
+    { "pkt_duration", nullptr, nullptr, getFramePktDuration, setFramePktDuration, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "metadata", nullptr, nullptr, getFrameMetadata, setFrameMetadata, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "decode_error_flags", nullptr, nullptr, getFrameDecodeErrFlags, setFrameDecodeErrFlags, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "channels", nullptr, nullptr, getFrameChannels, setFrameChannels, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
+    { "pkt_size", nullptr, nullptr, getFramePktSize, setFramePktSize, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_top", nullptr, nullptr, getFrameCropTop, setFrameCropTop, nullptr,
-      (napi_property_attributes) (napi_writable | napi_enumerable), f }, // 30
+      (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_bottom", nullptr, nullptr, getFrameCropBottom, setFrameCropBottom, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_left", nullptr, nullptr, getFrameCropLeft, setFrameCropLeft, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_right", nullptr, nullptr, getFrameCropRight, setFrameCropRight, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
-    { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr }
+    { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr } // 40
   };
-  status = napi_define_properties(env, jsFrame, 34, desc);
+  status = napi_define_properties(env, jsFrame, 40, desc);
   PASS_STATUS;
 
   for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
