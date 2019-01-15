@@ -32,13 +32,16 @@ extern "C" {
 }
 
 struct filtererCarrier : carrier {
-  AVFormatContext *fmtCtx;
-  AVCodecContext *decCtx;
-  int streamIdx = -1;
+  uint32_t width;
+  uint32_t height;
+  std::string pixFmt;
+  uint32_t timeBase[2];
+  uint32_t pixelAspect[2];
+  std::string filterSpec;
+
   AVFilterContext *srcCtx = nullptr;
   AVFilterContext *sinkCtx = nullptr;
   AVFilterGraph *filterGraph = nullptr;
-  char *filterDescription = nullptr;
   ~filtererCarrier() {}
 };
 
@@ -64,12 +67,11 @@ void filtererExecute(napi_env env, void* data) {
     goto end;
   }
 
-  AVRational time_base = c->fmtCtx->streams[c->streamIdx]->time_base;
   snprintf(args, sizeof(args),
           "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-          c->decCtx->width, c->decCtx->height, c->decCtx->pix_fmt,
-          time_base.num, time_base.den,
-          c->decCtx->sample_aspect_ratio.num, c->decCtx->sample_aspect_ratio.den);
+          c->width, c->height, av_get_pix_fmt(c->pixFmt.c_str()),
+          c->timeBase[0], c->timeBase[1],
+          c->pixelAspect[0], c->pixelAspect[1]);
   ret = avfilter_graph_create_filter(&c->srcCtx, buffersrc, "in", args, NULL, c->filterGraph);
   if (ret < 0) {
     c->status = BEAMCODER_ERROR_ENOMEM;
@@ -94,7 +96,7 @@ void filtererExecute(napi_env env, void* data) {
   inputs->pad_idx    = 0;
   inputs->next       = NULL;
 
-  if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterDescription, &inputs, &outputs, NULL)) < 0)
+  if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, &outputs, NULL)) < 0)
     goto end;
 
   if ((ret = avfilter_graph_config(c->filterGraph, NULL)) < 0)
@@ -177,52 +179,93 @@ napi_value filterer(napi_env env, napi_callback_info info) {
       BEAMCODER_INVALID_ARGS);
   }
 
-  bool hasFormat, hasDecoder, hasDescription;
-  c->status = napi_has_named_property(env, args[0], "format", &hasFormat);
+  bool hasInParams, hasFilterSpec;
+  c->status = napi_has_named_property(env, args[0], "inputParams", &hasInParams);
   REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "decoder", &hasDecoder);
-  REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "description", &hasDescription);
+  c->status = napi_has_named_property(env, args[0], "filterSpec", &hasFilterSpec);
   REJECT_RETURN;
 
-  if (!(hasFormat && hasDecoder && hasDescription)) {
-    REJECT_ERROR_RETURN("Filterer requires a format, decoder and a description.",
+  if (!(hasInParams && hasFilterSpec)) {
+    REJECT_ERROR_RETURN("Filterer parameter object requires inputParams and filterSpec to be defined.",
       BEAMCODER_INVALID_ARGS);
   }
 
-  napi_value formatJS, formatExt;
-  c->status = napi_get_named_property(env, args[0], "format", &formatJS);
-  REJECT_RETURN;
-  c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
-  REJECT_RETURN;
-  c->status = napi_get_value_external(env, formatExt, (void**)&c->fmtCtx);
+  napi_value inputParamsJS;
+  c->status = napi_get_named_property(env, args[0], "inputParams", &inputParamsJS);
   REJECT_RETURN;
 
-  napi_value decoderJS, decoderExt, streamExt;
-  c->status = napi_get_named_property(env, args[0], "decoder", &decoderJS);
+  napi_value widthVal;
+  c->status = napi_get_named_property(env, inputParamsJS, "width", &widthVal);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  c->status = napi_get_value_uint32(env, widthVal, &c->width);
   REJECT_RETURN;
-  c->status = napi_get_value_external(env, decoderExt, (void**)&c->decCtx);
+  napi_value heightVal;
+  c->status = napi_get_named_property(env, inputParamsJS, "height", &heightVal);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, decoderJS, "stream", &streamExt);
-  REJECT_RETURN;
-  c->status = napi_get_value_int32(env, streamExt, &c->streamIdx);
+  c->status = napi_get_value_uint32(env, heightVal, &c->height);
   REJECT_RETURN;
 
-  if (c->streamIdx < 0 || c->streamIdx >= (int)c->fmtCtx->nb_streams) {
-    REJECT_ERROR_RETURN("Stream index is out of bounds for the given format.",
-      BEAMCODER_ERROR_OUT_OF_BOUNDS);
+  napi_value pixFmtVal;
+  c->status = napi_get_named_property(env, inputParamsJS, "pixFmt", &pixFmtVal);
+  REJECT_RETURN;
+  size_t pixFmtLen;
+  c->status = napi_get_value_string_utf8(env, pixFmtVal, nullptr, 0, &pixFmtLen);
+  REJECT_RETURN;
+  c->pixFmt.reserve(pixFmtLen+1);
+  c->status = napi_get_value_string_utf8(env, pixFmtVal, (char *)c->pixFmt.data(), pixFmtLen+1, nullptr);
+  REJECT_RETURN;
+
+  napi_value timeBaseVal;
+  c->status = napi_get_named_property(env, inputParamsJS, "timeBase", &timeBaseVal);
+  REJECT_RETURN;
+  c->status = napi_is_array(env, timeBaseVal, &isArray);
+  REJECT_RETURN;
+  uint32_t arrayLen;
+  if (isArray) {
+    c->status = napi_get_array_length(env, timeBaseVal, &arrayLen);
+    REJECT_RETURN;
+  }
+  if (!(isArray && (2 == arrayLen))) {
+    REJECT_ERROR_RETURN("Filterer inputParams timeBase must be an array with 2 values representing a rational number.",
+      BEAMCODER_INVALID_ARGS);
+  }
+  for (uint32_t i = 0; i < arrayLen; ++i) {
+    napi_value arrayVal;
+    c->status = napi_get_element(env, timeBaseVal, i, &arrayVal);
+    REJECT_RETURN;
+    c->status = napi_get_value_uint32(env, arrayVal, &c->timeBase[i]);
+    REJECT_RETURN;
   }
 
-  napi_value descriptionJS;
-  c->status = napi_get_named_property(env, args[0], "description", &descriptionJS);
+  napi_value pixelAspectVal;
+  c->status = napi_get_named_property(env, inputParamsJS, "pixelAspect", &pixelAspectVal);
   REJECT_RETURN;
-  size_t descrLen;
-  c->status = napi_get_value_string_utf8(env, descriptionJS, nullptr, 0, &descrLen);
+  c->status = napi_is_array(env, pixelAspectVal, &isArray);
   REJECT_RETURN;
-  c->filterDescription = (char*)malloc(sizeof(char) * (descrLen + 1));
-  c->status = napi_get_value_string_utf8(env, descriptionJS, c->filterDescription, descrLen + 1, nullptr);
+  if (isArray) {
+    c->status = napi_get_array_length(env, pixelAspectVal, &arrayLen);
+    REJECT_RETURN;
+  }
+  if (!(isArray && (2 == arrayLen))) {
+    REJECT_ERROR_RETURN("Filterer inputParams pixelAspect must be an array with 2 values representing a rational number.",
+      BEAMCODER_INVALID_ARGS);
+  }
+  for (uint32_t i = 0; i < arrayLen; ++i) {
+    napi_value arrayVal;
+    c->status = napi_get_element(env, pixelAspectVal, i, &arrayVal);
+    REJECT_RETURN;
+    c->status = napi_get_value_uint32(env, arrayVal, &c->pixelAspect[i]);
+    REJECT_RETURN;
+  }
+
+  napi_value filterSpecJS;
+  c->status = napi_get_named_property(env, args[0], "filterSpec", &filterSpecJS);
+  REJECT_RETURN;
+  size_t specLen;
+  c->status = napi_get_value_string_utf8(env, filterSpecJS, nullptr, 0, &specLen);
+  REJECT_RETURN;
+  c->filterSpec.reserve(specLen+1);
+  c->status = napi_get_value_string_utf8(env, filterSpecJS, (char *)c->filterSpec.data(), specLen+1, nullptr);
   REJECT_RETURN;
 
   c->status = napi_create_string_utf8(env, "Filterer", NAPI_AUTO_LENGTH, &resourceName);

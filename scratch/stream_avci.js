@@ -29,19 +29,34 @@ async function run() {
 
   let format = await beamcoder.format(beamStream.governor);
   let decoder = await beamcoder.decoder({ format: format, stream : 0 });
-  let filterer = await beamcoder.filterer({ format: format, decoder: decoder, description: 'scale=78:24,transpose=cclock' });
+
+  const dp = decoder.getProperties();
+  let filterer = await beamcoder.filterer({
+    inputParams: {
+      width: dp.width,
+      height: dp.height,
+      pixFmt: dp.pix_fmt,
+      timeBase: format.streams[0].time_base,
+      pixelAspect: dp.sample_aspect_ratio,
+    },
+    filterSpec: 'scale=720:1280,transpose=cclock'
+  });
+
   console.log(decoder);
   console.log(filterer);
+
   for ( let x = 0 ; x < 10 ; x++ ) {
     let packet = await format.readFrame();
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
-      console.log(frames.frames[0]);
+      // console.log(frames.frames[0]);
       let filtFrames = await filterer.filter(frames);
-      console.log(filtFrames.frames[0]);
+      // console.log(filtFrames.frames[0]);
     }
   }
+  let frames = await decoder.flush();
+  console.log('flush', frames.totalTime, frames.length);
 }
 
-run();
+run().catch(console.error);
