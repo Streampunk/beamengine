@@ -211,7 +211,7 @@ void encodeExecute(napi_env env, void* data) {
        return;
      case AVERROR(EINVAL):
        if ((ret = avcodec_open2(c->encoder, c->encoder->codec, nullptr))) {
-         c->status = BEAMCODER_ERROR_ALLOC_DECODER;
+         c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
          c->errorMsg = avErrorMsg("Problem opening encoder: ", ret);
          return;
        }

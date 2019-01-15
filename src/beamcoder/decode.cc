@@ -91,11 +91,6 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "_decoder", value);
   REJECT_STATUS;
 
-  c->status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "decode", value);
-  REJECT_STATUS;
-
   c->status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
     getDecProperties, nullptr, &value);
   REJECT_STATUS;
@@ -106,6 +101,17 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
     setDecProperties, nullptr, &value);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "setProperties", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "decode", value);
+  REJECT_STATUS;
+
+  c->status = napi_create_function(env, "flush", NAPI_AUTO_LENGTH,
+    flushDec, nullptr, &value);
+  REJECT_STATUS;
+  c->status = napi_set_named_property(env, result, "flush", value);
   REJECT_STATUS;
 
   napi_status status;
@@ -449,6 +455,41 @@ AVPacket* getPacket(napi_env env, napi_value packet) {
   if (status != napi_ok) return nullptr;
 
   return result->packet;
+}
+
+napi_value flushDec(napi_env env, napi_callback_info info) {
+  decodeCarrier* c = new decodeCarrier;
+  napi_value decoderJS, decoderExt, promise, resourceName;
+
+  c->status = napi_create_promise(env, &c->_deferred, &promise);
+  REJECT_RETURN;
+
+  size_t argc = 0;
+  napi_value* args = nullptr;
+
+  c->status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
+  REJECT_RETURN;
+  c->status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  REJECT_RETURN;
+  c->status = napi_get_value_external(env, decoderExt, (void**) &c->decoder);
+  REJECT_RETURN;
+
+  if (argc != 0) {
+    REJECT_ERROR_RETURN("Decode flush takes no arguments.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  c->packets.push_back(nullptr);
+
+  c->status = napi_create_string_utf8(env, "DecodeFlush", NAPI_AUTO_LENGTH, &resourceName);
+  REJECT_RETURN;
+  c->status = napi_create_async_work(env, nullptr, resourceName, decodeExecute,
+    decodeComplete, c, &c->_request);
+  REJECT_RETURN;
+  c->status = napi_queue_async_work(env, c->_request);
+  REJECT_RETURN;
+
+  return promise;
 }
 
 napi_value getDecProperties(napi_env env, napi_callback_info info) {

@@ -26,15 +26,17 @@ async function run() {
   console.log(format.streams);
   let decoder = await beamcoder.decoder({ name: 'h264' });
   console.log(decoder);
-  for ( let x = 0 ; x < 100000 ; x++ ) {
+  for ( let x = 0 ; x < 1000 ; x++ ) {
     let packet = await format.readFrame();
-    if (packet.stream_index == 0) {
+    if (packet.stream_index === 0) {
       //console.log(packet);
       let frames = await decoder.decode(packet);
       // console.log(frames.frames[0]);
       console.log(x, frames.totalTime);
     }
   }
+  let frames = await decoder.flush();
+  console.log('flush', frames.totalTime, frames.length);
 }
 
 run();
