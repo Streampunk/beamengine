@@ -1072,10 +1072,16 @@ napi_value setFrameData(napi_env env, napi_callback_info info) {
   }
 
   for ( auto it = f->dataRefs.cbegin() ; it != f->dataRefs.cend() ; it++ ) {
+    // printf("On new buffers provided, freeing data refs for pts = %i\n", f->frame->pts);
     status = napi_delete_reference(env, *it);
     CHECK_STATUS;
   }
   f->dataRefs.clear();
+  for ( uint32_t x = 0 ; x < AV_NUM_DATA_POINTERS ; x++) {
+    if (f->frame->buf[x] != nullptr) {
+      av_buffer_unref(&f->frame->buf[x]);
+    }
+  }
   for ( uint32_t x = 0 ; x < AV_NUM_DATA_POINTERS ; x++) {
     if (x >= bufCount) {
       if (f->frame->buf[x] != nullptr) {
@@ -1087,18 +1093,19 @@ napi_value setFrameData(napi_env env, napi_callback_info info) {
     }
     status = napi_get_element(env, args[0], x, &element);
     CHECK_STATUS;
+    // printf("Creating data reference for pts = %i\n", f->frame->pts);
     status = napi_create_reference(env, element, 1, &dataRef);
     CHECK_STATUS;
     f->dataRefs.push_back(dataRef);
     avr = new avBufRef;
+    avr->pts = f->frame->pts;
+    // printf("Creating AV reference for pts = %i\n", f->frame->pts);
     status = napi_create_reference(env, element, 1, &avr->ref);
     CHECK_STATUS;
     avr->env = env;
     status = napi_get_buffer_info(env, element, (void**) &data, &length);
     CHECK_STATUS;
-    if (f->frame->buf[x] != nullptr) {
-      av_buffer_unref(&f->frame->buf[x]);
-    }
+
     f->frame->buf[x] = av_buffer_create(data, length, frameBufferFree, avr, 0);
     CHECK_STATUS;
     f->frame->data[x] = f->frame->buf[x]->data;
@@ -1825,17 +1832,20 @@ napi_status frameFromAVFrame(napi_env env, frameData* f, napi_value* result) {
 void frameFinalizer(napi_env env, void* data, void* hint) {
   AVFrame* frame = (AVFrame*) data;
   av_frame_free(&frame);
+  // printf("Freeing a frame.\n");
 }
 
 void frameDataFinalizer(napi_env env, void* data, void* hint) {
   napi_status status;
   int64_t externalMemory;
   frameData* f = (frameData*) data;
+  // printf("Freeing frame data for pts = %i\n", f->frame->pts);
   status = napi_adjust_external_memory(env, -f->extSize, &externalMemory);
   if (status != napi_ok) {
     printf("DEBUG: Failed to adjust external memory downwards on frame delete.\n");
   }
   for ( auto it = f->dataRefs.cbegin() ; it != f->dataRefs.cend() ; it++) {
+    // printf("Freeing data reference for frame with pts = %i\n", f->frame->pts);
     status = napi_delete_reference(env, *it);
     if (status != napi_ok) {
       printf("DEBUG: Failed to delete data reference for frame data, status %i.\n", status);
@@ -1847,11 +1857,13 @@ void frameDataFinalizer(napi_env env, void* data, void* hint) {
 void frameBufferFinalizer(napi_env env, void* data, void* hint) {
   AVBufferRef* hintRef = (AVBufferRef*) hint;
   av_buffer_unref(&hintRef);
+  // printf("Unreffing an AV buffer.\n");
 }
 
 void frameBufferFree(void* opaque, uint8_t* data) {
   napi_status status;
   avBufRef* avr = (avBufRef*) opaque;
+  // printf("AV freeing a frame buffer. pts = %i\n", avr->pts);
   status = napi_delete_reference(avr->env, (napi_ref) avr->ref);
   if (status != napi_ok)
     printf("DEBUG: Failed to delete buffer reference associated with an AVBufferRef.");

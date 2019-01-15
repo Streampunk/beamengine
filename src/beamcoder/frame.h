@@ -41,6 +41,7 @@ struct frameData {
   std::vector<napi_ref> dataRefs;
   int32_t extSize = 0;
   ~frameData() {
+    // printf("Freeing frame with pts = %i\n", frame->pts);
     av_frame_free(&frame);
   }
 };

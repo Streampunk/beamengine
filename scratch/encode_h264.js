@@ -25,6 +25,7 @@ const fs = require('fs');
 let endcode = Buffer.from([0, 0, 1, 0xb7]);
 
 async function run() {
+  let start = process.hrtime();
   let encParams = {
     name: 'libx264',
     width: 1920,
@@ -42,24 +43,24 @@ async function run() {
   console.log(encoder);
   console.log(encoder.getProperties());
 
-  let frame = beamcoder.makeFrame({
-    width: encParams.width,
-    height: encParams.height,
-    format: encParams.pix_fmt
-  });
-
   let outFile = fs.createWriteStream('wibble.h264');
 
-  for ( let i = 0 ; i < 100 ; i++ ) {
-    frame.pts = i;
-
+  for ( let i = 0 ; i < 1000 ; i++ ) {
+    let frame = beamcoder.makeFrame({
+      width: encParams.width,
+      height: encParams.height,
+      format: encParams.pix_fmt
+    });
 
     let linesize = frame.linesize;
+
     let [ ydata, bdata, cdata ]  = [
       Buffer.alloc(linesize[0] * frame.height + 64),
       Buffer.alloc(linesize[1]/2 * frame.height + 64),
       Buffer.alloc(linesize[2]/2 * frame.height + 64)
     ];
+
+    frame.pts = i;
 
     for ( let y = 0 ; y < frame.height ; y++ ) {
       for ( let x = 0 ; x < linesize[0] ; x++ ) {
@@ -75,7 +76,7 @@ async function run() {
     }
 
     frame.data = [ ydata, bdata, cdata ];
-    // console.log(frame);
+    // console.log(frame.data);
 
     let packets = await encoder.encode(frame);
     console.log(i, packets.totalTime);
@@ -87,6 +88,8 @@ async function run() {
   p2.packets.forEach(x => outFile.write(x.data));
   outFile.end(endcode);
 
+  // global.gc();
+  console.log('Total time ', process.hrtime(start));
 }
 
 run();

@@ -243,6 +243,11 @@ void encodeExecute(napi_env env, void* data) {
   av_packet_free(&packet);
 
   c->totalTime = microTime(encodeStart);
+  /* if (!c->frames.empty()) {
+    printf("Finished encoding frame. First pts = %i\n", c->frames.front()->pts);
+  } else {
+    printf("Flushing complete.\n");
+  } */
 };
 
 void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
@@ -250,6 +255,7 @@ void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
   napi_value result, packets, packet, value;
 
   for ( auto it = c->frameRefs.cbegin() ; it != c->frameRefs.cend() ; it++ ) {
+    // printf("Deleting frame reference. First pts = %i\n", c->frames.front()->pts);
     c->status = napi_delete_reference(env, *it);
     REJECT_STATUS;
   }
@@ -340,6 +346,7 @@ napi_value encode(napi_env env, napi_callback_info info) {
     for ( uint32_t x = 0 ; x < framesLength ; x++ ) {
       c->status = napi_get_element(env, args[0], x, &value);
       REJECT_RETURN;
+      // printf("Creating a reference to a frame.\n");
       c->status = napi_create_reference(env, value, 1, &frameRef);
       REJECT_RETURN;
       c->frameRefs.push_back(frameRef);
@@ -358,6 +365,7 @@ napi_value encode(napi_env env, napi_callback_info info) {
       REJECT_RETURN;
       c->frameRefs.push_back(frameRef);
       c->frames.push_back(getFrame(env, args[x]));
+      // printf("Creating a reference to a frame. First pts = %i\n", c->frames.front()->pts);
     }
   }
 
