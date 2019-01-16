@@ -25,12 +25,15 @@ napi_value getCodecParCodecType(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   codecParData* c;
+  const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
+  enumName = av_get_media_type_string(c->codecPars->codec_type);
   status = napi_create_string_utf8(env,
-    av_get_media_type_string(c->codecPars->codec_type), NAPI_AUTO_LENGTH, &result);
+    (enumName != nullptr) ? (char*) enumName : "unknown",
+    NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
 
   return result;
@@ -124,7 +127,7 @@ napi_value getCodecParName(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_string_utf8(env, (char*) avcodec_get_type(c->codecPars->codec_id),
+  status = napi_create_string_utf8(env, (char*) avcodec_get_name(c->codecPars->codec_id),
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
 
@@ -772,12 +775,17 @@ napi_value getCodecParChanLayout(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   codecParData* c;
+  char enumName[64];
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-//GET_BODY channel_layout uint64_t ChanLayout
-  return nullptr;
+  av_get_channel_layout_string(enumName, 64, c->codecPars->channels,
+    c->codecPars->channel_layout);
+  status = napi_create_string_utf8(env, enumName, NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
 }
 
 napi_value setCodecParChanLayout(napi_env env, napi_callback_info info) {
@@ -785,6 +793,8 @@ napi_value setCodecParChanLayout(napi_env env, napi_callback_info info) {
   napi_value result;
   napi_valuetype type;
   codecParData* c;
+  char* enumString;
+  size_t strLen;
 
   size_t argc = 1;
   napi_value args[1];
@@ -795,13 +805,23 @@ napi_value setCodecParChanLayout(napi_env env, napi_callback_info info) {
   }
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Codec parameter channel_layout must be set with a string value.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  enumString = (char*) malloc(sizeof(char) * (strLen + 1));
+  CHECK_STATUS;
+  status = napi_get_value_string_utf8(env, args[0], enumString, strLen + 1, &strLen);
+  CHECK_STATUS;
 
-//SET_BODY channel_layout uint64_t ChanLayout
+  c->codecPars->channel_layout = av_get_channel_layout((const char *) enumString);
+  free(enumString);
+
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
 }
-
 
 napi_value getCodecParBitsPerCodedSmp(napi_env env, napi_callback_info info) {
   napi_status status;
@@ -1325,6 +1345,81 @@ napi_value setCodecParSeekPreroll(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getCodecParProfile(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  codecParData* c;
+  const char* profName;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
+  CHECK_STATUS;
+
+  profName = avcodec_profile_name(c->codecPars->codec_id, c->codecPars->profile);
+  if (profName != nullptr) {
+    status = napi_create_string_utf8(env, (char*) profName, NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_create_int32(env, c->codecPars->profile, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setCodecParProfile(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  codecParData* c;
+  char* enumString;
+  size_t strLen;
+  const AVProfile* profile;
+  const AVCodecDescriptor* codecDesc;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &c);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Codec parameter profile must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type == napi_number) {
+    status = napi_get_value_int32(env, args[0], &c->codecPars->profile);
+    CHECK_STATUS;
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Codec parameter profile must be set by integer or string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  enumString = (char*) malloc(sizeof(char) * (strLen + 1));
+  CHECK_STATUS;
+  status = napi_get_value_string_utf8(env, args[0], enumString, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  codecDesc = avcodec_descriptor_get(c->codecPars->codec_id);
+  if (codecDesc == nullptr) goto done;
+  profile = codecDesc->profiles;
+  while (profile->profile != FF_PROFILE_UNKNOWN) {
+    if (strcmp(enumString, profile->name) == 0) {
+      c->codecPars->profile = profile->profile;
+      break;
+    }
+    profile = profile + 1;
+  }
+
+  free(enumString);
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value makeCodecParameters(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, global, jsObject, assign;
@@ -1382,9 +1477,65 @@ napi_status fromAVCodecParameters(napi_env env, codecParData* c, napi_value* res
 
   napi_property_descriptor desc[] = {
     { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
-    { "_codecPar", nullptr, nullptr, nullptr, nullptr, extCodecPar, napi_default, nullptr }
+    { "codec_type", nullptr, nullptr, getCodecParCodecType, setCodecParCodecType, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "codec_id", nullptr, nullptr, getCodecParCodecID, setCodecParCodecID, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "name", nullptr, nullptr, getCodecParName, setCodecParName, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "codec_tag", nullptr, nullptr, getCodecParCodecTag, nullptr, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "format", nullptr, nullptr, getCodecParFormat, setCodecParFormat, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "bit_rate", nullptr, nullptr, getCodecParBitRate, setCodecParBitRate, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "bits_per_coded_sample", nullptr, nullptr, getCodecParBitsPerCodedSmp, setCodecParBitsPerCodedSmp, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "bits_per_raw_sample", nullptr, nullptr, getCodecParBitsPerRawSmp, setCodecParBitsPerRawSmp, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "profile", nullptr, nullptr, getCodecParProfile, setCodecParProfile, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c }, // 10
+    { "level", nullptr, nullptr, getCodecParLevel, setCodecParLevel, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "width", nullptr, nullptr, getCodecParWidth, setCodecParWidth, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "height", nullptr, nullptr, getCodecParHeight, setCodecParHeight, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "sample_aspect_ratio", nullptr, nullptr, getCodecParSmpAspectRt, setCodecParSmpAspectRt, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "field_order", nullptr, nullptr, getCodecParFieldOrder, setCodecParFieldOrder, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "color_range", nullptr, nullptr, getCodecParColorRange, setCodecParColorRange, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "color_primaries", nullptr, nullptr, getCodecParColorPrims, setCodecParColorPrims, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "color_trc", nullptr, nullptr, getCodecParColorTrc, setCodecParColorTrc, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "color_space", nullptr, nullptr, getCodecParColorSpace, setCodecParColorSpace, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "chroma_location", nullptr, nullptr, getCodecParChromaLoc, setCodecParChromaLoc, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c }, // 20
+    { "video_delay", nullptr, nullptr, getCodecParVideoDelay, setCodecParVideoDelay, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "channel_layout", nullptr, nullptr, getCodecParChanLayout, setCodecParChanLayout, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "channels", nullptr, nullptr, getCodecParChannels, setCodecParChannels, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "sample_rate", nullptr, nullptr, getCodecParSampleRate, setCodecParSampleRate, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "block_align", nullptr, nullptr, getCodecParBlockAlign, setCodecParBlockAlign, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "frame_size", nullptr, nullptr, getCodecParFrameSize, setCodecParFrameSize, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "initial_padding", nullptr, nullptr, getCodecParInitialPad, setCodecParInitialPad, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "trailing_padding", nullptr, nullptr, getCodecParTrailingPad, setCodecParTrailingPad, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "seek_preroll", nullptr, nullptr, getCodecParSeekPreroll, setCodecParSeekPreroll, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    { "_codecPar", nullptr, nullptr, nullptr, nullptr, extCodecPar, napi_default, nullptr } // 30
   };
-  status = napi_define_properties(env, jsCodecPar, 2, desc);
+  status = napi_define_properties(env, jsCodecPar, 30, desc);
   PASS_STATUS;
 
   *result = jsCodecPar;
