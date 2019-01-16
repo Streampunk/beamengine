@@ -1176,11 +1176,14 @@ napi_value getFrameColorRange(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   frameData* f;
+  const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
   CHECK_STATUS;
 
-  status = napi_create_string_utf8(env, (char*) av_color_range_name(f->frame->color_range),
+  enumName = av_color_range_name(f->frame->color_range);
+  status = napi_create_string_utf8(env,
+    (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
   return result;
@@ -1230,12 +1233,14 @@ napi_value getFrameColorPrimaries(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   frameData* f;
+  const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
   CHECK_STATUS;
 
+  enumName = av_color_primaries_name(f->frame->color_primaries);
   status = napi_create_string_utf8(env,
-    (char*) av_color_primaries_name(f->frame->color_primaries),
+    (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
   return result;
@@ -1285,12 +1290,14 @@ napi_value getFrameColorTrc(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   frameData* f;
+  const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
   CHECK_STATUS;
 
+  enumName = av_color_transfer_name(f->frame->color_trc);
   status = napi_create_string_utf8(env,
-    (char*) av_color_transfer_name(f->frame->color_trc),
+    (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
   return result;
@@ -1340,12 +1347,14 @@ napi_value getFrameColorspace(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   frameData* f;
+  const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
   CHECK_STATUS;
 
+  enumName = av_color_space_name(f->frame->colorspace);
   status = napi_create_string_utf8(env,
-    (char*) av_color_space_name(f->frame->colorspace),
+    (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
   return result;
@@ -1395,12 +1404,14 @@ napi_value getFrameChromaLoc(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   frameData* f;
+  const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &f);
   CHECK_STATUS;
 
+  enumName = av_chroma_location_name(f->frame->chroma_location);
   status = napi_create_string_utf8(env,
-    (char*) av_chroma_location_name(f->frame->chroma_location),
+    (enumName != nullptr) ? (char*) enumName : "unspecified",
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
   return result;
@@ -1437,7 +1448,7 @@ napi_value setFrameChromaLoc(napi_env env, napi_callback_info info) {
   ret = av_chroma_location_from_name(name);
   free(name);
   if (ret < 0) {
-    NAPI_THROW_ERROR("Chroma location not recognised.");
+    NAPI_THROW_ERROR("Chroma location not recognised. Did you mean e.g. 'left'?");
   }
   f->frame->chroma_location = (AVChromaLocation) ret;
 

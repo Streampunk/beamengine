@@ -177,6 +177,7 @@ extern const beamEnum* beam_ff_dct;
 extern const beamEnum* beam_ff_idct;
 extern const beamEnum* beam_avdiscard;
 extern const beamEnum* beam_ff_sub_charenc_mode;
+extern const beamEnum* beam_avmedia_type;
 
 napi_value makeFrame(napi_env env, napi_callback_info info);
 

@@ -27,6 +27,7 @@
 #include "filter.h"
 #include "encode.h"
 #include "packet.h"
+#include "codec_par.h"
 #include <stdio.h>
 
 extern "C" {
@@ -385,10 +386,11 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("codecs", codecs),
     DECLARE_NAPI_METHOD("makePacket", makePacket),
     DECLARE_NAPI_METHOD("makeFrame", makeFrame),
+    DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters),
     DECLARE_NAPI_METHOD("demuxer", format),
     DECLARE_NAPI_METHOD("muxer", format)
    };
-  status = napi_define_properties(env, exports, 15, desc);
+  status = napi_define_properties(env, exports, 16, desc);
   CHECK_STATUS;
 
   // Iterate over all codecs to makes sure they are registered

@@ -2753,3 +2753,12 @@ std::unordered_map<int, std::string> beam_ff_sub_charenc_mode_fmap = {
   { FF_SUB_CHARENC_MODE_IGNORE, "ignore" }
 };
 const beamEnum* beam_ff_sub_charenc_mode = new beamEnum(beam_ff_sub_charenc_mode_fmap);
+
+std::unordered_map<int, std::string> beam_avmedia_type_fmap = {
+  { AVMEDIA_TYPE_VIDEO, "video" },
+  { AVMEDIA_TYPE_AUDIO, "audio" },
+  { AVMEDIA_TYPE_DATA, "data" },
+  { AVMEDIA_TYPE_SUBTITLE, "subtitle" },
+  { AVMEDIA_TYPE_ATTACHMENT, "attachment" }
+};
+const beamEnum* beam_avmedia_type = new beamEnum(beam_avmedia_type_fmap);

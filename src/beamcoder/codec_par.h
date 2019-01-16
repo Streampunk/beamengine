@@ -19,24 +19,27 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-const { beamcoder } = require('../index.js');
+#ifndef CODEC_PAR_H
+#define CODEC_PAR_H
 
-async function run() {
-  let format = await beamcoder.format('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
-  console.log(format.streams);
-  let decoder = await beamcoder.decoder({ name: 'h264' });
-  console.log(decoder);
-  for ( let x = 0 ; x < 1000 ; x++ ) {
-    let packet = await format.readFrame();
-    if (packet.stream_index === 0) {
-      //console.log(packet);
-      let frames = await decoder.decode(packet);
-      console.log(frames.frames[0]);
-      console.log(x, frames.totalTime);
-    }
-  }
-  let frames = await decoder.flush();
-  console.log('flush', frames.totalTime, frames.length);
+#include "node_api.h"
+#include "beamcoder_util.h"
+
+extern "C" {
+  #include <libavcodec/avcodec.h>
 }
 
-run();
+void codecParDataFinalizer(napi_env env, void* data, void* hint);
+
+struct codecParData {
+  AVCodecParameters* codecPars = nullptr;
+  // napi_ref codecParRef = nullptr;
+  ~codecParData() {
+    avcodec_parameters_free(&codecPars);
+  }
+};
+
+napi_value makeCodecParameters(napi_env env, napi_callback_info info);
+napi_status fromAVCodecParameters(napi_env env, codecParData* frame, napi_value* result);
+
+#endif // CODEC_PAR_H

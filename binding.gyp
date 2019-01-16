@@ -7,7 +7,8 @@
                     "src/beamcoder/governor.cc", "src/beamcoder/format.cc",
                     "src/beamcoder/decode.cc", "src/beamcoder/filter.cc",
                     "src/beamcoder/encode.cc",
-                    "src/beamcoder/packet.cc", "src/beamcoder/frame.cc" ],
+                    "src/beamcoder/packet.cc", "src/beamcoder/frame.cc",
+                    "src/beamcoder/codec_par.cc" ],
       "configurations": {
         "Release": {
           "msvs_settings": {
