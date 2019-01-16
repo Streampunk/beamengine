@@ -1991,7 +1991,7 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
     }
   }
 
-  status = frameFromAVFrame(env, f, &result);
+  status = fromAVFrame(env, f, &result);
   CHECK_STATUS;
 
   if (argc == 1) {
@@ -2054,7 +2054,7 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_status frameFromAVFrame(napi_env env, frameData* f, napi_value* result) {
+napi_status fromAVFrame(napi_env env, frameData* f, napi_value* result) {
   napi_status status;
   napi_value jsFrame, extFrame, typeName;
   int64_t externalMemory;

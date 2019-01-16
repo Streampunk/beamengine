@@ -47,6 +47,6 @@ struct frameData {
 };
 
 napi_value makeFrame(napi_env env, napi_callback_info info);
-napi_status frameFromAVFrame(napi_env env, frameData* frame, napi_value* result);
+napi_status fromAVFrame(napi_env env, frameData* frame, napi_value* result);
 
 #endif // FRAME_H

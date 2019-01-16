@@ -281,7 +281,7 @@ void encodeComplete(napi_env env, napi_status asyncStatus, void* data) {
     packetData* p = new packetData;
     p->packet = *it;
 
-    c->status = packetFromAVPacket(env, p, &packet);
+    c->status = fromAVPacket(env, p, &packet);
     REJECT_STATUS;
 
     c->status = napi_set_element(env, packets, packetCount++, packet);

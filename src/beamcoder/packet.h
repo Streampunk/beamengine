@@ -44,6 +44,6 @@ struct packetData {
 };
 
 napi_value makePacket(napi_env env, napi_callback_info info);
-napi_status packetFromAVPacket(napi_env env, packetData* packet, napi_value* result);
+napi_status fromAVPacket(napi_env env, packetData* packet, napi_value* result);
 
 #endif // PACKET_H

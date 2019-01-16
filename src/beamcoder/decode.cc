@@ -309,7 +309,7 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
     frameData* f = new frameData;
     f->frame = *it;
 
-    c->status = frameFromAVFrame(env, f, &frame);
+    c->status = fromAVFrame(env, f, &frame);
     REJECT_STATUS;
 
     c->status = napi_set_element(env, frames, frameCount++, frame);

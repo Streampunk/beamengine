@@ -430,7 +430,7 @@ napi_value makePacket(napi_env env, napi_callback_info info) {
     }
   }
 
-  status = packetFromAVPacket(env, p, &result);
+  status = fromAVPacket(env, p, &result);
   CHECK_STATUS;
 
   if (argc == 1) {
@@ -448,7 +448,7 @@ napi_value makePacket(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_status packetFromAVPacket(napi_env env, packetData* p, napi_value* result) {
+napi_status fromAVPacket(napi_env env, packetData* p, napi_value* result) {
   napi_status status;
   napi_value jsPacket, extPacket, typeName;
   int64_t externalMemory;

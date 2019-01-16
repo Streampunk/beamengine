@@ -23,6 +23,7 @@
 #include "beamcoder_util.h"
 #include "governor.h"
 #include "format.h"
+#include "demux.h"
 #include "decode.h"
 #include "filter.h"
 #include "encode.h"
@@ -379,7 +380,7 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("configurations", configurations),
     DECLARE_NAPI_METHOD("licenses", licenses),
     DECLARE_NAPI_METHOD("governor", governor),
-    DECLARE_NAPI_METHOD("format", format), // deprecated - so young!
+    DECLARE_NAPI_METHOD("format", demuxer), // deprecated - so young!
     DECLARE_NAPI_METHOD("decoder", decoder),
     DECLARE_NAPI_METHOD("filterer", filterer),
     DECLARE_NAPI_METHOD("encoder", encoder), // 10
@@ -387,8 +388,8 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("makePacket", makePacket),
     DECLARE_NAPI_METHOD("makeFrame", makeFrame),
     DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters),
-    DECLARE_NAPI_METHOD("demuxer", format),
-    DECLARE_NAPI_METHOD("muxer", format)
+    DECLARE_NAPI_METHOD("demuxer", demuxer),
+    DECLARE_NAPI_METHOD("muxer", demuxer)
    };
   status = napi_define_properties(env, exports, 16, desc);
   CHECK_STATUS;
