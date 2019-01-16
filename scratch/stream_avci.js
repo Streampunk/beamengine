@@ -32,14 +32,15 @@ async function run() {
 
   const dp = decoder.getProperties();
   let filterer = await beamcoder.filterer({
-    inputParams: {
+    inputParams: [{
+      name: '0:v',
       width: dp.width,
       height: dp.height,
       pixFmt: dp.pix_fmt,
       timeBase: format.streams[0].time_base,
       pixelAspect: dp.sample_aspect_ratio,
-    },
-    filterSpec: 'scale=720:1280,transpose=cclock'
+    }],
+    filterSpec: '[0:v]scale=1280:720,transpose=cclock'
   });
 
   console.log(decoder);
@@ -52,11 +53,11 @@ async function run() {
       let frames = await decoder.decode(packet);
       // console.log(frames.frames[0]);
       let filtFrames = await filterer.filter(frames);
-      // console.log(filtFrames.frames[0]);
+      console.log(filtFrames.frames[0]);
     }
   }
   let frames = await decoder.flush();
-  console.log('flush', frames.totalTime, frames.length);
+  console.log('flush', frames.totalTime, frames.frames.length);
 }
 
 run().catch(console.error);
