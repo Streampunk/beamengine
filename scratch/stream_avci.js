@@ -33,13 +33,14 @@ async function run() {
   const dp = decoder.getProperties();
   let filterer = await beamcoder.filterer({
     inputParams: [{
+      name: '0:v',
       width: dp.width,
       height: dp.height,
       pixFmt: dp.pix_fmt,
       timeBase: format.streams[0].time_base,
       pixelAspect: dp.sample_aspect_ratio,
     }],
-    filterSpec: 'scale=1280:720,transpose=cclock'
+    filterSpec: '[0:v]scale=1280:720,transpose=cclock'
   });
 
   console.log(decoder);

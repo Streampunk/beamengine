@@ -22,6 +22,7 @@
 #include "filter.h"
 #include "beamcoder_util.h"
 #include "frame.h"
+#include <sstream>
 
 extern "C" {
   #include <libavfilter/avfilter.h>
@@ -32,10 +33,11 @@ extern "C" {
 }
 
 struct filtererCarrier : carrier {
+  std::vector<std::string> inName;
   std::vector<std::string> inParams;
   std::string filterSpec;
 
-  AVFilterContext *srcCtx = nullptr;
+  std::vector<AVFilterContext *> srcCtx;
   AVFilterContext *sinkCtx = nullptr;
   AVFilterGraph *filterGraph = nullptr;
   ~filtererCarrier() {}
@@ -48,53 +50,67 @@ void graphFinalizer(napi_env env, void* data, void* hint) {
 
 void filtererExecute(napi_env env, void* data) {
   filtererCarrier* c = (filtererCarrier*) data;
-
   int ret = 0;
-  const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
-  const AVFilter *buffersink = avfilter_get_by_name("buffersink");
-  AVFilterInOut *outputs = avfilter_inout_alloc();
-  AVFilterInOut *inputs  = avfilter_inout_alloc();
 
   c->filterGraph = avfilter_graph_alloc();
-  if (!outputs || !inputs || !c->filterGraph) {
-    c->status = BEAMCODER_ERROR_ENOMEM;
-    c->errorMsg = "Failed to allocate filter resources.";
-    goto end;
-  }
+  AVFilterInOut *inputs  = avfilter_inout_alloc();
+  std::vector<AVFilterInOut *> outputs;
 
-  ret = avfilter_graph_create_filter(&c->srcCtx, buffersrc, "in", c->inParams[0].c_str(), NULL, c->filterGraph);
-  if (ret < 0) {
-    c->status = BEAMCODER_ERROR_ENOMEM;
-    c->errorMsg = "Failed to allocate source filter graph.";
-    goto end;
-  }
-
+  const AVFilter *buffersink = avfilter_get_by_name("buffersink");
   ret = avfilter_graph_create_filter(&c->sinkCtx, buffersink, "out", NULL, NULL, c->filterGraph);
   if (ret < 0) {
     c->status = BEAMCODER_ERROR_ENOMEM;
     c->errorMsg = "Failed to allocate sink filter graph.";
     goto end;
   }
-
-  outputs->name       = av_strdup("in");
-  outputs->filter_ctx = c->srcCtx;
-  outputs->pad_idx    = 0;
-  outputs->next       = NULL;
-
   inputs->name       = av_strdup("out");
   inputs->filter_ctx = c->sinkCtx;
   inputs->pad_idx    = 0;
   inputs->next       = NULL;
 
-  if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, &outputs, NULL)) < 0)
-    goto end;
+  c->srcCtx.resize(c->inParams.size());
+  outputs.resize(c->inParams.size());
+  bool opAlloc = true;
+  for (auto &op: outputs)
+    if (!(opAlloc = (op = avfilter_inout_alloc()) != NULL)) break;
 
-  if ((ret = avfilter_graph_config(c->filterGraph, NULL)) < 0)
+  if (!(opAlloc && inputs && c->filterGraph)) {
+    c->status = BEAMCODER_ERROR_ENOMEM;
+    c->errorMsg = "Failed to allocate filter resources.";
     goto end;
+  }
+
+  for (size_t i = 0; i < c->inParams.size(); ++i) {
+    AVFilterInOut *op = outputs[i];
+    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+    ret = avfilter_graph_create_filter(&c->srcCtx[i], buffersrc, "in", c->inParams[i].c_str(), NULL, c->filterGraph);
+    if (ret < 0) {
+      c->status = BEAMCODER_ERROR_ENOMEM;
+      c->errorMsg = "Failed to allocate source filter graph.";
+      goto end;
+    }
+    op->name       = av_strdup(c->inName[i].c_str());
+    op->filter_ctx = c->srcCtx[i];
+    op->pad_idx    = 0;
+    op->next       = i < c->inParams.size() - 1 ? outputs[i + 1] : NULL;
+  }
+
+  if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, &outputs[0], NULL)) < 0) {
+    c->status = BEAMCODER_ERROR_ENOMEM;
+    c->errorMsg = "Failed to parse filter graph.";
+    goto end;
+  }
+
+  if ((ret = avfilter_graph_config(c->filterGraph, NULL)) < 0) {
+    c->status = BEAMCODER_ERROR_ENOMEM;
+    c->errorMsg = "Failed to configure filter graph.";
+    goto end;
+  }
 
 end:
   avfilter_inout_free(&inputs);
-  avfilter_inout_free(&outputs);
+  for (auto &op: outputs)
+    avfilter_inout_free(&op);
 }
 
 void filtererComplete(napi_env env, napi_status asyncStatus, void* data) {
@@ -118,7 +134,7 @@ void filtererComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "graph", value);
   REJECT_STATUS;
 
-  c->status = napi_create_external(env, c->srcCtx, nullptr, nullptr, &value);
+  c->status = napi_create_external(env, c->srcCtx[0], nullptr, nullptr, &value);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "sourceContext", value);
   REJECT_STATUS;
@@ -198,11 +214,33 @@ napi_value filterer(napi_env env, napi_callback_info info) {
     c->status = napi_get_element(env, paramsArrayVal, i, &inParamsVal);
     REJECT_RETURN;
 
+    std::string name;
     uint32_t width;
     uint32_t height;
     std::string pixFmt;
     AVRational timeBase;
     AVRational pixelAspect;
+
+    bool hasNameVal;
+    c->status = napi_has_named_property(env, inParamsVal, "name", &hasNameVal);
+    REJECT_RETURN;
+    if (!hasNameVal && (i > 0)) {
+      REJECT_ERROR_RETURN("Filterer inputParams must include a name value if there is more than one input.",
+        BEAMCODER_INVALID_ARGS);
+    }
+    if (hasNameVal) {
+      napi_value nameVal;
+      c->status = napi_get_named_property(env, inParamsVal, "name", &nameVal);
+      REJECT_RETURN;
+      size_t nameLen;
+      c->status = napi_get_value_string_utf8(env, nameVal, nullptr, 0, &nameLen);
+      REJECT_RETURN;
+      name.resize(nameLen+1);
+      c->status = napi_get_value_string_utf8(env, nameVal, (char *)name.data(), nameLen+1, nullptr);
+      REJECT_RETURN;
+      c->inName.push_back(name);
+    } else
+      c->inName.push_back("in");
 
     napi_value widthVal;
     c->status = napi_get_named_property(env, inParamsVal, "width", &widthVal);
@@ -221,7 +259,7 @@ napi_value filterer(napi_env env, napi_callback_info info) {
     size_t pixFmtLen;
     c->status = napi_get_value_string_utf8(env, pixFmtVal, nullptr, 0, &pixFmtLen);
     REJECT_RETURN;
-    pixFmt.reserve(pixFmtLen+1);
+    pixFmt.resize(pixFmtLen+1);
     c->status = napi_get_value_string_utf8(env, pixFmtVal, (char *)pixFmt.data(), pixFmtLen+1, nullptr);
     REJECT_RETURN;
 
@@ -282,7 +320,7 @@ napi_value filterer(napi_env env, napi_callback_info info) {
   size_t specLen;
   c->status = napi_get_value_string_utf8(env, filterSpecJS, nullptr, 0, &specLen);
   REJECT_RETURN;
-  c->filterSpec.reserve(specLen+1);
+  c->filterSpec.resize(specLen+1);
   c->status = napi_get_value_string_utf8(env, filterSpecJS, (char *)c->filterSpec.data(), specLen+1, nullptr);
   REJECT_RETURN;
 
