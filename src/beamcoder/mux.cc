@@ -19,40 +19,15 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-#ifndef FORMAT_H
-#define FORMAT_H
+#include "mux.h"
 
-#include "node_api.h"
-#include "beamcoder_util.h"
+napi_value muxer(napi_env env, napi_callback_info info) {
 
-extern "C" {
-  #include <libavformat/avformat.h>
+  AVFormatContext* fmtCtx = nullptr;
+  avformat_alloc_output_context2(&fmtCtx, nullptr, nullptr, nullptr);
+
+  printf("Format context %p\n", fmtCtx);
+
+
+  return nullptr;
 }
-
-napi_value muxers(napi_env env, napi_callback_info info);
-napi_value demuxers(napi_env env, napi_callback_info info);
-
-napi_status fromAVInputFormat(napi_env env,
-  const AVInputFormat* iformat, napi_value* result);
-napi_status fromAVOutputFormat(napi_env env,
-  const AVOutputFormat* iformat, napi_value* result);
-
-
-/* Notes
-
-AVInputFormat and AVOutputFormats
-  - iterate over to produce lists of available
-  - JS objects that reflect the internal values only - lazy
-  - Ability to "guess" an output formats
-
-AVFormatContext
-  - full getters and setters pattern
-  - demuxer to offer add new streams
-  - uses setters and getters
-
-AVStream
-  - only public constructor is muxer.newStream()
-  - uses setters and getters
-*/
-
-#endif // FORMAT_H
