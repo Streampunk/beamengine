@@ -137,6 +137,237 @@ napi_value getOFormatExtensions(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_status getIOFormatFlags(napi_env env, int flags, napi_value* result, bool isInput) {
+  napi_status status;
+  napi_value value;
+
+  printf("IsInput %i flags %i\n", isInput, flags);
+
+  status = napi_create_object(env, &value);
+  PASS_STATUS;
+  status = beam_set_bool(env, value, "NOFILE", flags & AVFMT_NOFILE); // O I
+  PASS_STATUS;
+  status = beam_set_bool(env, value, "NEEDNUMBER", flags & AVFMT_NEEDNUMBER); // O I
+  PASS_STATUS;
+  if (isInput) {
+    status = beam_set_bool(env, value, "SHOW_IDS", flags & AVFMT_SHOW_IDS); // I
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "GLOBALHEADER", flags & AVFMT_GLOBALHEADER); // O
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "NOTIMESTAMPS", flags & AVFMT_NOTIMESTAMPS); // O
+    PASS_STATUS;
+  }
+  if (isInput) {
+    status = beam_set_bool(env, value, "GENERIC_INDEX", flags & AVFMT_GENERIC_INDEX); // I
+    PASS_STATUS;
+  }
+  if (isInput) {
+    status = beam_set_bool(env, value, "TS_DISCONT", flags & AVFMT_TS_DISCONT); // I
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "VARIABLE_FPS", flags & AVFMT_VARIABLE_FPS); // O
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "NODIMENSIONS", flags & AVFMT_NODIMENSIONS); // O
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "NOSTREAMS", flags & AVFMT_NOSTREAMS); // O
+    PASS_STATUS;
+  }
+  if (isInput) {
+    status = beam_set_bool(env, value, "NOBINSEARCH", flags & AVFMT_NOBINSEARCH); // I
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "NODIMENSIONS", flags & AVFMT_NODIMENSIONS); // O
+    PASS_STATUS;
+  }
+  if (isInput) {
+    status = beam_set_bool(env, value, "NOGENSEARCH", flags & AVFMT_NOGENSEARCH); // I
+    PASS_STATUS;
+  }
+  if (isInput) {
+    status = beam_set_bool(env, value, "NO_BYTE_SEEK", flags & AVFMT_NO_BYTE_SEEK); // I
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "ALLOW_FLUSH", flags & AVFMT_ALLOW_FLUSH); // O
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "TS_NONSTRICT", flags & AVFMT_TS_NONSTRICT); // O
+    PASS_STATUS;
+  }
+  if (!isInput) {
+    status = beam_set_bool(env, value, "TS_NEGATIVE", flags & AVFMT_TS_NEGATIVE); // O
+    PASS_STATUS;
+  }
+  if (isInput) {
+    status = beam_set_bool(env, value, "SEEK_TO_PTS", flags & AVFMT_SEEK_TO_PTS); // I
+    PASS_STATUS;
+  }
+
+  *result = value;
+  return napi_ok;
+}
+
+napi_value getOFormatFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* oformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
+  CHECK_STATUS;
+
+  status = getIOFormatFlags(env, oformat->flags, &result, false);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getIFormatFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* iformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &iformat);
+  CHECK_STATUS;
+
+  status = getIOFormatFlags(env, iformat->flags, &result, true);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getIFormatRawCodecID(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVInputFormat* iformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &iformat);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, iformat->raw_codec_id, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getOFormatPrivDataSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* oformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, oformat->priv_data_size, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getIFormatPrivDataSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVInputFormat* iformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &iformat);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, iformat->priv_data_size, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getOFormatPrivClass(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* oformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (oformat->priv_class != nullptr) ? oformat->priv_class->class_name : "",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getIFormatPrivClass(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVInputFormat* iformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &iformat);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (iformat->priv_class != nullptr) ? iformat->priv_class->class_name : "",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getOFormatAudioCodec(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* oformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) avcodec_get_name(oformat->audio_codec),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getOFormatVideoCodec(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* oformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) avcodec_get_name(oformat->video_codec),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getOFormatSubtitleCodec(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVOutputFormat* oformat;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    (char*) avcodec_get_name(oformat->subtitle_codec),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
 napi_value muxers(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, muxer;
@@ -179,8 +410,6 @@ napi_value demuxers(napi_env env, napi_callback_info info) {
   }
 
   return result;
-
-  return nullptr;
 }
 
 napi_status fromAVOutputFormat(napi_env env,
@@ -195,6 +424,7 @@ napi_status fromAVOutputFormat(napi_env env,
   status = napi_create_external(env, (void*) oformat, nullptr, nullptr, &extOFormat);
   PASS_STATUS;
 
+  // TODO - codec_tag is a bit hard
   napi_property_descriptor desc[] = {
     { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
     { "name", nullptr, nullptr, getOFormatName, nullptr,
@@ -205,9 +435,21 @@ napi_status fromAVOutputFormat(napi_env env,
       nullptr, napi_enumerable, (void*) oformat },
     { "extensions", nullptr, nullptr, getOFormatExtensions, nullptr,
       nullptr, napi_enumerable, (void*) oformat },
+    { "flags", nullptr, nullptr, getOFormatFlags, nullptr,
+      nullptr, napi_enumerable, (void*) oformat },
+    { "priv_data_size", nullptr, nullptr, getOFormatPrivDataSize, nullptr,
+      nullptr, napi_enumerable, (void*) oformat },
+    { "priv_class", nullptr, nullptr, getOFormatPrivClass, nullptr,
+      nullptr, napi_enumerable, (void*) oformat },
+    { "audio_codec", nullptr, nullptr, getOFormatAudioCodec, nullptr,
+      nullptr, napi_enumerable, (void*) oformat },
+    { "video_codec", nullptr, nullptr, getOFormatVideoCodec, nullptr,
+      nullptr, napi_enumerable, (void*) oformat }, // 10
+    { "subtitle_codec", nullptr, nullptr, getOFormatSubtitleCodec, nullptr,
+      nullptr, napi_enumerable, (void*) oformat },
     { "_oformat", nullptr, nullptr, nullptr, nullptr, extOFormat, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsOFormat, 6, desc);
+  status = napi_define_properties(env, jsOFormat, 12, desc);
   PASS_STATUS;
 
   *result = jsOFormat;
@@ -226,6 +468,7 @@ napi_status fromAVInputFormat(napi_env env,
   status = napi_create_external(env, (void*) iformat, nullptr, nullptr, &extIFormat);
   PASS_STATUS;
 
+  // TODO - codec_tag is a bit hard
   napi_property_descriptor desc[] = {
     { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
     { "name", nullptr, nullptr, getIFormatName, nullptr,
@@ -236,9 +479,17 @@ napi_status fromAVInputFormat(napi_env env,
       nullptr, napi_enumerable, (void*) iformat },
     { "extensions", nullptr, nullptr, getIFormatExtensions, nullptr,
       nullptr, napi_enumerable, (void*) iformat },
-    { "_iformat", nullptr, nullptr, nullptr, nullptr, extIFormat, napi_default, nullptr }
+    { "flags", nullptr, nullptr, getIFormatFlags, nullptr,
+      nullptr, napi_enumerable, (void*) iformat },
+    { "raw_codec_id", nullptr, nullptr, getIFormatRawCodecID, nullptr,
+      nullptr, napi_enumerable, (void*) iformat },
+    { "priv_data_size", nullptr, nullptr, getIFormatPrivDataSize, nullptr,
+      nullptr, napi_enumerable, (void*) iformat },
+    { "priv_class", nullptr, nullptr, getOFormatPrivClass, nullptr,
+      nullptr, napi_enumerable, (void*) iformat },
+    { "_iformat", nullptr, nullptr, nullptr, nullptr, extIFormat, napi_default, nullptr } // 10
   };
-  status = napi_define_properties(env, jsIFormat, 6, desc);
+  status = napi_define_properties(env, jsIFormat, 10, desc);
   PASS_STATUS;
 
   *result = jsIFormat;
