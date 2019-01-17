@@ -32,6 +32,7 @@ extern "C" {
 napi_value muxers(napi_env env, napi_callback_info info);
 napi_value demuxers(napi_env env, napi_callback_info info);
 napi_value guessFormat(napi_env env, napi_callback_info info);
+napi_value newStream(napi_env env, napi_callback_info info);
 
 napi_status fromAVInputFormat(napi_env env,
   const AVInputFormat* iformat, napi_value* result);
@@ -39,6 +40,7 @@ napi_status fromAVOutputFormat(napi_env env,
   const AVOutputFormat* iformat, napi_value* result);
 napi_status fromAVFormatContext(napi_env env,
   AVFormatContext* fmtCtx, napi_value* result, bool isMuxer);
+napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result);
 
 void formatContextFinalizer(napi_env env, void* data, void* hint);
 

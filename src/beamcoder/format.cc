@@ -1080,6 +1080,8 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "flags", nullptr, nullptr, getFmtCtxFlags, setFmtCtxFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx }, // 10
+    { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
+      napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
   status = napi_define_properties(env, jsFmtCtx, 11, desc);
@@ -1092,4 +1094,33 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
 void formatContextFinalizer(napi_env env, void* data, void* hint) {
   AVFormatContext* fc = (AVFormatContext*) data;
   avformat_free_context(fc);
+}
+
+napi_value newStream(napi_env env, napi_callback_info info) {
+  // stream = avformat_new_stream(fmtCtx, codec or nullptr);
+  // status = fromAVStream(env, stream, &result);
+  return nullptr;
+}
+
+napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
+  napi_status status;
+  napi_value jsStream, extStream, typeName;
+
+  status = napi_create_object(env, &jsStream);
+  PASS_STATUS;
+  status = napi_create_string_utf8(env, "Stream", NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+  // Note - streams are cleaned by avcodec_close() and avcodec_free_context()
+  status = napi_create_external(env, stream, nullptr, nullptr, &extStream);
+  PASS_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
+    { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
+  };
+  status = napi_define_properties(env, jsStream, 2, desc);
+  PASS_STATUS;
+
+  *result = jsStream;
+  return napi_ok;
 }
