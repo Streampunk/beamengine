@@ -19,26 +19,24 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-const { beamcoder, createBeamStream } = require('../index.js');
+const { beamcoder, createDemuxer } = require('../index.js');
 const fs = require('fs');
 
 async function run() {
   const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
-  const beamStream = createBeamStream({});
-  srcStream.pipe(beamStream);
+  let demuxer = await createDemuxer(srcStream);
 
-  let format = await beamcoder.format(beamStream.governor);
-  let decoder = await beamcoder.decoder({ format: format, stream : 0 });
+  let decoder = await beamcoder.decoder({ name: 'h264' });
 
-  const dp = decoder.getProperties();
+  const vidStream = demuxer.streams[0];
   let filterer = await beamcoder.filterer({
     inputParams: [{
       name: '0:v',
-      width: dp.width,
-      height: dp.height,
-      pixFmt: dp.pix_fmt,
-      timeBase: format.streams[0].time_base,
-      pixelAspect: dp.sample_aspect_ratio,
+      width: vidStream.codecpar.width,
+      height: vidStream.codecpar.height,
+      pixFmt: vidStream.codecpar.format,
+      timeBase: vidStream.time_base,
+      pixelAspect: vidStream.sample_aspect_ratio,
     }],
     filterSpec: '[0:v]scale=1280:720,transpose=cclock'
   });
@@ -47,7 +45,7 @@ async function run() {
   console.log(filterer);
 
   for ( let x = 0 ; x < 10 ; x++ ) {
-    let packet = await format.readFrame();
+    let packet = await demuxer.readFrame();
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
