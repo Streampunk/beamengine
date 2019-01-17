@@ -526,7 +526,7 @@ napi_value filter(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
 
   if (argc != 1) {
-    REJECT_ERROR_RETURN("Filter requires frame object.",
+    REJECT_ERROR_RETURN("Filter requires source frame object.",
       BEAMCODER_INVALID_ARGS);
   }
 
@@ -534,7 +534,7 @@ napi_value filter(napi_env env, napi_callback_info info) {
   c->status = napi_is_array(env, args[0], &isArray);
   REJECT_RETURN;
   if (!isArray)
-    REJECT_ERROR_RETURN("Expected an array of source frames.",
+    REJECT_ERROR_RETURN("Expected an array of source frame objects.",
       BEAMCODER_INVALID_ARGS);
 
   uint32_t srcFramesLen;
@@ -546,17 +546,28 @@ napi_value filter(napi_env env, napi_callback_info info) {
     c->status = napi_get_element(env, args[0], i, &item);
     REJECT_RETURN;
 
-    napi_value nameVal, frameVal;
-    c->status = napi_get_named_property(env, item, "name", &nameVal);
-    REJECT_RETURN;
-    size_t nameLen;
-    c->status = napi_get_value_string_utf8(env, nameVal, nullptr, 0, &nameLen);
-    REJECT_RETURN;
     std::string name;
-    name.resize(nameLen+1);
-    c->status = napi_get_value_string_utf8(env, nameVal, (char *)name.data(), nameLen+1, nullptr);
+    bool hasName;
+    c->status = napi_has_named_property(env, item, "name", &hasName);
     REJECT_RETURN;
-
+    if (hasName) {
+      napi_value nameVal;
+      c->status = napi_get_named_property(env, item, "name", &nameVal);
+      REJECT_RETURN;
+      size_t nameLen;
+      c->status = napi_get_value_string_utf8(env, nameVal, nullptr, 0, &nameLen);
+      REJECT_RETURN;
+      name.resize(nameLen+1);
+      c->status = napi_get_value_string_utf8(env, nameVal, (char *)name.data(), nameLen+1, nullptr);
+      REJECT_RETURN;
+    } else if (0 == i) {
+      name = "in";
+    } else {
+      REJECT_ERROR_RETURN("Source frame object requires a name.",
+        BEAMCODER_INVALID_ARGS);
+    }
+      
+    napi_value frameVal;
     c->status = napi_get_named_property(env, item, "frame", &frameVal);
     REJECT_RETURN;
     AVFrame *frame = getFrame(env, frameVal);
