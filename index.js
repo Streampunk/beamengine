@@ -55,7 +55,16 @@ function createBeamStream(params) {
   return beamStream;
 }
 
+function createDemuxer(params) {
+  if (typeof params.pipe === 'function') {
+    const beamStream = createBeamStream({});
+    params.pipe(beamStream);
+    return beamcoder.demuxer(beamStream.governor);
+  } else
+    return beamcoder.demuxer(params);
+}
+
 module.exports = {
   beamcoder,
-  createBeamStream
+  createDemuxer
 };
