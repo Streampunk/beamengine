@@ -30,15 +30,25 @@ async function run() {
 
   const vidStream = demuxer.streams[0];
   let filterer = await beamcoder.filterer({
-    inputParams: [{
-      name: '0:v',
-      width: vidStream.codecpar.width,
-      height: vidStream.codecpar.height,
-      pixFmt: vidStream.codecpar.format,
-      timeBase: vidStream.time_base,
-      pixelAspect: vidStream.sample_aspect_ratio,
-    }],
-    filterSpec: '[0:v]scale=1280:720,transpose=cclock'
+    inputParams: [
+      {
+        name: '0:v',
+        width: vidStream.codecpar.width,
+        height: vidStream.codecpar.height,
+        pixFmt: vidStream.codecpar.format,
+        timeBase: vidStream.time_base,
+        pixelAspect: vidStream.sample_aspect_ratio,
+      },
+      {
+        name: '1:v',
+        width: vidStream.codecpar.width,
+        height: vidStream.codecpar.height,
+        pixFmt: vidStream.codecpar.format,
+        timeBase: vidStream.time_base,
+        pixelAspect: vidStream.sample_aspect_ratio,
+      }
+    ],
+    filterSpec: '[0:v] scale=1280:720 [left]; [1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out]'
   });
 
   console.log(decoder);
@@ -49,9 +59,14 @@ async function run() {
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
-      // console.log(frames.frames[0]);
-      let filtFrames = await filterer.filter(frames);
-      console.log(filtFrames.frames[0]);
+      console.log(frames.frames[0]);
+      frames.frames.forEach(async f => {
+        let filtFrames = await filterer.filter([
+          { name: '0:v', frame: f },
+          { name: '1:v', frame: f },
+        ]);
+        console.log(filtFrames.frames[0]);
+      });
     }
   }
   let frames = await decoder.flush();
