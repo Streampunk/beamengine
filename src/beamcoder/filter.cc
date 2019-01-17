@@ -22,7 +22,7 @@
 #include "filter.h"
 #include "beamcoder_util.h"
 #include "frame.h"
-#include <sstream>
+#include <map>
 
 extern "C" {
   #include <libavfilter/avfilter.h>
@@ -32,12 +32,33 @@ extern "C" {
   #include <libavfilter/buffersrc.h>
 }
 
+class srcContexts {
+public:
+  srcContexts() {}
+  ~srcContexts() {}
+
+  void add(const std::string &name, AVFilterContext *context) {
+    mSrcContexts.insert(std::make_pair(name, context));
+  }
+
+  AVFilterContext *getContext(const std::string &name) const {
+    AVFilterContext *result = nullptr;
+    auto &c = mSrcContexts.find(name);
+    if (c != mSrcContexts.end())
+      result = c->second;
+    return result;
+  }
+
+private:
+  std::map<std::string, AVFilterContext *> mSrcContexts;
+};
+
 struct filtererCarrier : carrier {
   std::vector<std::string> inName;
   std::vector<std::string> inParams;
   std::string filterSpec;
 
-  std::vector<AVFilterContext *> srcCtx;
+  srcContexts *srcCtxs;
   AVFilterContext *sinkCtx = nullptr;
   AVFilterGraph *filterGraph = nullptr;
   ~filtererCarrier() {}
@@ -48,13 +69,28 @@ void graphFinalizer(napi_env env, void* data, void* hint) {
   avfilter_graph_free(&graph);
 }
 
+void srcCtxsFinalizer(napi_env env, void* data, void* hint) {
+  srcContexts* srcCtxs = (srcContexts*)data;
+  delete srcCtxs;
+}
+
 void filtererExecute(napi_env env, void* data) {
   filtererCarrier* c = (filtererCarrier*) data;
   int ret = 0;
 
   c->filterGraph = avfilter_graph_alloc();
   AVFilterInOut *inputs  = avfilter_inout_alloc();
-  std::vector<AVFilterInOut *> outputs;
+
+  AVFilterInOut **outputs = new AVFilterInOut*[c->inParams.size()];
+  bool opAlloc = true;
+  for (size_t i = 0; i < c->inParams.size(); ++i)
+    if (!(opAlloc = (outputs[i] = avfilter_inout_alloc()) != NULL)) break;
+
+  if (!(opAlloc && inputs && c->filterGraph)) {
+    c->status = BEAMCODER_ERROR_ENOMEM;
+    c->errorMsg = "Failed to allocate filter resources.";
+    goto end;
+  }
 
   const AVFilter *buffersink = avfilter_get_by_name("buffersink");
   ret = avfilter_graph_create_filter(&c->sinkCtx, buffersink, "out", NULL, NULL, c->filterGraph);
@@ -68,34 +104,25 @@ void filtererExecute(napi_env env, void* data) {
   inputs->pad_idx    = 0;
   inputs->next       = NULL;
 
-  c->srcCtx.resize(c->inParams.size());
-  outputs.resize(c->inParams.size());
-  bool opAlloc = true;
-  for (auto &op: outputs)
-    if (!(opAlloc = (op = avfilter_inout_alloc()) != NULL)) break;
-
-  if (!(opAlloc && inputs && c->filterGraph)) {
-    c->status = BEAMCODER_ERROR_ENOMEM;
-    c->errorMsg = "Failed to allocate filter resources.";
-    goto end;
-  }
-
+  c->srcCtxs = new srcContexts;
   for (size_t i = 0; i < c->inParams.size(); ++i) {
-    AVFilterInOut *op = outputs[i];
     const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
-    ret = avfilter_graph_create_filter(&c->srcCtx[i], buffersrc, "in", c->inParams[i].c_str(), NULL, c->filterGraph);
+    AVFilterContext *srcCtx = nullptr;
+    ret = avfilter_graph_create_filter(&srcCtx, buffersrc, "in", c->inParams[i].c_str(), NULL, c->filterGraph);
     if (ret < 0) {
       c->status = BEAMCODER_ERROR_ENOMEM;
       c->errorMsg = "Failed to allocate source filter graph.";
       goto end;
     }
-    op->name       = av_strdup(c->inName[i].c_str());
-    op->filter_ctx = c->srcCtx[i];
-    op->pad_idx    = 0;
-    op->next       = i < c->inParams.size() - 1 ? outputs[i + 1] : NULL;
+    outputs[i]->name       = av_strdup(c->inName[i].c_str());
+    outputs[i]->filter_ctx = srcCtx;
+    outputs[i]->pad_idx    = 0;
+    outputs[i]->next       = i < c->inParams.size() - 1 ? outputs[i + 1] : NULL;
+
+    c->srcCtxs->add(c->inName[i], srcCtx);
   }
 
-  if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, &outputs[0], NULL)) < 0) {
+  if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, outputs, NULL)) < 0) {
     c->status = BEAMCODER_ERROR_ENOMEM;
     c->errorMsg = "Failed to parse filter graph.";
     goto end;
@@ -109,8 +136,8 @@ void filtererExecute(napi_env env, void* data) {
 
 end:
   avfilter_inout_free(&inputs);
-  for (auto &op: outputs)
-    avfilter_inout_free(&op);
+  avfilter_inout_free(outputs);
+  delete outputs;
 }
 
 void filtererComplete(napi_env env, napi_status asyncStatus, void* data) {
@@ -134,9 +161,9 @@ void filtererComplete(napi_env env, napi_status asyncStatus, void* data) {
   c->status = napi_set_named_property(env, result, "graph", value);
   REJECT_STATUS;
 
-  c->status = napi_create_external(env, c->srcCtx[0], nullptr, nullptr, &value);
+  c->status = napi_create_external(env, c->srcCtxs, srcCtxsFinalizer, nullptr, &value);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "sourceContext", value);
+  c->status = napi_set_named_property(env, result, "sourceContexts", value);
   REJECT_STATUS;
 
   c->status = napi_create_external(env, c->sinkCtx, nullptr, nullptr, &value);
@@ -337,10 +364,10 @@ napi_value filterer(napi_env env, napi_callback_info info) {
 
 
 struct filterCarrier : carrier {
-  AVFilterContext *srcCtx = nullptr;
+  srcContexts *srcCtxs;
   AVFilterContext *sinkCtx = nullptr;
-  std::vector<AVFrame*> srcFrames;
-  std::vector<AVFrame*> dstFrames;
+  std::map<std::string, AVFrame *> srcFrames;
+  std::vector<AVFrame *> dstFrames;
   ~filterCarrier() {
     // printf("Filter carrier destructor.\n");
   }
@@ -402,8 +429,13 @@ void filterExecute(napi_env env, void* data) {
   HR_TIME_POINT filterStart = NOW;
 
   for (auto it = c->srcFrames.cbegin(); it != c->srcFrames.cend(); ++it) {
-
-    if (av_buffersrc_add_frame_flags(c->srcCtx, *it, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
+    AVFilterContext *srcCtx = c->srcCtxs->getContext(it->first);
+    if (!srcCtx) {
+      c->status = BEAMCODER_INVALID_ARGS;
+      c->errorMsg = "Frame name not found in source contexts.";
+      return;
+    }
+    if (av_buffersrc_add_frame_flags(srcCtx, it->second, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
       c->status = BEAMCODER_ERROR_ENOMEM;
       c->errorMsg = "Error while feeding the filtergraph.";
       return;
@@ -482,45 +514,65 @@ napi_value filter(napi_env env, napi_callback_info info) {
   c->status = napi_get_cb_info(env, info, &argc, args, &filtererJS, nullptr);
   REJECT_RETURN;
 
-  napi_value srcCtxExt, sinkCtxExt;
-  c->status = napi_get_named_property(env, filtererJS, "sourceContext", &srcCtxExt);
+  napi_value srcCtxsExt, sinkCtxExt;
+  c->status = napi_get_named_property(env, filtererJS, "sourceContexts", &srcCtxsExt);
   REJECT_RETURN;
-  c->status = napi_get_value_external(env, srcCtxExt, (void**)&c->srcCtx);
+  c->status = napi_get_value_external(env, srcCtxsExt, (void**)&c->srcCtxs);
   REJECT_RETURN;
+
   c->status = napi_get_named_property(env, filtererJS, "sinkContext", &sinkCtxExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, sinkCtxExt, (void**)&c->sinkCtx);
   REJECT_RETURN;
 
   if (argc != 1) {
-    REJECT_ERROR_RETURN("Filter requires frame object.",
+    REJECT_ERROR_RETURN("Filter requires source frame object.",
       BEAMCODER_INVALID_ARGS);
   }
 
-  napi_value frames;
-  c->status = napi_get_named_property(env, args[0], "frames", &frames);
-  REJECT_RETURN;
-
   bool isArray;
-  c->status = napi_is_array(env, frames, &isArray);
+  c->status = napi_is_array(env, args[0], &isArray);
   REJECT_RETURN;
   if (!isArray)
-    REJECT_ERROR_RETURN("Expected an array of frames.",
+    REJECT_ERROR_RETURN("Expected an array of source frame objects.",
       BEAMCODER_INVALID_ARGS);
 
-  uint32_t framesLength;
-  c->status = napi_get_array_length(env, frames, &framesLength);
+  uint32_t srcFramesLen;
+  c->status = napi_get_array_length(env, args[0], &srcFramesLen);
   REJECT_RETURN;
-  for (uint32_t x = 0 ; x < framesLength ; x++) {
+
+  for (uint32_t i = 0; i < srcFramesLen; ++i) {
     napi_value item;
-    c->status = napi_get_element(env, frames, x, &item);
+    c->status = napi_get_element(env, args[0], i, &item);
     REJECT_RETURN;
-    c->status = isFrame(env, item);
-    if (c->status != napi_ok) {
-      REJECT_ERROR_RETURN("All passed frames in an array must be of type frame.",
+
+    std::string name;
+    bool hasName;
+    c->status = napi_has_named_property(env, item, "name", &hasName);
+    REJECT_RETURN;
+    if (hasName) {
+      napi_value nameVal;
+      c->status = napi_get_named_property(env, item, "name", &nameVal);
+      REJECT_RETURN;
+      size_t nameLen;
+      c->status = napi_get_value_string_utf8(env, nameVal, nullptr, 0, &nameLen);
+      REJECT_RETURN;
+      name.resize(nameLen+1);
+      c->status = napi_get_value_string_utf8(env, nameVal, (char *)name.data(), nameLen+1, nullptr);
+      REJECT_RETURN;
+    } else if (0 == i) {
+      name = "in";
+    } else {
+      REJECT_ERROR_RETURN("Source frame object requires a name.",
         BEAMCODER_INVALID_ARGS);
     }
-    c->srcFrames.push_back(getFrame(env, item));
+      
+    napi_value frameVal;
+    c->status = napi_get_named_property(env, item, "frame", &frameVal);
+    REJECT_RETURN;
+    AVFrame *frame = getFrame(env, frameVal);
+
+    c->srcFrames.insert(std::make_pair(name, frame));
   }
 
   c->status = napi_create_string_utf8(env, "Filter", NAPI_AUTO_LENGTH, &resourceName);
