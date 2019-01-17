@@ -24,6 +24,8 @@
 
 #include "node_api.h"
 #include "beamcoder_util.h"
+#include "format.h"
+
 
 extern "C" {
   #include <libavformat/avformat.h>

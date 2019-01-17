@@ -392,9 +392,10 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("makeFrame", makeFrame),
     DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters),
     DECLARE_NAPI_METHOD("demuxer", demuxer),
-    DECLARE_NAPI_METHOD("muxer", muxer)
-   };
-  status = napi_define_properties(env, exports, 18, desc);
+    DECLARE_NAPI_METHOD("muxer", muxer),
+    DECLARE_NAPI_METHOD("guessFormat", guessFormat)
+  };
+  status = napi_define_properties(env, exports, 19, desc);
   CHECK_STATUS;
 
   // Iterate over all codecs to makes sure they are registered

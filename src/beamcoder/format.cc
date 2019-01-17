@@ -141,8 +141,6 @@ napi_status getIOFormatFlags(napi_env env, int flags, napi_value* result, bool i
   napi_status status;
   napi_value value;
 
-  printf("IsInput %i flags %i\n", isInput, flags);
-
   status = napi_create_object(env, &value);
   PASS_STATUS;
   status = beam_set_bool(env, value, "NOFILE", flags & AVFMT_NOFILE); // O I
@@ -412,6 +410,51 @@ napi_value demuxers(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value guessFormat(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  char* testName;
+  size_t strLen;
+  AVOutputFormat* oformat;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Unable to guess an output format without a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Cannot guess an output format without a string value.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  testName = (char*) malloc(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], testName, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  oformat = av_guess_format((const char*) testName, nullptr, nullptr);
+  if (oformat == nullptr) {
+    oformat = av_guess_format(nullptr, (const char*) testName, nullptr);
+  }
+  if (oformat == nullptr) {
+    oformat = av_guess_format(nullptr, nullptr, (const char*) testName);
+  }
+  if (oformat == nullptr) {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  } else {
+    status = fromAVOutputFormat(env, oformat, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
 napi_status fromAVOutputFormat(napi_env env,
     const AVOutputFormat* oformat, napi_value* result) {
   napi_status status;
@@ -494,4 +537,33 @@ napi_status fromAVInputFormat(napi_env env,
 
   *result = jsIFormat;
   return napi_ok;
+}
+
+napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
+    napi_value* result, bool isMuxer) {
+  napi_status status;
+  napi_value jsFmtCtx, extFmtCtx, typeName;
+
+  status = napi_create_object(env, &jsFmtCtx);
+  PASS_STATUS;
+  status = napi_create_string_utf8(env, isMuxer ? "muxer" : "demuxer",
+    NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+  status = napi_create_external(env, fmtCtx, formatContextFinalizer, nullptr, &extFmtCtx);
+  PASS_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
+    { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
+  };
+  status = napi_define_properties(env, jsFmtCtx, 2, desc);
+  PASS_STATUS;
+
+  *result = jsFmtCtx;
+  return napi_ok;
+}
+
+void formatContextFinalizer(napi_env env, void* data, void* hint) {
+  AVFormatContext* fc = (AVFormatContext*) data;
+  avformat_free_context(fc);
 }
