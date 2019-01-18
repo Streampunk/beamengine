@@ -180,13 +180,14 @@ napi_value getCodecParCodecTag(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   codecParData* c;
-  char fourcc[AV_FOURCC_MAX_STRING_SIZE];
+  char* fourcc = (char*) malloc(sizeof(char) * AV_FOURCC_MAX_STRING_SIZE);
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  av_fourcc_make_string(fourcc, c->codecPars->codec_tag);
+  fourcc = av_fourcc_make_string(fourcc, c->codecPars->codec_tag);
   status = napi_create_string_utf8(env, fourcc, NAPI_AUTO_LENGTH, &result);
+  free(fourcc);
   CHECK_STATUS;
 
   return result;

@@ -631,6 +631,28 @@ napi_value getFmtCtxCtxFlags(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFmtCtxStreams(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+
+  for ( uint32_t x = 0 ; x < fmtCtx->nb_streams ; x++ ) {
+    if (fmtCtx->streams[x] == nullptr) continue;
+    status = fromAVStream(env, fmtCtx->streams[x], &element);
+    CHECK_STATUS;
+    status = napi_set_element(env, result, x, element);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
 napi_value getFmtCtxURL(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1063,6 +1085,8 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "ctx_flags", nullptr, nullptr, getFmtCtxCtxFlags, nullptr, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "streams", nullptr, nullptr, getFmtCtxStreams, nullptr, nullptr,
+       napi_enumerable, fmtCtx },
     { "url", nullptr, nullptr, getFmtCtxURL,
       isMuxer ? setFmtCtxURL : nullptr, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
@@ -1077,14 +1101,14 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     { "packet_size", nullptr, nullptr, getFmtCtxPacketSize, setFmtCtxPacketSize, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "max_delay", nullptr, nullptr, getFmtCtxMaxDelay, setFmtCtxMaxDelay, nullptr,
-      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },  // 10
     { "flags", nullptr, nullptr, getFmtCtxFlags, setFmtCtxFlags, nullptr,
-      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx }, // 10
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 11, desc);
+  status = napi_define_properties(env, jsFmtCtx, 13, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
@@ -1097,9 +1121,140 @@ void formatContextFinalizer(napi_env env, void* data, void* hint) {
 }
 
 napi_value newStream(napi_env env, napi_callback_info info) {
-  // stream = avformat_new_stream(fmtCtx, codec or nullptr);
-  // status = fromAVStream(env, stream, &result);
-  return nullptr;
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  AVStream* stream;
+  char* codecName = nullptr;
+  size_t strLen;
+  AVCodec* codec = nullptr;
+  const AVCodecDescriptor* codecDesc = nullptr;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  if (argc >= 1) {
+    status = napi_typeof(env, args[0], &type);
+    CHECK_STATUS;
+    if (type != napi_string) {
+      NAPI_THROW_ERROR("New stream for a format context requires a string value to specify a codec, where provided.");
+    }
+    status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+    CHECK_STATUS;
+    codecName = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, args[0], codecName, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    if (fmtCtx->oformat) { // Look for encoders
+      codec = avcodec_find_encoder_by_name(codecName);
+      if (codec == nullptr) {
+        codecDesc = avcodec_descriptor_get_by_name(codecName);
+        if (codecDesc != nullptr) {
+          codec = avcodec_find_encoder(codecDesc->id);
+        }
+      }
+    }
+    if (codec == nullptr) {
+      codec = avcodec_find_decoder_by_name(codecName);
+      if (codec == nullptr) {
+        codecDesc = avcodec_descriptor_get_by_name(codecName);
+        if (codecDesc != nullptr) {
+          codec = avcodec_find_decoder(codecDesc->id);
+        }
+      }
+    }
+    printf("From name %s, selected AVCodec %s\n", codecName,
+      (codec != nullptr) ? codec->name : "");
+    free(codecName);
+  }
+  stream = avformat_new_stream(fmtCtx, codec);
+
+  if (stream == nullptr) {
+    NAPI_THROW_ERROR("Unable to create a stream for this format context.");
+  }
+
+  if (codec != nullptr) {
+    stream->codecpar->codec_type = codec->type;
+    stream->codecpar->codec_id = codec->id;
+  }
+  status = fromAVStream(env, stream, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamIndex(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, stream->index, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+  codecParData* cpd = new codecParData;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  printf("Stream codec pars at %p\n", stream->codecpar);
+
+  cpd->codecPars = stream->codecpar;
+  status = fromAVCodecParameters(env, cpd, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, jsCodecPar, extCodecPar;
+  napi_valuetype type;
+  AVStream* stream;
+  bool isArray;
+  codecParData* cpd;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Cannot set stream codec parameters without a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("Setting stream codec parameters requires an object.");
+  }
+  status = napi_get_named_property(env, args[0], "_codecPar", &extCodecPar);
+  CHECK_STATUS;
+  status = napi_typeof(env, extCodecPar, &type);
+  CHECK_STATUS;
+  if (type != napi_external) {
+    jsCodecPar = makeCodecParameters(env, info); // Try and make some
+    status = napi_get_named_property(env, jsCodecPar, "_codecPar", &extCodecPar);
+    CHECK_STATUS;
+  }
+  status = napi_get_value_external(env, extCodecPar, (void**) &cpd);
+  CHECK_STATUS;
+  stream->codecpar = cpd->codecPars;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
 }
 
 napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
@@ -1116,9 +1271,12 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
 
   napi_property_descriptor desc[] = {
     { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
+    { "index", nullptr, nullptr, getStreamIndex, nullptr, nullptr, napi_enumerable, stream },
+    { "codecpar", nullptr, nullptr, getStreamCodecPar, setStreamCodecPar, nullptr,
+       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsStream, 2, desc);
+  status = napi_define_properties(env, jsStream, 4, desc);
   PASS_STATUS;
 
   *result = jsStream;
