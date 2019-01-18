@@ -653,6 +653,10 @@ napi_value getFmtCtxStreams(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value setFmtCtxStreams(napi_env env, napi_callback_info info) {
+  NAPI_THROW_ERROR("Streams can only be created with newStream() and then set via reference.");
+}
+
 napi_value getFmtCtxURL(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1085,8 +1089,8 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "ctx_flags", nullptr, nullptr, getFmtCtxCtxFlags, nullptr, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
-    { "streams", nullptr, nullptr, getFmtCtxStreams, nullptr, nullptr,
-       napi_enumerable, fmtCtx },
+    { "streams", nullptr, nullptr, getFmtCtxStreams, setFmtCtxStreams, nullptr,
+       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "url", nullptr, nullptr, getFmtCtxURL,
       isMuxer ? setFmtCtxURL : nullptr, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
@@ -1122,7 +1126,7 @@ void formatContextFinalizer(napi_env env, void* data, void* hint) {
 
 napi_value newStream(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result;
+  napi_value result, name, assign, global, jsObject;
   napi_valuetype type;
   AVFormatContext* fmtCtx;
   AVStream* stream;
@@ -1140,13 +1144,19 @@ napi_value newStream(napi_env env, napi_callback_info info) {
   if (argc >= 1) {
     status = napi_typeof(env, args[0], &type);
     CHECK_STATUS;
-    if (type != napi_string) {
+    if ((type != napi_string) && (type != napi_object)) {
       NAPI_THROW_ERROR("New stream for a format context requires a string value to specify a codec, where provided.");
     }
-    status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+    if (type == napi_object) {
+      status = napi_get_named_property(env, args[0], "name", &name);
+      CHECK_STATUS;
+    } else {
+      name = args[0];
+    }
+    status = napi_get_value_string_utf8(env, name, nullptr, 0, &strLen);
     CHECK_STATUS;
     codecName = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, args[0], codecName, strLen + 1, &strLen);
+    status = napi_get_value_string_utf8(env, name, codecName, strLen + 1, &strLen);
     CHECK_STATUS;
 
     if (fmtCtx->oformat) { // Look for encoders
@@ -1180,9 +1190,22 @@ napi_value newStream(napi_env env, napi_callback_info info) {
   if (codec != nullptr) {
     stream->codecpar->codec_type = codec->type;
     stream->codecpar->codec_id = codec->id;
+    // TODO set codec_tag here
   }
   status = fromAVStream(env, stream, &result);
   CHECK_STATUS;
+
+  if ((argc >=1) && (type == napi_object)) {
+    status = napi_get_global(env, &global);
+    CHECK_STATUS;
+    status = napi_get_named_property(env, global, "Object", &jsObject);
+    CHECK_STATUS;
+    status = napi_get_named_property(env, jsObject, "assign", &assign);
+    CHECK_STATUS;
+    const napi_value fargs[] = { result, args[0] };
+    status = napi_call_function(env, result, assign, 2, fargs, &result);
+    CHECK_STATUS;
+  }
   return result;
 }
 
@@ -1195,6 +1218,112 @@ napi_value getStreamIndex(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   status = napi_create_int32(env, stream->index, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamID(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, stream->id, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setStreamID(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream id property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("The stream's is property must be set with a number.");
+  }
+
+  status = napi_get_value_int32(env, args[0], &stream->id);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamTimeBase(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->time_base.num, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 0, element);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->time_base.den, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 1, element);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamTimeBase(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  napi_valuetype type;
+  bool isArray;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the stream time_base property.");
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("The stream's time_base property must be set with an array of two numbers.");
+  }
+  for ( uint32_t x = 0 ; x < 2 ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_typeof(env, element, &type);
+    CHECK_STATUS;
+    if (type != napi_number) {
+      NAPI_THROW_ERROR("The stream's time_base property array elements must be numbers.");
+    }
+  }
+  status = napi_get_element(env, args[0], 0, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->time_base.num);
+  CHECK_STATUS;
+  status = napi_get_element(env, args[0], 1, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->time_base.den);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1269,14 +1398,20 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
   status = napi_create_external(env, stream, nullptr, nullptr, &extStream);
   PASS_STATUS;
 
+  // Note - name is a dummy property used to avoid it being accidentally set
   napi_property_descriptor desc[] = {
     { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
     { "index", nullptr, nullptr, getStreamIndex, nullptr, nullptr, napi_enumerable, stream },
+    { "id", nullptr, nullptr, getStreamID, setStreamID, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "time_base", nullptr, nullptr, getStreamTimeBase, setStreamTimeBase, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "codecpar", nullptr, nullptr, getStreamCodecPar, setStreamCodecPar, nullptr,
        (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "name", nullptr, nullptr, nullptr, nullptr, typeName, napi_writable, nullptr },
     { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsStream, 4, desc);
+  status = napi_define_properties(env, jsStream, 7, desc);
   PASS_STATUS;
 
   *result = jsStream;
