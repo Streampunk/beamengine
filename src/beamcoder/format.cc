@@ -1068,6 +1068,94 @@ napi_value setFmtCtxFlags(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFmtCtxMetadata(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+  AVDictionaryEntry* tag = nullptr;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  while ((tag = av_dict_get(fmtCtx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+    status = beam_set_string_utf8(env, result, tag->key, tag->value);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFmtCtxMetadata(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, names, key, value, valueS;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  bool isArray;
+  uint32_t propCount;
+  AVDictionary* dict = nullptr;
+  char* keyStr, *valueStr;
+  size_t strLen;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the format context's metadata property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("Format context metadata can only be set with an object of tag names and values.");
+  }
+
+  status = napi_get_property_names(env, args[0], &names);
+  CHECK_STATUS;
+  status = napi_get_array_length(env, names, &propCount);
+  CHECK_STATUS;
+
+  // Replace all metadata values ... no partial operation
+  for ( uint32_t x = 0 ; x < propCount ; x++ ) {
+    status = napi_get_element(env, names, x, &key);
+    CHECK_STATUS;
+    status = napi_get_property(env, args[0], key, &value);
+    CHECK_STATUS;
+    status = napi_coerce_to_string(env, value, &valueS);
+    CHECK_STATUS;
+
+    status = napi_get_value_string_utf8(env, key, nullptr, 0, &strLen);
+    CHECK_STATUS;
+    keyStr = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, key, keyStr, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    status = napi_get_value_string_utf8(env, valueS, nullptr, 0, &strLen);
+    CHECK_STATUS;
+    valueStr = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, valueS, valueStr, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    ret = av_dict_set(&dict, keyStr, valueStr, 0);
+    free(keyStr);
+    free(valueStr);
+    if (ret < 0) {
+      NAPI_THROW_ERROR(avErrorMsg("Failed to set a dictionary entry: ", ret));
+    }
+  }
+  fmtCtx->metadata = dict;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     napi_value* result, bool isMuxer) {
   napi_status status;
@@ -1108,11 +1196,13 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },  // 10
     { "flags", nullptr, nullptr, getFmtCtxFlags, setFmtCtxFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "metadata", nullptr, nullptr, getFmtCtxMetadata, setFmtCtxMetadata, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 13, desc);
+  status = napi_define_properties(env, jsFmtCtx, 14, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
@@ -1247,12 +1337,12 @@ napi_value setStreamID(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
   CHECK_STATUS;
   if (argc < 1) {
-    NAPI_THROW_ERROR("A value is required to set a stream id property.");
+    NAPI_THROW_ERROR("A value is required to set the stream id property.");
   }
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
   if (type != napi_number) {
-    NAPI_THROW_ERROR("The stream's is property must be set with a number.");
+    NAPI_THROW_ERROR("The stream's id property must be set with a number.");
   }
 
   status = napi_get_value_int32(env, args[0], &stream->id);
@@ -1328,6 +1418,522 @@ napi_value setStreamTimeBase(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getStreamStartTime(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  if (stream->start_time == AV_NOPTS_VALUE) {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_create_int64(env, stream->start_time, &result);
+    CHECK_STATUS;
+  }
+  return result;
+}
+
+napi_value setStreamStartTime(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream's start_time property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    stream->start_time = AV_NOPTS_VALUE;
+    goto done;
+  }
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("The stream's start_time property must be set with a number.");
+  }
+
+  status = napi_get_value_int64(env, args[0], &stream->start_time);
+  CHECK_STATUS;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamDuration(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  if (stream->duration == AV_NOPTS_VALUE) {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_create_int64(env, stream->duration, &result);
+    CHECK_STATUS;
+  }
+  return result;
+}
+
+napi_value setStreamDuration(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream's duration property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    stream->start_time = AV_NOPTS_VALUE;
+    goto done;
+  }
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("The stream's duration property must be set with a number.");
+  }
+
+  status = napi_get_value_int64(env, args[0], &stream->duration);
+  CHECK_STATUS;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamNbFrames(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, stream->nb_frames, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setStreamNbFrames(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream's nb_frames property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    stream->start_time = 0;
+    goto done;
+  }
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("The stream's nb_frames property must be set with a number.");
+  }
+
+  status = napi_get_value_int64(env, args[0], &stream->nb_frames);
+  CHECK_STATUS;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamDisposition(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  status = beam_set_bool(env, result, "DEFAULT", stream->disposition & AV_DISPOSITION_DEFAULT);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DUB", stream->disposition & AV_DISPOSITION_DUB);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "ORIGINAL", stream->disposition & AV_DISPOSITION_ORIGINAL);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "COMMENT", stream->disposition & AV_DISPOSITION_COMMENT);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "LYRICS", stream->disposition & AV_DISPOSITION_LYRICS);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "KARAOKE", stream->disposition & AV_DISPOSITION_KARAOKE);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "FORCED", stream->disposition & AV_DISPOSITION_FORCED);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "HEARING_IMPAIRED", stream->disposition & AV_DISPOSITION_HEARING_IMPAIRED);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "VISUAL_IMPAIRED", stream->disposition & AV_DISPOSITION_VISUAL_IMPAIRED);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "CLEAN_EFFECTS", stream->disposition & AV_DISPOSITION_CLEAN_EFFECTS);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "ATTACHED_PIC", stream->disposition & AV_DISPOSITION_ATTACHED_PIC);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "TIMED_THUMBNAILS", stream->disposition & AV_DISPOSITION_TIMED_THUMBNAILS);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "CAPTIONS", stream->disposition & AV_DISPOSITION_CAPTIONS);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DESCRIPTIONS", stream->disposition & AV_DISPOSITION_DESCRIPTIONS);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "METADATA", stream->disposition & AV_DISPOSITION_METADATA);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DEPENDENT", stream->disposition & AV_DISPOSITION_DEPENDENT);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "STILL_IMAGE", stream->disposition & AV_DISPOSITION_STILL_IMAGE);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamDisposition(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+  bool isArray, present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream's disposition flags.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("The stream's disposition flags must be set with an object with Boolean-valued properties.");
+  }
+
+  status = beam_get_bool(env, args[0], "DEFAULT", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_DEFAULT :
+    stream->disposition & ~AV_DISPOSITION_DEFAULT; }
+  status = beam_get_bool(env, args[0], "DUB", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_DUB :
+    stream->disposition & ~AV_DISPOSITION_DUB; }
+  status = beam_get_bool(env, args[0], "ORIGINAL", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_ORIGINAL :
+    stream->disposition & ~AV_DISPOSITION_ORIGINAL; }
+  status = beam_get_bool(env, args[0], "COMMENT", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_COMMENT :
+    stream->disposition & ~AV_DISPOSITION_COMMENT; }
+  status = beam_get_bool(env, args[0], "LYRICS", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_LYRICS :
+    stream->disposition & ~AV_DISPOSITION_LYRICS; }
+  status = beam_get_bool(env, args[0], "KARAOKE", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_KARAOKE :
+    stream->disposition & ~AV_DISPOSITION_KARAOKE; }
+  status = beam_get_bool(env, args[0], "FORCED", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_FORCED :
+    stream->disposition & ~AV_DISPOSITION_FORCED; }
+  status = beam_get_bool(env, args[0], "HEARING_IMPAIRED", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_HEARING_IMPAIRED :
+    stream->disposition & ~AV_DISPOSITION_HEARING_IMPAIRED; }
+  status = beam_get_bool(env, args[0], "VISUAL_IMPAIRED", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_VISUAL_IMPAIRED :
+    stream->disposition & ~AV_DISPOSITION_VISUAL_IMPAIRED; }
+  status = beam_get_bool(env, args[0], "CLEAN_EFFECTS", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_CLEAN_EFFECTS :
+    stream->disposition & ~AV_DISPOSITION_CLEAN_EFFECTS; }
+  status = beam_get_bool(env, args[0], "ATTACHED_PIC", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_ATTACHED_PIC :
+    stream->disposition & ~AV_DISPOSITION_ATTACHED_PIC; }
+  status = beam_get_bool(env, args[0], "TIMED_THUMBNAILS", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_TIMED_THUMBNAILS :
+    stream->disposition & ~AV_DISPOSITION_TIMED_THUMBNAILS; }
+  status = beam_get_bool(env, args[0], "CAPTIONS", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_CAPTIONS :
+    stream->disposition & ~AV_DISPOSITION_CAPTIONS; }
+  status = beam_get_bool(env, args[0], "DESCRIPTIONS", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_DESCRIPTIONS :
+    stream->disposition & ~AV_DISPOSITION_DESCRIPTIONS; }
+  status = beam_get_bool(env, args[0], "METADATA", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_METADATA :
+    stream->disposition & ~AV_DISPOSITION_METADATA; }
+  status = beam_get_bool(env, args[0], "DEPENDENT", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_DEPENDENT :
+    stream->disposition & ~AV_DISPOSITION_DEPENDENT; }
+  status = beam_get_bool(env, args[0], "STILL_IMAGE", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->disposition = (flag) ?
+    stream->disposition | AV_DISPOSITION_STILL_IMAGE :
+    stream->disposition & ~AV_DISPOSITION_STILL_IMAGE; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamDiscard(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    beam_lookup_name(beam_avdiscard->forward, stream->discard),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value setStreamDiscard(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+  char* enumName;
+  size_t strLen;
+  int enumValue;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream's discard property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("The stream's discard property must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  enumName = (char*) malloc(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], enumName, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  enumValue = beam_lookup_enum(beam_avdiscard->inverse, enumName);
+  stream->discard = (enumValue != BEAM_ENUM_UNKNOWN) ? (AVDiscard) enumValue : AVDISCARD_NONE;
+  free(enumName);
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamSmpAspectRt(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->sample_aspect_ratio.num, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 0, element);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->sample_aspect_ratio.den, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 1, element);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamSmpAspectRt(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  napi_valuetype type;
+  bool isArray;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the stream sample_aspect_ratio property.");
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("The stream's sample_aspect_ratio property must be set with an array of two numbers.");
+  }
+  for ( uint32_t x = 0 ; x < 2 ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_typeof(env, element, &type);
+    CHECK_STATUS;
+    if (type != napi_number) {
+      NAPI_THROW_ERROR("The stream's sample_aspect_ratio property array elements must be numbers.");
+    }
+  }
+  status = napi_get_element(env, args[0], 0, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->sample_aspect_ratio.num);
+  CHECK_STATUS;
+  status = napi_get_element(env, args[0], 1, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->sample_aspect_ratio.den);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamMetadata(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+  AVDictionaryEntry* tag = nullptr;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  while ((tag = av_dict_get(stream->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+    status = beam_set_string_utf8(env, result, tag->key, tag->value);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setStreamMetadata(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, names, key, value, valueS;
+  napi_valuetype type;
+  AVStream* stream;
+  bool isArray;
+  uint32_t propCount;
+  AVDictionary* dict = nullptr;
+  char* keyStr, *valueStr;
+  size_t strLen;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the stream's metadata property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("Stream metadata can only be set with an object of tag names and values.");
+  }
+
+  status = napi_get_property_names(env, args[0], &names);
+  CHECK_STATUS;
+  status = napi_get_array_length(env, names, &propCount);
+  CHECK_STATUS;
+
+  // Replace all metadata values ... no partial operation
+  for ( uint32_t x = 0 ; x < propCount ; x++ ) {
+    status = napi_get_element(env, names, x, &key);
+    CHECK_STATUS;
+    status = napi_get_property(env, args[0], key, &value);
+    CHECK_STATUS;
+    status = napi_coerce_to_string(env, value, &valueS);
+    CHECK_STATUS;
+
+    status = napi_get_value_string_utf8(env, key, nullptr, 0, &strLen);
+    CHECK_STATUS;
+    keyStr = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, key, keyStr, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    status = napi_get_value_string_utf8(env, valueS, nullptr, 0, &strLen);
+    CHECK_STATUS;
+    valueStr = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, valueS, valueStr, strLen + 1, &strLen);
+    CHECK_STATUS;
+
+    ret = av_dict_set(&dict, keyStr, valueStr, 0);
+    free(keyStr);
+    free(valueStr);
+    if (ret < 0) {
+      NAPI_THROW_ERROR(avErrorMsg("Failed to set a dictionary entry: ", ret));
+    }
+  }
+  stream->metadata = dict;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1336,8 +1942,6 @@ napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
   CHECK_STATUS;
-
-  printf("Stream codec pars at %p\n", stream->codecpar);
 
   cpd->codecPars = stream->codecpar;
   status = fromAVCodecParameters(env, cpd, &result);
@@ -1406,12 +2010,26 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "time_base", nullptr, nullptr, getStreamTimeBase, setStreamTimeBase, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
-    { "codecpar", nullptr, nullptr, getStreamCodecPar, setStreamCodecPar, nullptr,
+    { "start_time", nullptr, nullptr, getStreamStartTime, setStreamStartTime, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "duration", nullptr, nullptr, getStreamDuration, setStreamDuration, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "nb_frames", nullptr, nullptr, getStreamNbFrames, setStreamNbFrames, nullptr,
        (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "disposition", nullptr, nullptr, getStreamDisposition, setStreamDisposition, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "discard", nullptr, nullptr, getStreamDiscard, setStreamDiscard, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "sample_aspect_ratio", nullptr, nullptr, getStreamSmpAspectRt, setStreamSmpAspectRt, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream }, // 10
+    { "metadata", nullptr, nullptr, getStreamMetadata, setStreamMetadata, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "codecpar", nullptr, nullptr, getStreamCodecPar, setStreamCodecPar, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "name", nullptr, nullptr, nullptr, nullptr, typeName, napi_writable, nullptr },
     { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsStream, 7, desc);
+  status = napi_define_properties(env, jsStream, 14, desc);
   PASS_STATUS;
 
   *result = jsStream;
