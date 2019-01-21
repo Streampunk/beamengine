@@ -23,6 +23,7 @@
 #include "beamcoder_util.h"
 #include "frame.h"
 #include <map>
+#include <deque>
 
 extern "C" {
   #include <libavfilter/avfilter.h>
@@ -366,7 +367,7 @@ napi_value filterer(napi_env env, napi_callback_info info) {
 struct filterCarrier : carrier {
   srcContexts *srcCtxs;
   AVFilterContext *sinkCtx = nullptr;
-  std::map<std::string, AVFrame *> srcFrames;
+  std::map<std::string, std::deque<AVFrame *> > srcFrames;
   std::vector<AVFrame *> dstFrames;
   ~filterCarrier() {
     // printf("Filter carrier destructor.\n");
@@ -428,17 +429,23 @@ void filterExecute(napi_env env, void* data) {
   int ret = 0;
   HR_TIME_POINT filterStart = NOW;
 
-  for (auto it = c->srcFrames.cbegin(); it != c->srcFrames.cend(); ++it) {
+  for (auto it = c->srcFrames.begin(); it != c->srcFrames.end(); ++it) {
     AVFilterContext *srcCtx = c->srcCtxs->getContext(it->first);
     if (!srcCtx) {
       c->status = BEAMCODER_INVALID_ARGS;
       c->errorMsg = "Frame name not found in source contexts.";
       return;
     }
-    if (av_buffersrc_add_frame_flags(srcCtx, it->second, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
-      c->status = BEAMCODER_ERROR_ENOMEM;
-      c->errorMsg = "Error while feeding the filtergraph.";
-      return;
+
+    std::deque<AVFrame *> frames = it->second;
+    while (frames.size() > 0) {
+      ret = av_buffersrc_add_frame_flags(srcCtx, frames.front(), AV_BUFFERSRC_FLAG_KEEP_REF);
+      if (ret < 0) {
+        c->status = BEAMCODER_ERROR_FILTER_ADD_FRAME;
+        c->errorMsg = "Error while feeding the filtergraph.";
+        return;
+      }
+      frames.pop_front();
     }
   }
 
@@ -448,7 +455,7 @@ void filterExecute(napi_env env, void* data) {
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
       break;
     if (ret < 0) {
-      c->status = BEAMCODER_ERROR_ENOMEM;
+      c->status = BEAMCODER_ERROR_FILTER_GET_FRAME;
       c->errorMsg = "Error while filtering.";
       break;
     }
@@ -537,11 +544,10 @@ napi_value filter(napi_env env, napi_callback_info info) {
     REJECT_ERROR_RETURN("Expected an array of source frame objects.",
       BEAMCODER_INVALID_ARGS);
 
-  uint32_t srcFramesLen;
-  c->status = napi_get_array_length(env, args[0], &srcFramesLen);
+  uint32_t srcsLen;
+  c->status = napi_get_array_length(env, args[0], &srcsLen);
   REJECT_RETURN;
-
-  for (uint32_t i = 0; i < srcFramesLen; ++i) {
+  for (uint32_t i = 0; i < srcsLen; ++i) {
     napi_value item;
     c->status = napi_get_element(env, args[0], i, &item);
     REJECT_RETURN;
@@ -567,12 +573,37 @@ napi_value filter(napi_env env, napi_callback_info info) {
         BEAMCODER_INVALID_ARGS);
     }
       
-    napi_value frameVal;
-    c->status = napi_get_named_property(env, item, "frame", &frameVal);
+    napi_value framesVal;
+    c->status = napi_get_named_property(env, item, "frames", &framesVal);
     REJECT_RETURN;
-    AVFrame *frame = getFrame(env, frameVal);
 
-    c->srcFrames.insert(std::make_pair(name, frame));
+    napi_value framesArrVal;
+    c->status = napi_get_named_property(env, framesVal, "frames", &framesArrVal);
+    REJECT_RETURN;
+
+    bool isArray;
+    c->status = napi_is_array(env, framesArrVal, &isArray);
+    REJECT_RETURN;
+    if (!isArray)
+      REJECT_ERROR_RETURN("Expected an array of frame objects.",
+        BEAMCODER_INVALID_ARGS);
+
+    uint32_t framesLen;
+    c->status = napi_get_array_length(env, framesArrVal, &framesLen);
+    REJECT_RETURN;
+    std::deque<AVFrame *> frames;
+    for (uint32_t f = 0; f < framesLen; ++f) {
+      napi_value item;
+      c->status = napi_get_element(env, framesArrVal, f, &item);
+      REJECT_RETURN;
+      c->status = isFrame(env, item);
+      if (c->status != napi_ok) {
+        REJECT_ERROR_RETURN("Values in array must by of type frame.",
+          BEAMCODER_INVALID_ARGS);
+      }
+      frames.push_back(getFrame(env, item));
+    }
+    c->srcFrames.insert(std::make_pair(name, frames));
   }
 
   c->status = napi_create_string_utf8(env, "Filter", NAPI_AUTO_LENGTH, &resourceName);

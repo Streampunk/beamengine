@@ -59,14 +59,12 @@ async function run() {
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
-      console.log(frames.frames[0]);
-      frames.frames.forEach(async f => {
-        let filtFrames = await filterer.filter([
-          { name: '0:v', frame: f },
-          { name: '1:v', frame: f },
-        ]);
-        console.log(filtFrames.frames[0]);
-      });
+      console.log(frames);
+      let filtFrames = await filterer.filter([
+        { name: '0:v', frames: frames },
+        { name: '1:v', frames: frames },
+      ]);
+      console.log(filtFrames);
     }
   }
   let frames = await decoder.flush();
