@@ -33,6 +33,7 @@ extern "C" {
 
 #include "beamcoder_util.h"
 #include "packet.h"
+#include "format.h"
 #include "node_api.h"
 #include "Adaptor.h"
 

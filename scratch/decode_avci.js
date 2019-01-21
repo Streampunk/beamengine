@@ -23,15 +23,15 @@ const { beamcoder } = require('../index.js');
 
 async function run() {
   let format = await beamcoder.format('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
-  console.log(format.streams);
+  console.log(format);
   let decoder = await beamcoder.decoder({ name: 'h264' });
   console.log(decoder);
-  for ( let x = 0 ; x < 1000 ; x++ ) {
+  for ( let x = 0 ; x < 100 ; x++ ) {
     let packet = await format.readFrame();
     if (packet.stream_index === 0) {
       //console.log(packet);
       let frames = await decoder.decode(packet);
-      console.log(frames.frames[0]);
+      //console.log(frames.frames[0]);
       console.log(x, frames.totalTime);
     }
   }

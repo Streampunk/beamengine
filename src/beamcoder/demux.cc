@@ -62,7 +62,7 @@ void demuxerExecute(napi_env env, void* data) {
 
 void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
   demuxerCarrier* c = (demuxerCarrier*) data;
-  napi_value result, value, item, prop, subprop;
+  napi_value result, prop;
   AVDictionaryEntry* tag = nullptr;
 
   if (asyncStatus != napi_ok) {
@@ -77,236 +77,11 @@ void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
     REJECT_STATUS;
   }
 
-  c->status = napi_create_object(env, &result);
+  c->status = fromAVFormatContext(env, c->format, &result, false);
+  c->format = nullptr;
   REJECT_STATUS;
 
-  c->status = beam_set_string_utf8(env, result, "type", "demuxer");
-  REJECT_STATUS;
-
-  c->status = napi_create_object(env, &value);
-  REJECT_STATUS;
-  c->status = beam_set_string_utf8(env, value, "type", "inputFormat");
-  REJECT_STATUS;
-  if (c->format->iformat->name != nullptr) {
-    c->status = beam_set_string_utf8(env, value, "name", (char*) c->format->iformat->name);
-    REJECT_STATUS;
-  }
-  if (c->format->iformat->long_name != nullptr) {
-    c->status = beam_set_string_utf8(env, value, "long_name", (char*) c->format->iformat->long_name);
-    REJECT_STATUS;
-  }
-  if (c->format->iformat->mime_type != nullptr) {
-    c->status = beam_set_string_utf8(env, value, "mime_type", (char*) c->format->iformat->mime_type);
-    REJECT_STATUS;
-  }
-  c->status = napi_set_named_property(env, result, "iformat", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_array(env, &value);
-  REJECT_STATUS;
-  for ( uint32_t x = 0 ; x < c->format->nb_streams ; x++ ) {
-    AVStream *stream = c->format->streams[x];
-    AVCodecParameters *codec = stream->codecpar;
-    AVCodec *codecImpl = avcodec_find_decoder(codec->codec_id);
-
-    c->status = napi_create_object(env, &item);
-    REJECT_STATUS;
-    c->status = beam_set_string_utf8(env, item, "type", "stream");
-    REJECT_STATUS;
-
-    if (stream->index != x) {
-      c->status = beam_set_int32(env, item, "index", stream->index);
-      REJECT_STATUS;
-    }
-
-    c->status = beam_set_rational(env, item, "time_base", stream->time_base);
-    REJECT_STATUS;
-
-    if (stream->start_time != AV_NOPTS_VALUE) {
-      c->status = napi_create_int64(env, stream->start_time, &prop);
-      REJECT_STATUS;
-    }
-    else {
-      c->status = napi_get_null(env, &prop);
-      REJECT_STATUS;
-    }
-    c->status = napi_set_named_property(env, item, "start_time", prop);
-    REJECT_STATUS;
-
-    if (stream->duration != AV_NOPTS_VALUE) {
-      c->status = napi_create_int64(env, stream->duration, &prop);
-      REJECT_STATUS;
-    }
-    else {
-      c->status = napi_get_null(env, &prop);
-      REJECT_STATUS;
-    }
-    c->status = napi_set_named_property(env, item, "duration", prop);
-    REJECT_STATUS;
-
-    c->status = beam_set_int64(env, item, "nb_frames", stream->nb_frames);
-    REJECT_STATUS;
-
-    if (stream->sample_aspect_ratio.num != 0) {
-      c->status = beam_set_rational(env, item, "sample_aspect_ratio", stream->sample_aspect_ratio);
-      REJECT_STATUS;
-    }
-
-    c->status = napi_create_object(env, &prop);
-    REJECT_STATUS;
-    while ((tag = av_dict_get(stream->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-      c->status = beam_set_string_utf8(env, prop, tag->key, tag->value);
-      REJECT_STATUS;
-    }
-    c->status = napi_set_named_property(env, item, "metadata", prop);
-    REJECT_STATUS;
-
-    if (stream->avg_frame_rate.num != 0) {
-      c->status = beam_set_rational(env, item, "avg_frame_rate", stream->avg_frame_rate);
-      REJECT_STATUS;
-    }
-
-    c->status = napi_create_object(env, &prop);
-    REJECT_STATUS;
-    c->status = beam_set_string_utf8(env, prop, "type", "codecParameters");
-    REJECT_STATUS;
-
-    c->status = beam_set_string_utf8(env, prop, "codec_type",
-      (char*) av_get_media_type_string(codec->codec_type));
-    REJECT_STATUS;
-
-    if (codecImpl != nullptr) {
-      c->status = beam_set_string_utf8(env, prop, "name", (char*) codecImpl->name);
-      REJECT_STATUS;
-      c->status = beam_set_string_utf8(env, prop, "long_name", (char*) codecImpl->long_name);
-      REJECT_STATUS;
-    }
-    else {
-      c->status = beam_set_string_utf8(env, prop, "name", "unknown");
-      REJECT_STATUS;
-    }
-
-    c->status = beam_set_int32(env, prop, "codec_id", codec->codec_id);
-    REJECT_STATUS;
-
-    char codecTag[AV_FOURCC_MAX_STRING_SIZE];
-    c->status = beam_set_string_utf8(env, prop, "codec_tag",
-      av_fourcc_make_string(codecTag, codec->codec_tag));
-    REJECT_STATUS;
-
-    if (codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-      const char* pixelFormatName = av_get_pix_fmt_name((AVPixelFormat) codec->format);
-      if (pixelFormatName != nullptr) {
-        c->status = beam_set_string_utf8(env, prop, "format", (char*) pixelFormatName);
-        REJECT_STATUS;
-      }
-
-      c->status = beam_set_int32(env, prop, "width", codec->width);
-      REJECT_STATUS;
-      c->status = beam_set_int32(env, prop, "height", codec->height);
-      REJECT_STATUS;
-
-      c->status = beam_set_enum(env, prop, "field_order",
-        beam_field_order, codec->field_order);
-      REJECT_STATUS;
-
-      c->status = napi_create_string_utf8(env,
-        av_color_range_name(codec->color_range), NAPI_AUTO_LENGTH, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "color_range", subprop);
-      REJECT_STATUS;
-
-      c->status = napi_create_string_utf8(env,
-        av_color_primaries_name(codec->color_primaries), NAPI_AUTO_LENGTH, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "color_primaries", subprop);
-      REJECT_STATUS;
-
-      c->status = napi_create_string_utf8(env,
-        av_color_transfer_name(codec->color_trc), NAPI_AUTO_LENGTH, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "color_trc", subprop);
-      REJECT_STATUS;
-
-      c->status = napi_create_string_utf8(env,
-        av_color_space_name(codec->color_space), NAPI_AUTO_LENGTH, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "color_space", subprop);
-      REJECT_STATUS;
-
-      c->status = napi_create_string_utf8(env,
-        av_chroma_location_name(codec->chroma_location), NAPI_AUTO_LENGTH, &subprop);
-      REJECT_STATUS;
-      c->status = napi_set_named_property(env, prop, "chroma_location", subprop);
-      REJECT_STATUS;
-    } // Video-only properties
-
-    if (codec->codec_type == AVMEDIA_TYPE_AUDIO) {
-      const char* sampleFormatName = av_get_sample_fmt_name((AVSampleFormat) codec->format);
-      if (sampleFormatName != nullptr) {
-        c->status = napi_create_string_utf8(env, sampleFormatName, NAPI_AUTO_LENGTH, &subprop);
-        REJECT_STATUS;
-        c->status = napi_set_named_property(env, prop, "format", subprop);
-        REJECT_STATUS;
-      }
-
-      c->status = beam_set_int32(env, prop, "channels", codec->channels);
-      REJECT_STATUS;
-      c->status = beam_set_int32(env, prop, "sample_rate", codec->sample_rate);
-      REJECT_STATUS;
-      c->status = beam_set_int32(env, prop, "block_align", codec->block_align);
-      REJECT_STATUS;
-
-      if (codec->channel_layout != 0) {
-        char cl[64];
-        av_get_channel_layout_string(cl, 64, codec->channels, codec->channel_layout);
-        c->status = beam_set_string_utf8(env, prop, "channel_layout", cl);
-        REJECT_STATUS;
-      }
-    } // Audio-only properties
-
-    c->status = beam_set_int32(env, prop, "bit_rate", codec->bit_rate);
-    REJECT_STATUS;
-
-    if (codec->profile >= 0) {
-      const char* profileName = avcodec_profile_name(codec->codec_id, codec->profile);
-      if (profileName != nullptr) {
-        c->status = beam_set_string_utf8(env, prop, "profile", (char*) profileName);
-        REJECT_STATUS;
-      }
-    }
-
-    if (codec->level >= 0) {
-      c->status = beam_set_int32(env, prop, "level", codec->level);
-      REJECT_STATUS;
-    }
-
-    c->status = napi_set_named_property(env, item, "codecpar", prop);
-    REJECT_STATUS;
-
-    c->status = napi_set_element(env, value, stream->index, item);
-    REJECT_STATUS;
-  } // End of stream section
-  c->status = napi_set_named_property(env, result, "streams", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_object(env, &prop);
-  REJECT_STATUS;
-  while ((tag = av_dict_get(c->format->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-    c->status = beam_set_string_utf8(env, prop, tag->key, tag->value);
-    REJECT_STATUS;
-  }
-  c->status = napi_set_named_property(env, result, "metadata", prop);
-  REJECT_STATUS;
-
-  c->status = beam_set_int64(env, result, "start_time", c->format->start_time);
-  REJECT_STATUS;
-  c->status = beam_set_int64(env, result, "duration", c->format->duration);
-  REJECT_STATUS;
-
-  c->status = beam_set_int32(env, result, "bit_rate", c->format->bit_rate);
-  REJECT_STATUS;
-
+  /*
   if (c->format->start_time_realtime != AV_NOPTS_VALUE) {
     c->status = napi_create_int64(env, c->format->start_time_realtime, &prop);
   }
@@ -315,18 +90,7 @@ void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
   }
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "start_time_realtime", prop);
-  REJECT_STATUS;
-
-  c->status = beam_set_uint32(env, result, "packet_size", c->format->packet_size);
-  REJECT_STATUS;
-  c->status = beam_set_uint32(env, result, "max_delay", c->format->max_delay);
-  REJECT_STATUS;
-
-  c->status = napi_create_external(env, c->format, demuxerFinalizer, nullptr, &prop);
-  REJECT_STATUS;
-  c->format = nullptr;
-  c->status = napi_set_named_property(env, result, "_formatContext", prop);
-  REJECT_STATUS;
+  REJECT_STATUS; */
 
   c->status = napi_create_external(env, c->adaptor, nullptr, nullptr, &prop);
   REJECT_STATUS;

@@ -1156,6 +1156,60 @@ napi_value setFmtCtxMetadata(napi_env env, napi_callback_info info) {
   return result;
 }
 
+// TODO use Javascript Date?
+napi_value getFmtCtxStartTRealT(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  if (fmtCtx->start_time_realtime == AV_NOPTS_VALUE) {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_create_int64(env, fmtCtx->start_time_realtime, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFmtCtxStartTRealT(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context start_time_realtime must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if ((type == napi_undefined) || (type == napi_null)) {
+    fmtCtx->start_time_realtime = AV_NOPTS_VALUE;
+    goto done;
+  }
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context start_time_realtime must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &fmtCtx->start_time_realtime);
+  CHECK_STATUS;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     napi_value* result, bool isMuxer) {
   napi_status status;
@@ -1198,11 +1252,13 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "metadata", nullptr, nullptr, getFmtCtxMetadata, setFmtCtxMetadata, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "start_time_realtime", nullptr, nullptr, getFmtCtxStartTRealT, setFmtCtxStartTRealT, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 14, desc);
+  status = napi_define_properties(env, jsFmtCtx, 15, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
