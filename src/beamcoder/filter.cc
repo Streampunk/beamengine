@@ -38,8 +38,9 @@ public:
   srcContexts() {}
   ~srcContexts() {}
 
-  void add(const std::string &name, AVFilterContext *context) {
-    mSrcContexts.insert(std::make_pair(name, context));
+  bool add(const std::string &name, AVFilterContext *context) {
+    auto result = mSrcContexts.emplace(name, context);
+    return result.second;
   }
 
   AVFilterContext *getContext(const std::string &name) const {
@@ -120,7 +121,11 @@ void filtererExecute(napi_env env, void* data) {
     outputs[i]->pad_idx    = 0;
     outputs[i]->next       = i < c->inParams.size() - 1 ? outputs[i + 1] : NULL;
 
-    c->srcCtxs->add(c->inName[i], srcCtx);
+    if (!c->srcCtxs->add(c->inName[i], srcCtx)) {
+      c->status = BEAMCODER_ERROR_EINVAL;
+      c->errorMsg = "Filter sources must have unique names.";
+      goto end;
+    }
   }
 
   if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, outputs, NULL)) < 0) {
@@ -603,7 +608,11 @@ napi_value filter(napi_env env, napi_callback_info info) {
       }
       frames.push_back(getFrame(env, item));
     }
-    c->srcFrames.insert(std::make_pair(name, frames));
+    auto result = c->srcFrames.emplace(name, frames);
+    if (!result.second) {
+      REJECT_ERROR_RETURN("Frame names must be unique.",
+        BEAMCODER_INVALID_ARGS);
+    }
   }
 
   c->status = napi_create_string_utf8(env, "Filter", NAPI_AUTO_LENGTH, &resourceName);
