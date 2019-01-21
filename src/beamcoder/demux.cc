@@ -81,17 +81,6 @@ void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->format = nullptr;
   REJECT_STATUS;
 
-  /*
-  if (c->format->start_time_realtime != AV_NOPTS_VALUE) {
-    c->status = napi_create_int64(env, c->format->start_time_realtime, &prop);
-  }
-  else {
-    c->status = napi_get_null(env, &prop);
-  }
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "start_time_realtime", prop);
-  REJECT_STATUS; */
-
   c->status = napi_create_external(env, c->adaptor, nullptr, nullptr, &prop);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "adaptor", prop);

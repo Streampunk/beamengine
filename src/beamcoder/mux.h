@@ -31,6 +31,58 @@ extern "C" {
   #include <libavformat/avformat.h>
 }
 
-napi_value muxer(napi_env env, napi_callback_info info);
+napi_value muxer(napi_env env, napi_callback_info info); // Set to interleaving once
+
+void openIOExecute(napi_env env, void* data);
+void openIOComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value openIO(napi_env env, napi_callback_info info);
+
+void writeHeaderExecute(napi_env env, void* data);
+void writeHeaderComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value writeHeader(napi_env env, napi_callback_info info);
+
+void initOutputExecute(napi_env env, void* data);
+void initOutputComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value initOutput(napi_env env, napi_callback_info info);
+
+void writeFrameExecute(napi_env env, void* data);
+void writeFrameComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value writeFrame(napi_env env, napi_callback_info info); // IF AVFrame, must include stream_index
+
+void writeTrailerExecute(napi_env env, void* data);
+void writeTrailerComplete(napi_env env, napi_status asyncStatus, void* data);
+napi_value writeTrailer(napi_env env, napi_callback_info info);
+
+struct openIOCarrier : carrier {
+  AVFormatContext* format;
+  ~openIOCarrier() {
+  }
+};
+
+struct writeHeaderCarrier : carrier {
+  AVFormatContext* format;
+  ~writeHeaderCarrier() {
+  }
+};
+
+struct initOutputCarrier : carrier {
+  AVFormatContext* format;
+  ~initOutputCarrier() {
+  }
+};
+
+struct writeFrameCarrier : carrier {
+  AVFormatContext* format;
+  AVPacket* packet = nullptr;
+  AVFrame* frame = nullptr;
+  ~writeFrameCarrier() {
+  }
+};
+
+struct writeTrailerCarrier : carrier {
+  AVFormatContext* format;
+  ~writeTrailerCarrier() {
+  }
+};
 
 #endif // MUX_H

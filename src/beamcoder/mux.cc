@@ -106,5 +106,107 @@ napi_value muxer(napi_env env, napi_callback_info info) {
   status = fromAVFormatContext(env, fmtCtx, &result, true);
   CHECK_STATUS;
 
+  status = napi_create_function(env, "openIO", NAPI_AUTO_LENGTH,
+    openIO, nullptr, &prop);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, result, "openIO", prop);
+  CHECK_STATUS;
+
+  status = napi_create_function(env, "writeHeader", NAPI_AUTO_LENGTH,
+    writeHeader, nullptr, &prop);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, result, "writeHeader", prop);
+  CHECK_STATUS;
+
+  status = napi_create_function(env, "initOutput", NAPI_AUTO_LENGTH,
+    initOutput, nullptr, &prop);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, result, "initOutput", prop);
+  CHECK_STATUS;
+
+  status = napi_create_function(env, "writeFrame", NAPI_AUTO_LENGTH,
+    writeFrame, nullptr, &prop);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, result, "writeFrame", prop);
+  CHECK_STATUS;
+
+  status = napi_create_function(env, "writeTrailer", NAPI_AUTO_LENGTH,
+    writeTrailer, nullptr, &prop);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, result, "writeTrailer", prop);
+  CHECK_STATUS;
+
   return result;
+}
+
+void openIOExecute(napi_env env, void* data) {
+  openIOCarrier* c = (openIOCarrier*) data;
+}
+
+void openIOComplete(napi_env env, napi_status asyncStatus, void* data) {
+  openIOCarrier* c = (openIOCarrier*) data;
+
+  tidyCarrier(env, c);
+}
+
+napi_value openIO(napi_env env, napi_callback_info info) {
+  napi_value promise;
+  openIOCarrier* c = new openIOCarrier;
+
+  c->status = napi_create_promise(env, &c->_deferred, &promise);
+  REJECT_RETURN;
+
+  return promise;
+}
+
+void writeHeaderExecute(napi_env env, void* data) {
+
+}
+
+void writeHeaderComplete(napi_env env, napi_status asyncStatus, void* data) {
+
+}
+
+napi_value writeHeader(napi_env env, napi_callback_info info) {
+
+  return nullptr;
+}
+
+void initOutputExecute(napi_env env, void* data) {
+
+}
+
+void initOutputComplete(napi_env env, napi_status asyncStatus, void* data) {
+
+}
+
+napi_value initOutput(napi_env env, napi_callback_info info) {
+
+  return nullptr;
+}
+
+void writeFrameExecute(napi_env env, void* data) {
+
+}
+
+void writeFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
+
+}
+
+napi_value writeFrame(napi_env env, napi_callback_info info) {
+
+  return nullptr;
+}
+
+void writeTrailerExecute(napi_env env, void* data) {
+
+}
+
+void writeTrailerComplete(napi_env env, napi_status asyncStatus, void* data) {
+
+}
+
+napi_value writeTrailer(napi_env env, napi_callback_info info) {
+
+  return nullptr;
 }

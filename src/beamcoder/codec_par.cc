@@ -1486,6 +1486,7 @@ napi_status fromAVCodecParameters(napi_env env, codecParData* c, napi_value* res
       (napi_property_attributes) (napi_writable | napi_enumerable), c },
     { "codec_tag", nullptr, nullptr, getCodecParCodecTag, nullptr, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), c },
+    // extradata
     { "format", nullptr, nullptr, getCodecParFormat, setCodecParFormat, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), c },
     { "bit_rate", nullptr, nullptr, getCodecParBitRate, setCodecParBitRate, nullptr,

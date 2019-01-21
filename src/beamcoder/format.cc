@@ -1068,6 +1068,88 @@ napi_value setFmtCtxFlags(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFmtCtxProbeSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, fmtCtx->probesize, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxProbeSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Demuxer probesize must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Demuxer probesize must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &fmtCtx->probesize);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxAnDur(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, fmtCtx->max_analyze_duration, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxAnDur(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Demuxer max_analyze_duration must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Demuxer max_analyze_duration must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &fmtCtx->max_analyze_duration);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value getFmtCtxMetadata(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1250,15 +1332,59 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },  // 10
     { "flags", nullptr, nullptr, getFmtCtxFlags, setFmtCtxFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "probesize", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxProbeSize,
+      isMuxer ? nullptr : setFmtCtxProbeSize, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "max_analyze_duration", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxMaxAnDur,
+      isMuxer ? nullptr : setFmtCtxMaxAnDur, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+      // key?
+      // programs?
+      // max_index_size
+      // max_picture_buffer
+      // chapters?
+      // fps_probe_size
     { "metadata", nullptr, nullptr, getFmtCtxMetadata, setFmtCtxMetadata, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "start_time_realtime", nullptr, nullptr, getFmtCtxStartTRealT, setFmtCtxStartTRealT, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+      // error_recognition
+      // debug
+      // max_interleave_delta
+      // strict_std_compliance
+      // event_flags
+      // max_ts_probe
+      // avoid_negative_ts
+      // audio_preload
+      // max_chunk_duration
+      // max_chunk_size
+      // use_wallclock_as_timestamps
+      // avio_flags
+      // duration_estimation_method
+      // skip_initial_bytes
+      // correct_ts_overflow
+      // seek2any
+      // flush_packets
+      // probe_score
+      // format_probesize
+      // codec_whitelist
+      // format_whitelist
+      // metaadata_header_padding
+      // output_ts_offset
+      // dump_separator
+      // protocol_whitelist
+      // protocol_blacklist
+      // max_streams
+      // skip_estimate_duration_from_pts
+
+
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 15, desc);
+  status = napi_define_properties(env, jsFmtCtx, 17, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
@@ -1902,6 +2028,57 @@ napi_value setStreamSmpAspectRt(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getStreamEventFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  status = beam_set_bool(env, result, "METADATA_UPDATED",
+    stream->event_flags & AVSTREAM_EVENT_FLAG_METADATA_UPDATED);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamEventFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVStream* stream;
+  bool isArray, present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the stream event_flags property.")
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("Stream property event_flags is set with an object of Boolean values.");
+  }
+  status = beam_get_bool(env, args[0], "METADATA_UPDATED", &present, &flag);
+  CHECK_STATUS;
+  if (present) { stream->event_flags = (flag) ?
+    stream->event_flags | AVSTREAM_EVENT_FLAG_METADATA_UPDATED :
+    stream->event_flags & ~AVSTREAM_EVENT_FLAG_METADATA_UPDATED; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value getStreamMetadata(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1990,6 +2167,136 @@ napi_value setStreamMetadata(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getStreamAvgFrameRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->avg_frame_rate.num, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 0, element);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->avg_frame_rate.den, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 1, element);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamAvgFrameRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  napi_valuetype type;
+  bool isArray;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the stream avg_frame_rate property.");
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("The stream's avg_frame_rate property must be set with an array of two numbers.");
+  }
+  for ( uint32_t x = 0 ; x < 2 ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_typeof(env, element, &type);
+    CHECK_STATUS;
+    if (type != napi_number) {
+      NAPI_THROW_ERROR("The stream's avg_frame_rate property array elements must be numbers.");
+    }
+  }
+  status = napi_get_element(env, args[0], 0, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->avg_frame_rate.num);
+  CHECK_STATUS;
+  status = napi_get_element(env, args[0], 1, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->avg_frame_rate.den);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getStreamRFrameRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->r_frame_rate.num, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 0, element);
+  CHECK_STATUS;
+  status = napi_create_int32(env, stream->r_frame_rate.den, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, result, 1, element);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamRFrameRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  napi_valuetype type;
+  bool isArray;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the stream r_frame_rate property.");
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("The stream's r_frame_rate property must be set with an array of two numbers.");
+  }
+  for ( uint32_t x = 0 ; x < 2 ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_typeof(env, element, &type);
+    CHECK_STATUS;
+    if (type != napi_number) {
+      NAPI_THROW_ERROR("The stream's r_frame_rate property array elements must be numbers.");
+    }
+  }
+  status = napi_get_element(env, args[0], 0, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->r_frame_rate.num);
+  CHECK_STATUS;
+  status = napi_get_element(env, args[0], 1, &element);
+  CHECK_STATUS;
+  status = napi_get_value_int32(env, element, &stream->r_frame_rate.den);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -2046,6 +2353,26 @@ napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getStreamAttachedPic(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+  packetData* pd = new packetData;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+
+  if (stream->attached_pic.data == nullptr) {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  } else {
+    pd->packet = &stream->attached_pic;
+    status = fromAVPacket(env, pd, &result);
+    CHECK_STATUS;
+  }
+  return result;
+}
+
 napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
   napi_status status;
   napi_value jsStream, extStream, typeName;
@@ -2080,12 +2407,21 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), stream }, // 10
     { "metadata", nullptr, nullptr, getStreamMetadata, setStreamMetadata, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "avg_frame_rate", nullptr, nullptr, getStreamAvgFrameRate, setStreamAvgFrameRate, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "attached_pic", nullptr, nullptr, getStreamAttachedPic, nullptr, nullptr,
+       napi_enumerable, stream },
+    // side data
+    { "event_flags", nullptr, nullptr, getStreamEventFlags, setStreamEventFlags, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+    { "r_frame_rate", nullptr, nullptr, getStreamRFrameRate, setStreamRFrameRate, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "codecpar", nullptr, nullptr, getStreamCodecPar, setStreamCodecPar, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "name", nullptr, nullptr, nullptr, nullptr, typeName, napi_writable, nullptr },
     { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsStream, 14, desc);
+  status = napi_define_properties(env, jsStream, 18, desc);
   PASS_STATUS;
 
   *result = jsStream;
