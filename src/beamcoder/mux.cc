@@ -609,15 +609,17 @@ void writeFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
 
 napi_value writeFrame(napi_env env, napi_callback_info info) {
   napi_value promise, formatJS, formatExt, interleavedJS, resourceName, options, prop;
-  napi_valuetype type, type2;
+  napi_valuetype type;
   bool isArray;
+  bool hasOptions = false;
   writeFrameCarrier* c = new writeFrameCarrier;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
 
-  size_t argc = 0;
-  c->status = napi_get_cb_info(env, info, &argc, nullptr, &formatJS, nullptr);
+  size_t argc = 1;
+  napi_value args[1];
+  c->status = napi_get_cb_info(env, info, &argc, args, &formatJS, nullptr);
   REJECT_RETURN;
   c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
   REJECT_RETURN;
@@ -630,8 +632,6 @@ napi_value writeFrame(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
 
   if (argc > 0) { // is it a packet, a frame, an options object
-    napi_value args[1];
-    argc = 1;
     c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     REJECT_RETURN;
     c->status = napi_typeof(env, args[0], &type);
@@ -647,8 +647,9 @@ napi_value writeFrame(napi_env env, napi_callback_info info) {
     REJECT_RETURN;
     c->status = napi_typeof(env, options, &type);
     REJECT_RETURN;
+    hasOptions = (type == napi_object);
     c->status = napi_get_named_property(env,
-      (type == napi_object) ? options : args[0], "_packet", &prop);
+      hasOptions ? options : args[0], "_packet", &prop);
     REJECT_RETURN;
     c->status = napi_typeof(env, prop, &type);
     REJECT_RETURN;
@@ -662,22 +663,23 @@ napi_value writeFrame(napi_env env, napi_callback_info info) {
     REJECT_RETURN;
     c->status = napi_typeof(env, options, &type);
     REJECT_RETURN;
+    hasOptions = (type == napi_object);
     c->status = napi_get_named_property(env,
-      (type == napi_object) ? options : args[0], "_frame", &prop);
+      hasOptions ? options : args[0], "_frame", &prop);
     REJECT_RETURN;
-    c->status = napi_typeof(env, prop, &type2);
+    c->status = napi_typeof(env, prop, &type);
     REJECT_RETURN;
-    if (type2 == napi_external) {
+    if (type == napi_external) {
       c->status = napi_get_value_external(env, prop, (void**) &c->frame);
       REJECT_RETURN;
     }
 
     c->status = napi_get_named_property(env,
-      (type == napi_object) ? options : args[0], "stream_index", &prop);
+      hasOptions ? options : args[0], "stream_index", &prop);
     REJECT_RETURN;
-    c->status = napi_typeof(env, prop, &type2);
+    c->status = napi_typeof(env, prop, &type);
     REJECT_RETURN;
-    if (type2 == napi_number) {
+    if (type == napi_number) {
       c->status = napi_get_value_int32(env, prop, &c->streamIndex);
       REJECT_RETURN;
     }
@@ -688,6 +690,12 @@ napi_value writeFrame(napi_env env, napi_callback_info info) {
   }
 
 work:
+  if ((c->packet != nullptr) || (c->frame != nullptr)) {
+    c->status = napi_create_reference(env, hasOptions ? options : args[0], 1,
+      &c->passthru);
+    REJECT_RETURN;
+  } // Don't garbage collect during write
+
   c->status = napi_create_string_utf8(env, "WriteFrame", NAPI_AUTO_LENGTH, &resourceName);
   REJECT_RETURN;
   c->status = napi_create_async_work(env, nullptr, resourceName, writeFrameExecute,
