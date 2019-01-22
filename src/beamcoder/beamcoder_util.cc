@@ -2642,6 +2642,48 @@ napi_status beam_get_enum(napi_env env, napi_value target, char* name,
   return napi_ok;
 };
 
+napi_status fromAVClass(napi_env env, const AVClass* cls, napi_value* result) {
+  napi_status status;
+  napi_value desc, options, opt;
+  const AVOption* option;
+
+  status = napi_create_object(env, &desc);
+  PASS_STATUS;
+
+  status = beam_set_string_utf8(env, desc, "type", "Class");
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, desc, "class_name", (char*) cls->class_name);
+  PASS_STATUS;
+  status = napi_create_object(env, &options);
+  PASS_STATUS;
+  option = cls->option;
+  while (option != nullptr) {
+    if (option->type == AV_OPT_TYPE_CONST) {
+      option = av_opt_next(&cls, option);
+      continue;
+    }
+    status = napi_create_object(env, &opt);
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, opt, "name", (char*) option->name);
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, opt, "help", (char*) option->help);
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, opt, "option_type",
+      (char*) beam_lookup_name(beam_option_type->forward, option->type));
+    PASS_STATUS;
+    status = napi_set_named_property(env, options, option->name, opt);
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, opt, "unit", (char*) option->unit);
+    PASS_STATUS;
+    option = av_opt_next(&cls, option);
+  }
+  status = napi_set_named_property(env, desc, "options", options);
+  PASS_STATUS;
+
+  *result = desc;
+  return napi_ok;
+}
+
 std::unordered_map<int, std::string> beam_field_order_fmap = {
   { AV_FIELD_PROGRESSIVE, "progressive" },
   { AV_FIELD_TT, "top coded first, top displayed first" },
@@ -2762,3 +2804,26 @@ std::unordered_map<int, std::string> beam_avmedia_type_fmap = {
   { AVMEDIA_TYPE_ATTACHMENT, "attachment" }
 };
 const beamEnum* beam_avmedia_type = new beamEnum(beam_avmedia_type_fmap);
+
+std::unordered_map<int, std::string> beam_option_type_fmap = {
+  { AV_OPT_TYPE_FLAGS, "flags" },
+  { AV_OPT_TYPE_INT, "int" },
+  { AV_OPT_TYPE_INT64, "int64" },
+  { AV_OPT_TYPE_DOUBLE, "double" },
+  { AV_OPT_TYPE_FLOAT, "float" },
+  { AV_OPT_TYPE_STRING, "string" },
+  { AV_OPT_TYPE_RATIONAL, "rational" },
+  { AV_OPT_TYPE_BINARY, "binary" }, ///< offset must point to a pointer immediately followed by an int for the length
+  { AV_OPT_TYPE_DICT, "dict" },
+  { AV_OPT_TYPE_UINT64, "uint64" },
+  { AV_OPT_TYPE_CONST, "const" },
+  { AV_OPT_TYPE_IMAGE_SIZE, "image_size" }, ///< offset must point to two consecutive integers
+  { AV_OPT_TYPE_PIXEL_FMT, "pixel_fmt" },
+  { AV_OPT_TYPE_SAMPLE_FMT, "sample_fmt" },
+  { AV_OPT_TYPE_VIDEO_RATE, "video_rate" }, ///< offset must point to AVRational
+  { AV_OPT_TYPE_DURATION, "duration" },
+  { AV_OPT_TYPE_COLOR, "color" },
+  { AV_OPT_TYPE_CHANNEL_LAYOUT, "channel_layout" },
+  { AV_OPT_TYPE_BOOL, "bool" }
+};
+const beamEnum* beam_option_type = new beamEnum(beam_option_type_fmap);

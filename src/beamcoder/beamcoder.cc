@@ -38,6 +38,7 @@ extern "C" {
   #include <libavfilter/avfilter.h>
   #include <libavformat/avformat.h>
   #include <libavutil/avutil.h>
+  #include <libavutil/pixdesc.h>
   #include <libpostproc/postprocess.h>
   #include <libswresample/swresample.h>
   #include <libswscale/swscale.h>
@@ -372,6 +373,284 @@ napi_value codecs(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value pix_fmts(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, pixfmt, flags, comps, comp;
+  const AVPixFmtDescriptor* desc = nullptr;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  while ((desc = av_pix_fmt_desc_next(desc))) {
+    status = napi_create_object(env, &pixfmt);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, pixfmt, "name", (char*) desc->name);
+    CHECK_STATUS;
+    status = beam_set_int32(env, pixfmt, "nb_components", desc->nb_components);
+    CHECK_STATUS;
+    status = beam_set_uint32(env, pixfmt, "log2_chroma_h", desc->log2_chroma_h);
+    CHECK_STATUS;
+    status = beam_set_uint32(env, pixfmt, "log2_chroma_w", desc->log2_chroma_w);
+    CHECK_STATUS;
+    status = napi_create_object(env, &flags);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "BE", desc->flags & AV_PIX_FMT_FLAG_BE);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "PAL", desc->flags & AV_PIX_FMT_FLAG_PAL);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "BITSTREAM", desc->flags & AV_PIX_FMT_FLAG_BITSTREAM);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "HWACCEL", desc->flags & AV_PIX_FMT_FLAG_HWACCEL);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "PLANAR", desc->flags & AV_PIX_FMT_FLAG_PLANAR);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "RGB", desc->flags & AV_PIX_FMT_FLAG_RGB);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "PSEUDOPAL", desc->flags & AV_PIX_FMT_FLAG_PSEUDOPAL);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "ALPHA", desc->flags & AV_PIX_FMT_FLAG_ALPHA);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "BAYER", desc->flags & AV_PIX_FMT_FLAG_BAYER);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "FLOAT", desc->flags & AV_PIX_FMT_FLAG_FLOAT);
+    CHECK_STATUS;
+    status = napi_set_named_property(env, pixfmt, "flags", flags);
+    CHECK_STATUS;
+    status = napi_create_array(env, &comps);
+    CHECK_STATUS;
+    for ( int x = 0 ; x < desc->nb_components ; x++ ) {
+      status = napi_create_object(env, &comp);
+      CHECK_STATUS;
+      char letter[] = { 'X', '\0' };
+      switch(x) {
+        case 0:
+          if (desc->nb_components < 3) { letter[0] = 'Y'; break; }
+          letter[0] = (desc->flags & AV_PIX_FMT_FLAG_RGB) ? 'R' : 'Y';
+          break;
+        case 1:
+          if (desc->nb_components < 3) { letter[0] = 'A'; break; }
+          letter[0] = (desc->flags & AV_PIX_FMT_FLAG_RGB) ? 'G' : 'U';
+          break;
+        case 2:
+          letter[0] = (desc->flags & AV_PIX_FMT_FLAG_RGB) ? 'B' : 'V';
+          break;
+        case 3:
+          letter[0] = 'A';
+          break;
+        default:
+          break;
+      }
+      status = beam_set_string_utf8(env, comp, "code", letter);
+      CHECK_STATUS;
+
+      status = beam_set_int32(env, comp, "plane", desc->comp[x].plane);
+      CHECK_STATUS;
+      status = beam_set_int32(env, comp, "step", desc->comp[x].step);
+      CHECK_STATUS;
+      status = beam_set_int32(env, comp, "offset", desc->comp[x].offset);
+      CHECK_STATUS;
+      status = beam_set_int32(env, comp, "shift", desc->comp[x].shift);
+      CHECK_STATUS;
+      status = beam_set_int32(env, comp, "depth", desc->comp[x].depth);
+      CHECK_STATUS;
+
+      status = napi_set_element(env, comps, x, comp);
+      CHECK_STATUS;
+    }
+    status = napi_set_named_property(env, pixfmt, "comp", comps);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, pixfmt, "alias",
+      (desc->alias != nullptr) ? (char*) desc->alias : "");
+    CHECK_STATUS;
+    status = napi_set_named_property(env, result, desc->name, pixfmt);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value protocols(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, inputs, outputs, element;
+  void* opaque = nullptr;
+  int pos = 0;
+  const char* protocol;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = napi_create_array(env, &inputs);
+  CHECK_STATUS;
+  status = napi_create_array(env, &outputs);
+  CHECK_STATUS;
+
+  while ((protocol = avio_enum_protocols(&opaque, 0))) {
+    status = napi_create_string_utf8(env, (char*) protocol, NAPI_AUTO_LENGTH, &element);
+    CHECK_STATUS;
+    status = napi_set_element(env, inputs, pos++, element);
+    CHECK_STATUS;
+  }
+
+  opaque = nullptr;
+  pos = 0;
+  while ((protocol = avio_enum_protocols(&opaque, 1))) {
+    status = napi_create_string_utf8(env, (char*) protocol, NAPI_AUTO_LENGTH, &element);
+    CHECK_STATUS;
+    status = napi_set_element(env, outputs, pos++, element);
+    CHECK_STATUS;
+  }
+
+  status = napi_set_named_property(env, result, "inputs", inputs);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, result, "outputs", outputs);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value filters(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, desc, flags, pads, pad;
+  void* opaque = nullptr;
+  const AVFilter* filter;
+  int padCount;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  while ((filter = av_filter_iterate(&opaque))) {
+    status = napi_create_object(env, &desc);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, desc, "name", (char*) filter->name);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, desc, "description", (char*) filter->description);
+    CHECK_STATUS;
+
+    status = napi_create_array(env, &pads);
+    CHECK_STATUS;
+    padCount = avfilter_pad_count(filter->inputs);
+    for ( int x = 0 ; x < padCount ; x++ ) {
+      status = napi_create_object(env, &pad);
+      CHECK_STATUS;
+      status = beam_set_string_utf8(env, pad, "name",
+        (char*) avfilter_pad_get_name(filter->inputs, x));
+      CHECK_STATUS;
+      status = beam_set_string_utf8(env, pad, "media_type",
+        (char*) av_get_media_type_string(avfilter_pad_get_type(filter->inputs, x)));
+      CHECK_STATUS;
+      status = napi_set_element(env, pads, x, pad);
+      CHECK_STATUS;
+    }
+    status = napi_set_named_property(env, desc, "inputs", pads);
+    CHECK_STATUS;
+
+    status = napi_create_array(env, &pads);
+    CHECK_STATUS;
+    padCount = avfilter_pad_count(filter->outputs);
+    for ( int x = 0 ; x < padCount ; x++ ) {
+      status = napi_create_object(env, &pad);
+      CHECK_STATUS;
+      status = beam_set_string_utf8(env, pad, "name",
+        (char*) avfilter_pad_get_name(filter->outputs, x));
+      CHECK_STATUS;
+      status = beam_set_string_utf8(env, pad, "media_type",
+        (char*) av_get_media_type_string(avfilter_pad_get_type(filter->outputs, x)));
+      CHECK_STATUS;
+      status = napi_set_element(env, pads, x, pad);
+      CHECK_STATUS;
+    }
+    status = napi_set_named_property(env, desc, "outputs", pads);
+    CHECK_STATUS;
+
+    // TODO expand class details
+    if (filter->priv_class != nullptr) {
+      status = beam_set_string_utf8(env, desc, "priv_class",
+        (char*) filter->priv_class->class_name);
+      CHECK_STATUS;
+    } else {
+      status = napi_get_null(env, &pad);
+      CHECK_STATUS;
+      status = napi_set_named_property(env, desc, "priv_class", pad);
+      CHECK_STATUS;
+    }
+
+    status = napi_create_object(env, &flags);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "DYNAMIC_INPUTS",
+      filter->flags & AVFILTER_FLAG_DYNAMIC_INPUTS);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "DYNAMIC_OUTPUTS",
+      filter->flags & AVFILTER_FLAG_DYNAMIC_OUTPUTS);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "SLICE_THREADS",
+      filter->flags & AVFILTER_FLAG_SLICE_THREADS);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "SUPPORT_TIMELINE_GENERIC",
+      filter->flags & AVFILTER_FLAG_SUPPORT_TIMELINE_GENERIC);
+    CHECK_STATUS;
+    status = beam_set_bool(env, flags, "SUPPORT_TIMELINE_INTERNAL",
+      filter->flags & AVFILTER_FLAG_SUPPORT_TIMELINE_INTERNAL);
+    CHECK_STATUS;
+    status = napi_set_named_property(env, desc, "flags", flags);
+    CHECK_STATUS;
+
+    status = napi_set_named_property(env, result, filter->name, desc);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value bsfs(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, desc, codecs, codec;
+  void* opaque = nullptr;
+  const AVBitStreamFilter* bsf;
+  const AVCodecID* codecID;
+  int pos = 0;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  while ((bsf = av_bsf_iterate(&opaque))) {
+    status = napi_create_object(env, &desc);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, desc, "name", (char*) bsf->name);
+    CHECK_STATUS;
+
+    status = napi_create_array(env, &codecs);
+    CHECK_STATUS;
+    codecID = bsf->codec_ids;
+    if (codecID != nullptr) {
+      pos = 0;
+      while (*codecID != AV_CODEC_ID_NONE) {
+        status = napi_create_string_utf8(env,
+          (char*) avcodec_get_name(*codecID), NAPI_AUTO_LENGTH, &codec);
+        CHECK_STATUS;
+        status = napi_set_element(env, codecs, pos++, codec);
+        CHECK_STATUS;
+        codecID = codecID + 1;
+      }
+    }
+    status = napi_set_named_property(env, desc, "codec_ids", codecs);
+    CHECK_STATUS;
+
+    // TODO expand class details
+    if (bsf->priv_class != nullptr) {
+      status = fromAVClass(env, bsf->priv_class, &codec);
+      CHECK_STATUS;
+    } else {
+      status = napi_get_null(env, &codec);
+      CHECK_STATUS;
+    }
+    status = napi_set_named_property(env, desc, "priv_class", codec);
+    CHECK_STATUS;
+
+    status = napi_set_named_property(env, result, bsf->name, desc);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
 napi_value Init(napi_env env, napi_value exports) {
   napi_status status;
   napi_property_descriptor desc[] = {
@@ -388,14 +667,18 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("codecs", codecs),
     DECLARE_NAPI_METHOD("muxers", muxers),
     DECLARE_NAPI_METHOD("demuxers", demuxers),
+    DECLARE_NAPI_METHOD("pix_fmts", pix_fmts),
+    DECLARE_NAPI_METHOD("protocols", protocols),
+    DECLARE_NAPI_METHOD("filters", filters),
+    DECLARE_NAPI_METHOD("bsfs", bsfs),
     DECLARE_NAPI_METHOD("makePacket", makePacket),
     DECLARE_NAPI_METHOD("makeFrame", makeFrame),
-    DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters),
+    DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters), // 20
     DECLARE_NAPI_METHOD("demuxer", demuxer),
     DECLARE_NAPI_METHOD("muxer", muxer),
     DECLARE_NAPI_METHOD("guessFormat", guessFormat)
   };
-  status = napi_define_properties(env, exports, 19, desc);
+  status = napi_define_properties(env, exports, 23, desc);
   CHECK_STATUS;
 
   // Iterate over all codecs to makes sure they are registered
