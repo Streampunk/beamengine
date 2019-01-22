@@ -2056,12 +2056,14 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
 
 napi_status fromAVFrame(napi_env env, frameData* f, napi_value* result) {
   napi_status status;
-  napi_value jsFrame, extFrame, typeName;
+  napi_value jsFrame, extFrame, typeName, undef;
   int64_t externalMemory;
 
   status = napi_create_object(env, &jsFrame);
   PASS_STATUS;
   status = napi_create_string_utf8(env, "Frame", NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+  status = napi_get_undefined(env, &undef);
   PASS_STATUS;
   status = napi_create_external(env, f, frameDataFinalizer, nullptr, &extFrame);
   PASS_STATUS;
@@ -2144,9 +2146,11 @@ napi_status fromAVFrame(napi_env env, frameData* f, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "crop_right", nullptr, nullptr, getFrameCropRight, setFrameCropRight, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
-    { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr } // 40
+    { "stream_index", nullptr, nullptr, nullptr, nullptr, undef, // Set for muxing
+      (napi_property_attributes) (napi_writable | napi_enumerable), nullptr}, // 40
+    { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFrame, 40, desc);
+  status = napi_define_properties(env, jsFrame, 41, desc);
   PASS_STATUS;
 
   for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {

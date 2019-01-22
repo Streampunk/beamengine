@@ -53,21 +53,32 @@ void writeTrailerExecute(napi_env env, void* data);
 void writeTrailerComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value writeTrailer(napi_env env, napi_callback_info info);
 
+napi_value forceClose(napi_env env, napi_callback_info info);
+
 struct openIOCarrier : carrier {
   AVFormatContext* format;
+  int flags = AVIO_FLAG_WRITE;
+  AVDictionary* options = nullptr;
   ~openIOCarrier() {
+    if (options != nullptr) av_dict_free(&options);
   }
 };
 
 struct writeHeaderCarrier : carrier {
   AVFormatContext* format;
+  AVDictionary* options = nullptr;
+  int result = -1;
   ~writeHeaderCarrier() {
+    if (options != nullptr) av_dict_free(&options);
   }
 };
 
 struct initOutputCarrier : carrier {
   AVFormatContext* format;
+  AVDictionary* options = nullptr;
+  int result = -1;
   ~initOutputCarrier() {
+    if (options != nullptr) av_dict_free(&options);
   }
 };
 
@@ -75,6 +86,8 @@ struct writeFrameCarrier : carrier {
   AVFormatContext* format;
   AVPacket* packet = nullptr;
   AVFrame* frame = nullptr;
+  int streamIndex = 0;
+  bool interleaved = true;
   ~writeFrameCarrier() {
   }
 };

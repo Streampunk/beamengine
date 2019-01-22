@@ -1295,12 +1295,14 @@ done:
 napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     napi_value* result, bool isMuxer) {
   napi_status status;
-  napi_value jsFmtCtx, extFmtCtx, typeName;
+  napi_value jsFmtCtx, extFmtCtx, typeName, truth;
 
   status = napi_create_object(env, &jsFmtCtx);
   PASS_STATUS;
   status = napi_create_string_utf8(env, isMuxer ? "muxer" : "demuxer",
     NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+  status = napi_get_boolean(env, true, &truth);
   PASS_STATUS;
   status = napi_create_external(env, fmtCtx, formatContextFinalizer, nullptr, &extFmtCtx);
   PASS_STATUS;
@@ -1378,13 +1380,13 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       // protocol_blacklist
       // max_streams
       // skip_estimate_duration_from_pts
-
-
+    { "interleaved", nullptr, nullptr, nullptr, nullptr, truth,
+      (napi_property_attributes) (napi_writable | napi_enumerable), nullptr }, // format is interleaved?
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 17, desc);
+  status = napi_define_properties(env, jsFmtCtx, 18, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
@@ -1393,6 +1395,14 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
 
 void formatContextFinalizer(napi_env env, void* data, void* hint) {
   AVFormatContext* fc = (AVFormatContext*) data;
+  int ret;
+  if (fc->pb != nullptr) {
+    ret = avio_closep(&fc->pb);
+    if (ret < 0) {
+      printf("DEBUG: For url '%s', %s", (fc->url != nullptr) ? fc->url : "unknown",
+        avErrorMsg("error closing IO: ", ret));
+    }
+  }
   avformat_free_context(fc);
 }
 
