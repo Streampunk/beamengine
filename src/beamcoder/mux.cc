@@ -203,7 +203,7 @@ void openIOExecute(napi_env env, void* data) {
 void openIOComplete(napi_env env, napi_status asyncStatus, void* data) {
   napi_value result, unset;
   openIOCarrier* c = (openIOCarrier*) data;
-  AVDictionaryEntry* tag;
+  AVDictionaryEntry* tag = nullptr;
 
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
@@ -362,7 +362,7 @@ void writeHeaderExecute(napi_env env, void* data) {
 void writeHeaderComplete(napi_env env, napi_status asyncStatus, void* data) {
   napi_value result, unset, initIn;
   writeHeaderCarrier* c = (writeHeaderCarrier*) data;
-  AVDictionaryEntry* tag;
+  AVDictionaryEntry* tag = nullptr;
 
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
@@ -466,7 +466,7 @@ void initOutputExecute(napi_env env, void* data) {
 
 void initOutputComplete(napi_env env, napi_status asyncStatus, void* data) {
   napi_value result, initIn, unset;
-  AVDictionaryEntry* tag;
+  AVDictionaryEntry* tag = nullptr;
   initOutputCarrier* c = (initOutputCarrier*) data;
 
   if (asyncStatus != napi_ok) {

@@ -294,11 +294,13 @@ napi_value getOFormatPrivClass(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &oformat);
   CHECK_STATUS;
 
-  status = napi_create_string_utf8(env,
-    (oformat->priv_class != nullptr) ? oformat->priv_class->class_name : "",
-    NAPI_AUTO_LENGTH, &result);
-  CHECK_STATUS;
-
+  if (oformat->priv_class != nullptr) {
+    status = fromAVClass(env, (const AVClass*) oformat->priv_class, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
   return result;
 }
 
@@ -310,11 +312,13 @@ napi_value getIFormatPrivClass(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &iformat);
   CHECK_STATUS;
 
-  status = napi_create_string_utf8(env,
-    (iformat->priv_class != nullptr) ? iformat->priv_class->class_name : "",
-    NAPI_AUTO_LENGTH, &result);
-  CHECK_STATUS;
-
+  if (iformat->priv_class != nullptr) {
+    status = fromAVClass(env, (const AVClass*) iformat->priv_class, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
   return result;
 }
 

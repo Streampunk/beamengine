@@ -286,87 +286,331 @@ napi_value testSetProps(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_status fromAVCodec(napi_env env, const AVCodec* codec, napi_value *result) {
+  napi_status status;
+  napi_value array, element, subel, value, props, nullval;
+  const AVProfile* profile;
+  const AVRational* framerate;
+  const enum AVPixelFormat* pixfmt;
+  const int* samplerate;
+  const AVCodecDescriptor* codecDesc;
+  const enum AVSampleFormat* samplefmt;
+  const uint64_t* chanlay;
+  int32_t index = 0, count = 0;
+
+  status = napi_get_null(env, &nullval);
+  PASS_STATUS;
+
+  status = napi_create_object(env, &value);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, value, "type", "Codec");
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, value, "name", (char*) codec->name);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, value, "long_name", (char*) codec->long_name);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, value, "codec_type",
+    (char*) av_get_media_type_string(codec->type));
+  PASS_STATUS;
+  status = beam_set_int32(env, value, "id", (int32_t) codec->id);
+  PASS_STATUS;
+  status = beam_set_bool(env, value, "decoder", av_codec_is_decoder(codec));
+  PASS_STATUS;
+  status = beam_set_bool(env, value, "encoder", av_codec_is_encoder(codec));
+  PASS_STATUS;
+
+  status = napi_create_object(env, &props);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "DRAW_HORIZ_BAND", codec->capabilities & AV_CODEC_CAP_DRAW_HORIZ_BAND);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "DR1", codec->capabilities & AV_CODEC_CAP_DR1);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "TRUNCATED", codec->capabilities & AV_CODEC_CAP_TRUNCATED);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "DELAY", codec->capabilities & AV_CODEC_CAP_DELAY);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "SMALL_LAST_FRAME", codec->capabilities & AV_CODEC_CAP_SMALL_LAST_FRAME);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "SUBFRAMES", codec->capabilities & AV_CODEC_CAP_SUBFRAMES);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "EXPERIMENTAL", codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "CHANNEL_CONF", codec->capabilities & AV_CODEC_CAP_CHANNEL_CONF);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "FRAME_THREADS", codec->capabilities & AV_CODEC_CAP_FRAME_THREADS);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "SLICE_THREADS", codec->capabilities & AV_CODEC_CAP_SLICE_THREADS);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "PARAM_CHANGE", codec->capabilities & AV_CODEC_CAP_PARAM_CHANGE);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "AUTO_THREADS", codec->capabilities & AV_CODEC_CAP_AUTO_THREADS);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "VARIABLE_FRAME_SIZE", codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "AVOID_PROBING", codec->capabilities & AV_CODEC_CAP_AVOID_PROBING);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "INTRA_ONLY", codec->capabilities & AV_CODEC_CAP_INTRA_ONLY);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "LOSSLESS", codec->capabilities & AV_CODEC_CAP_LOSSLESS);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "HARDWARE", codec->capabilities & AV_CODEC_CAP_HARDWARE);
+  PASS_STATUS;
+  status = beam_set_bool(env, props, "HYBRID", codec->capabilities & AV_CODEC_CAP_HYBRID);
+  PASS_STATUS;
+  status = napi_set_named_property(env, value, "capabilities", props);
+  PASS_STATUS;
+
+  if (codec->supported_framerates != nullptr) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    framerate = codec->supported_framerates;
+    index = 0;
+    while ((framerate->num != 0) && (framerate->den != 0)) {
+      status = napi_create_array(env, &element);
+      PASS_STATUS;
+      status = napi_create_int32(env, framerate->num, &subel);
+      PASS_STATUS;
+      status = napi_set_element(env, element, 0, subel);
+      PASS_STATUS;
+      status = napi_create_int32(env, framerate->den, &subel);
+      PASS_STATUS;
+      status = napi_set_element(env, element, 1, subel);
+      PASS_STATUS;
+      status = napi_set_element(env, array, index++, element);
+      PASS_STATUS;
+      framerate = framerate + 1;
+    }
+    status = napi_set_named_property(env, value, "supported_framerates", array);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "supported_framerates", nullval);
+    PASS_STATUS;
+  }
+
+  if (codec->pix_fmts != nullptr) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    pixfmt = codec->pix_fmts;
+    index = 0;
+    while (*pixfmt != -1) {
+      status = napi_create_string_utf8(env,
+        (char*) av_get_pix_fmt_name(*pixfmt), NAPI_AUTO_LENGTH, &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, index++, element);
+      PASS_STATUS;
+      pixfmt = pixfmt + 1;
+    }
+    status = napi_set_named_property(env, value, "pix_fmts", array);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "pix_fmts", nullval);
+    PASS_STATUS;
+  }
+
+  if (codec->supported_samplerates != nullptr) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    samplerate = codec->supported_samplerates;
+    index = 0;
+    while (*samplerate != 0) {
+      status = napi_create_int32(env, *samplerate, &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, index++, element);
+      PASS_STATUS;
+      samplerate = samplerate + 1;
+    }
+    status = napi_set_named_property(env, value, "supported_samplerates", array);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "supported_samplerates", nullval);
+    PASS_STATUS;
+  }
+
+  if (codec->sample_fmts) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    samplefmt = codec->sample_fmts;
+    index = 0;
+    while (*samplefmt != -1) {
+      status = napi_create_string_utf8(env,
+        (char*) av_get_sample_fmt_name(*samplefmt), NAPI_AUTO_LENGTH, &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, index++, element);
+      PASS_STATUS;
+      samplefmt = samplefmt + 1;
+    }
+    status = napi_set_named_property(env, value, "sample_fmts", array);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "sample_fmts", nullval);
+    PASS_STATUS;
+  }
+
+  if (codec->channel_layouts != nullptr) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    chanlay = codec->channel_layouts;
+    index = 0;
+    while (*chanlay != 0) {
+      char chanLayStr[64];
+      av_get_channel_layout_string(chanLayStr, 64, 0, *chanlay);
+      status = napi_create_string_utf8(env, chanLayStr, NAPI_AUTO_LENGTH, &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, index++, element);
+      PASS_STATUS;
+      chanlay = chanlay + 1;
+    }
+    status = napi_set_named_property(env, value, "channel_layouts", array);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "channel_layouts", nullval);
+    PASS_STATUS;
+  }
+
+  status = beam_set_uint32(env, value, "max_lowres", codec->max_lowres);
+  PASS_STATUS;
+
+  if (codec->priv_class != nullptr) {
+    status = fromAVClass(env, codec->priv_class, &element);
+    PASS_STATUS;
+    status = napi_set_named_property(env, value, "priv_class", element);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "priv_class", nullval);
+    PASS_STATUS;
+  }
+
+  if (codec->profiles != nullptr) {
+    status = napi_create_array(env, &array);
+    PASS_STATUS;
+    profile = codec->profiles;
+    index = 0;
+    // printf("Profiles for %s %s\n", codec->name, profile->name);
+    while (profile->profile != FF_PROFILE_UNKNOWN) {
+      status = napi_create_string_utf8(env, profile->name, NAPI_AUTO_LENGTH, &element);
+      PASS_STATUS;
+      status = napi_set_element(env, array, index++, element);
+      PASS_STATUS;
+      profile = profile + 1;
+    }
+    status = napi_set_named_property(env, value, "profiles", array);
+    PASS_STATUS;
+  } else {
+    status = napi_set_named_property(env, value, "profiles", nullval);
+    PASS_STATUS;
+  }
+
+  if (codec->wrapper_name != nullptr) {
+    status = beam_set_string_utf8(env, value, "wrapper_name", (char*) codec->wrapper_name);
+    PASS_STATUS;
+  }
+
+  codecDesc = avcodec_descriptor_get(codec->id);
+  if (codecDesc != nullptr) {
+    status = napi_create_object(env, &element);
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, element, "type", "CodecDescriptor");
+    PASS_STATUS;
+    status = beam_set_string_utf8(env, element, "name", (char*) codecDesc->name);
+    PASS_STATUS;
+    status = napi_create_object(env, &props);
+    PASS_STATUS;
+    status = beam_set_bool(env, props, "INTRA_ONLY", codecDesc->props & AV_CODEC_PROP_INTRA_ONLY);
+    PASS_STATUS;
+    status = beam_set_bool(env, props, "LOSSY", codecDesc->props & AV_CODEC_PROP_LOSSY);
+    PASS_STATUS;
+    status = beam_set_bool(env, props, "LOSSLESS", codecDesc->props & AV_CODEC_PROP_LOSSLESS);
+    PASS_STATUS;
+    status = beam_set_bool(env, props, "REORDER", codecDesc->props & AV_CODEC_PROP_REORDER);
+    PASS_STATUS;
+    status = beam_set_bool(env, props, "BITMAP_SUB", codecDesc->props & AV_CODEC_PROP_BITMAP_SUB);
+    PASS_STATUS;
+    status = beam_set_bool(env, props, "TEXT_SUB", codecDesc->props & AV_CODEC_PROP_TEXT_SUB);
+    PASS_STATUS;
+    status = napi_set_named_property(env, element, "props", props);
+    PASS_STATUS;
+    status = napi_set_named_property(env, value, "descriptor", element);
+    PASS_STATUS;
+  }
+
+  *result = value;
+  return napi_ok;
+}
+
 napi_value codecs(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, value, array, element;
+  napi_value result, value, decEnc;
+  bool hasProp;
   void* opaque = nullptr;
   const AVCodec* codec;
-  const AVProfile* profile;
-  const AVCodecDescriptor* codecDesc;
-  int32_t index = 0;
 
   status = napi_create_object(env, &result);
   CHECK_STATUS;
   codec = av_codec_iterate(&opaque);
   while (codec != nullptr) {
-    status = napi_create_object(env, &value);
+    status = fromAVCodec(env, codec, &value);
     CHECK_STATUS;
-    status = beam_set_string_utf8(env, value, "type", "Codec");
+    status = napi_has_named_property(env, result, codec->name, &hasProp);
     CHECK_STATUS;
-    status = beam_set_string_utf8(env, value, "name", (char*) codec->name);
-    CHECK_STATUS;
-    status = beam_set_string_utf8(env, value, "long_name", (char*) codec->long_name);
-    CHECK_STATUS;
-    status = beam_set_string_utf8(env, value, "codec_type",
-      (char*) av_get_media_type_string(codec->type));
-    CHECK_STATUS;
-    status = beam_set_int32(env, value, "id", (int32_t) codec->id);
-    CHECK_STATUS;
-    status = beam_set_bool(env, value, "decoder", av_codec_is_decoder(codec));
-    CHECK_STATUS;
-    status = beam_set_bool(env, value, "encoder", av_codec_is_encoder(codec));
+    if (hasProp) {
+      status = napi_get_named_property(env, result, codec->name, &decEnc);
+      CHECK_STATUS;
+    } else {
+      status = napi_create_object(env, &decEnc);
+      CHECK_STATUS;
+      status = napi_set_named_property(env, result, codec->name, decEnc);
+      CHECK_STATUS;
+    }
+    status = napi_set_named_property(env, decEnc,
+      av_codec_is_decoder(codec) ? "decoder" : "encoder", value);
     CHECK_STATUS;
 
-    if (codec->profiles != nullptr) {
-      status = napi_create_array(env, &array);
+    codec = av_codec_iterate(&opaque);
+  }
+
+  return result;
+}
+
+napi_value decoders(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, value;
+  void* opaque = nullptr;
+  const AVCodec* codec;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  codec = av_codec_iterate(&opaque);
+  while (codec != nullptr) {
+    if (av_codec_is_decoder(codec)) {
+      status = fromAVCodec(env, codec, &value);
       CHECK_STATUS;
-      profile = codec->profiles;
-      index = 0;
-      printf("Profiles for %s %s\n", codec->name, profile->name);
-      while (profile->profile != FF_PROFILE_UNKNOWN) {
-        status = napi_create_string_utf8(env, profile->name, NAPI_AUTO_LENGTH, &element);
-        CHECK_STATUS;
-        status = napi_set_element(env, array, index++, element);
-        CHECK_STATUS;
-        profile = profile + 1;
-      }
-      status = napi_set_named_property(env, value, "profiles", array);
+      status = napi_set_named_property(env, result, codec->name, value);
       CHECK_STATUS;
     }
 
-    status = beam_set_bool(env, value, "frame-level_multithreading",
-      codec->capabilities & AV_CODEC_CAP_FRAME_THREADS);
-    CHECK_STATUS;
-    status = beam_set_bool(env, value, "slice-level_multithreading",
-      codec->capabilities & AV_CODEC_CAP_SLICE_THREADS);
-    CHECK_STATUS;
-    status = beam_set_bool(env, value, "experimental",
-      codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL);
-    CHECK_STATUS;
-    status = beam_set_bool(env, value, "supports_draw-horiz-band",
-      codec->capabilities & AV_CODEC_CAP_DRAW_HORIZ_BAND);
-    CHECK_STATUS;
-    status = beam_set_bool(env, value, "supports_direct_rendering_1",
-      codec->capabilities & AV_CODEC_CAP_DR1);
-    CHECK_STATUS;
+    codec = av_codec_iterate(&opaque);
+  }
 
-    codecDesc = avcodec_descriptor_get(codec->id);
-    if (codecDesc != nullptr) {
-      status = beam_set_string_utf8(env, value, "descriptor_name", (char*) codecDesc->name);
+  return result;
+}
+
+napi_value encoders(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, value;
+  void* opaque = nullptr;
+  const AVCodec* codec;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  codec = av_codec_iterate(&opaque);
+  while (codec != nullptr) {
+    if (av_codec_is_encoder(codec)) {
+      status = fromAVCodec(env, codec, &value);
       CHECK_STATUS;
-      status = beam_set_bool(env, value, "intra-frame_only",
-        codecDesc->props & AV_CODEC_PROP_INTRA_ONLY);
-      CHECK_STATUS;
-      status = beam_set_bool(env, value, "lossy",
-        codecDesc->props & AV_CODEC_PROP_LOSSY);
-      CHECK_STATUS;
-      status = beam_set_bool(env, value, "lossless",
-        codecDesc->props & AV_CODEC_PROP_LOSSLESS);
+      status = napi_set_named_property(env, result, codec->name, value);
       CHECK_STATUS;
     }
 
-    status = napi_set_named_property(env, result, codec->name, value);
-    CHECK_STATUS;
     codec = av_codec_iterate(&opaque);
   }
 
@@ -562,15 +806,14 @@ napi_value filters(napi_env env, napi_callback_info info) {
 
     // TODO expand class details
     if (filter->priv_class != nullptr) {
-      status = beam_set_string_utf8(env, desc, "priv_class",
-        (char*) filter->priv_class->class_name);
+      status = fromAVClass(env, filter->priv_class, &pad);
       CHECK_STATUS;
     } else {
       status = napi_get_null(env, &pad);
       CHECK_STATUS;
-      status = napi_set_named_property(env, desc, "priv_class", pad);
-      CHECK_STATUS;
     }
+    status = napi_set_named_property(env, desc, "priv_class", pad);
+    CHECK_STATUS;
 
     status = napi_create_object(env, &flags);
     CHECK_STATUS;
@@ -651,6 +894,42 @@ napi_value bsfs(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value sampleFormats(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, value;
+  int count = 0;
+  const char* name;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  while ((name = av_get_sample_fmt_name((AVSampleFormat) count))) {
+    status = napi_create_object(env, &value);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "type", "SampleFormat");
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "name", (char*) name);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "packed",
+      (char*) av_get_sample_fmt_name(av_get_packed_sample_fmt((AVSampleFormat) count)));
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, value, "planar",
+      (char*) av_get_sample_fmt_name(av_get_planar_sample_fmt((AVSampleFormat) count)));
+    CHECK_STATUS;
+    status = beam_set_int32(env, value, "bytes_per_sample",
+      av_get_bytes_per_sample((AVSampleFormat) count));
+    CHECK_STATUS;
+    status = beam_set_bool(env, value, "is_planar",
+      av_sample_fmt_is_planar((AVSampleFormat) count));
+    CHECK_STATUS;
+    status = napi_set_named_property(env, result, name, value);
+    CHECK_STATUS;
+    count++;
+  }
+
+  return result;
+}
+
 napi_value Init(napi_env env, napi_value exports) {
   napi_status status;
   napi_property_descriptor desc[] = {
@@ -665,20 +944,23 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("filterer", filterer),
     DECLARE_NAPI_METHOD("encoder", encoder), // 10
     DECLARE_NAPI_METHOD("codecs", codecs),
+    DECLARE_NAPI_METHOD("decoders", decoders),
+    DECLARE_NAPI_METHOD("encoders", encoders),
     DECLARE_NAPI_METHOD("muxers", muxers),
     DECLARE_NAPI_METHOD("demuxers", demuxers),
     DECLARE_NAPI_METHOD("pix_fmts", pix_fmts),
+    DECLARE_NAPI_METHOD("sample_fmts", sampleFormats),
     DECLARE_NAPI_METHOD("protocols", protocols),
     DECLARE_NAPI_METHOD("filters", filters),
-    DECLARE_NAPI_METHOD("bsfs", bsfs),
+    DECLARE_NAPI_METHOD("bsfs", bsfs), // 20
     DECLARE_NAPI_METHOD("makePacket", makePacket),
     DECLARE_NAPI_METHOD("makeFrame", makeFrame),
-    DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters), // 20
+    DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters),
     DECLARE_NAPI_METHOD("demuxer", demuxer),
     DECLARE_NAPI_METHOD("muxer", muxer),
     DECLARE_NAPI_METHOD("guessFormat", guessFormat)
   };
-  status = napi_define_properties(env, exports, 23, desc);
+  status = napi_define_properties(env, exports, 26, desc);
   CHECK_STATUS;
 
   // Iterate over all codecs to makes sure they are registered

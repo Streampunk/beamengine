@@ -2644,8 +2644,9 @@ napi_status beam_get_enum(napi_env env, napi_value target, char* name,
 
 napi_status fromAVClass(napi_env env, const AVClass* cls, napi_value* result) {
   napi_status status;
-  napi_value desc, options, opt;
+  napi_value desc, options, units, opt, consts, element, flags;
   const AVOption* option;
+  uint32_t constCount;
 
   status = napi_create_object(env, &desc);
   PASS_STATUS;
@@ -2656,25 +2657,83 @@ napi_status fromAVClass(napi_env env, const AVClass* cls, napi_value* result) {
   PASS_STATUS;
   status = napi_create_object(env, &options);
   PASS_STATUS;
+  status = napi_create_object(env, &units);
+  PASS_STATUS;
   option = cls->option;
-  while (option != nullptr) {
-    if (option->type == AV_OPT_TYPE_CONST) {
-      option = av_opt_next(&cls, option);
-      continue;
+  while ((option != nullptr) && (option->name != nullptr)) {
+    if (option->type != AV_OPT_TYPE_CONST) {
+      status = napi_create_object(env, &opt);
+      PASS_STATUS;
+      status = napi_set_named_property(env, options, option->name, opt);
+      PASS_STATUS;
+      status = beam_set_string_utf8(env, opt, "name", (char*) option->name);
+      PASS_STATUS;
+      status = beam_set_string_utf8(env, opt, "help", (char*) option->help);
+      PASS_STATUS;
+      status = beam_set_string_utf8(env, opt, "option_type",
+        (char*) beam_lookup_name(beam_option_type->forward, option->type));
+      PASS_STATUS;
+      status = napi_create_object(env, &flags);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "ENCODING_PARAM",
+        option->flags & AV_OPT_FLAG_ENCODING_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "DECODING_PARAM",
+        option->flags & AV_OPT_FLAG_DECODING_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "AUDIO_PARAM",
+        option->flags & AV_OPT_FLAG_AUDIO_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "VIDEO_PARAM",
+        option->flags & AV_OPT_FLAG_VIDEO_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "SUBTITLE_PARAM",
+        option->flags & AV_OPT_FLAG_SUBTITLE_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "EXPORT",
+        option->flags & AV_OPT_FLAG_EXPORT);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "READONLY",
+        option->flags & AV_OPT_FLAG_READONLY);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "BSF_PARAM",
+        option->flags & AV_OPT_FLAG_BSF_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "FILTERING_PARAM",
+        option->flags & AV_OPT_FLAG_FILTERING_PARAM);
+      PASS_STATUS;
+      status = beam_set_bool(env, flags, "DEPRECATED",
+        option->flags & AV_OPT_FLAG_DEPRECATED);
+      PASS_STATUS;
+      status = napi_set_named_property(env, opt, "flags", flags);
+      PASS_STATUS;
+      if (option->unit != nullptr) {
+        status = beam_set_string_utf8(env, opt, "unit", (char*) option->unit);
+        PASS_STATUS;
+        status = napi_create_array(env, &consts);
+        PASS_STATUS;
+        status = napi_set_named_property(env, opt, "consts", consts);
+        PASS_STATUS;
+        status = napi_set_named_property(env, units, option->unit, opt);
+        PASS_STATUS;
+      }
     }
-    status = napi_create_object(env, &opt);
-    PASS_STATUS;
-    status = beam_set_string_utf8(env, opt, "name", (char*) option->name);
-    PASS_STATUS;
-    status = beam_set_string_utf8(env, opt, "help", (char*) option->help);
-    PASS_STATUS;
-    status = beam_set_string_utf8(env, opt, "option_type",
-      (char*) beam_lookup_name(beam_option_type->forward, option->type));
-    PASS_STATUS;
-    status = napi_set_named_property(env, options, option->name, opt);
-    PASS_STATUS;
-    status = beam_set_string_utf8(env, opt, "unit", (char*) option->unit);
-    PASS_STATUS;
+    option = av_opt_next(&cls, option);
+  }
+  option = cls->option;
+  while ((option != nullptr) && (option->name != nullptr)) {
+    if (option->type == AV_OPT_TYPE_CONST) {
+      status = napi_get_named_property(env, units, option->unit, &opt);
+      PASS_STATUS;
+      status = napi_get_named_property(env, opt, "consts", &consts);
+      PASS_STATUS;
+      status = napi_get_array_length(env, consts, &constCount);
+      PASS_STATUS;
+      status = napi_create_string_utf8(env, option->name, NAPI_AUTO_LENGTH, &element);
+      PASS_STATUS;
+      status = napi_set_element(env, consts, constCount, element);
+      PASS_STATUS;
+    }
     option = av_opt_next(&cls, option);
   }
   status = napi_set_named_property(env, desc, "options", options);
