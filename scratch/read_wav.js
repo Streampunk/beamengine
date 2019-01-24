@@ -22,18 +22,14 @@
 const { beamcoder } = require('../index.js');
 
 async function run() {
-  let format = await beamcoder.demuxer('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
-  console.log(format.streams[1]);
-  let decoder = await beamcoder.decoder({ format: format, stream : 1 });
-  console.log(decoder);
-  for ( let x = 0 ; x < 100 ; x++ ) {
-    let packet = await format.read();
-    if (packet.stream == 1) {
-      //console.log(packet);
-      let frames = await decoder.decode(packet);
-      console.log(frames.frames);
-    }
+  let format = await beamcoder.demuxer('../media/sound/BBCNewsCountdown.wav');
+  let packet = {};
+  for ( let x = 0 ; x < 100 && packet !== null ; x++ ) {
+    packet = await format.read();
+    console.log(x, packet);
   }
+  console.log(await format.seek({ frame : 120 }));
+  console.log(await format.read());
 }
 
 run();

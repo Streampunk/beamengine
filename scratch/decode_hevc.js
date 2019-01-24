@@ -22,11 +22,11 @@
 const { beamcoder } = require('../index.js');
 
 async function run() {
-  let format = await beamcoder.format('../media/bbb_1080p_c.ts');
+  let format = await beamcoder.demuxer('../media/bbb_1080p_c.ts');
   console.log(format);
   let decoder = await beamcoder.decoder({ name: 'hevc' });
   for ( let x = 0 ; x < 100 ; x++ ) {
-    let packet = await format.readFrame();
+    let packet = await format.read();
     if (packet.stream_index == 0) {
       //console.log(packet);
       let frames = await decoder.decode(packet);

@@ -953,9 +953,9 @@ napi_value Init(napi_env env, napi_value exports) {
     DECLARE_NAPI_METHOD("protocols", protocols),
     DECLARE_NAPI_METHOD("filters", filters),
     DECLARE_NAPI_METHOD("bsfs", bsfs), // 20
-    DECLARE_NAPI_METHOD("makePacket", makePacket),
-    DECLARE_NAPI_METHOD("makeFrame", makeFrame),
-    DECLARE_NAPI_METHOD("makeCodecParameters", makeCodecParameters),
+    DECLARE_NAPI_METHOD("packet", makePacket),
+    DECLARE_NAPI_METHOD("frame", makeFrame),
+    DECLARE_NAPI_METHOD("codecParameters", makeCodecParameters),
     DECLARE_NAPI_METHOD("demuxer", demuxer),
     DECLARE_NAPI_METHOD("muxer", muxer),
     DECLARE_NAPI_METHOD("guessFormat", guessFormat)

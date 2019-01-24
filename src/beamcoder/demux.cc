@@ -89,13 +89,13 @@ void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
   c->status = napi_create_function(env, "readFrame", NAPI_AUTO_LENGTH, readFrame,
     nullptr, &prop);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "readFrame", prop);
+  c->status = napi_set_named_property(env, result, "read", prop);
   REJECT_STATUS;
 
   c->status = napi_create_function(env, "seekFrame", NAPI_AUTO_LENGTH, seekFrame,
     nullptr, &prop);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "seekFrame", prop);
+  c->status = napi_set_named_property(env, result, "seek", prop);
   REJECT_STATUS;
 
   napi_status status;
@@ -163,7 +163,10 @@ void readFrameExecute(napi_env env, void* data) {
   readFrameCarrier* c = (readFrameCarrier*) data;
   int ret;
 
-  if ((ret = av_read_frame(c->format, c->packet))) {
+  ret = av_read_frame(c->format, c->packet);
+  if (ret == AVERROR_EOF) {
+    av_packet_free(&c->packet);
+  } else if (ret < 0) {
     c->status = BEAMCODER_ERROR_READ_FRAME;
     c->errorMsg = avErrorMsg("Problem reading frame: ", ret);
     return;
@@ -187,11 +190,16 @@ void readFrameComplete(napi_env env, napi_status asyncStatus, void* data) {
     REJECT_STATUS;
   }
 
-  p = new packetData;
-  p->packet = c->packet;
-  c->status = fromAVPacket(env, p, &result);
-  REJECT_STATUS;
-  c->packet = nullptr;
+  if (c->packet != nullptr) {
+    p = new packetData;
+    p->packet = c->packet;
+    c->status = fromAVPacket(env, p, &result);
+    c->packet = nullptr;
+    REJECT_STATUS;
+  } else {
+    c->status = napi_get_null(env, &result);
+    REJECT_STATUS;
+  }
 
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
@@ -250,6 +258,8 @@ void seekFrameExecute(napi_env env, void *data) {
   int ret;
 
   ret = av_seek_frame(c->format, c->streamIndex, c->timestamp, c->flags);
+  printf("Seek and ye shall %i, streamIndex = %i, timestamp = %i, flags = %i\n",
+    ret, c->streamIndex, c->timestamp, c->flags );
   if (ret < 0) {
     c->status = BEAMCODER_ERROR_SEEK_FRAME;
     c->errorMsg = avErrorMsg("Problem seeking frame: ", ret);
@@ -292,6 +302,7 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
   napi_valuetype type;
   seekFrameCarrier* c = new seekFrameCarrier;
   bool isArray, bValue;
+  double fracTime = 0.0;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
   REJECT_RETURN;
@@ -323,7 +334,7 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
       BEAMCODER_INVALID_ARGS);
   }
 
-  c->status = napi_get_named_property(env, argv[0], "streamIndex", &value);
+  c->status = napi_get_named_property(env, argv[0], "stream_index", &value);
   REJECT_RETURN;
   c->status = napi_typeof(env, value, &type);
   REJECT_RETURN;
@@ -336,15 +347,99 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
   REJECT_RETURN;
   c->status = napi_typeof(env, value, &type);
   REJECT_RETURN;
-  if (type != napi_number) {
-    REJECT_ERROR_RETURN("Seek must have a timestamp specified.",
-      BEAMCODER_INVALID_ARGS);
+  if (type == napi_number) {
+    if (c->streamIndex < 0) {
+      REJECT_ERROR_RETURN("Stream index must be provided when seeking by timestamp.",
+        BEAMCODER_INVALID_ARGS);
+    }
+    c->status = napi_get_value_int64(env, value, &c->timestamp);
+    REJECT_RETURN;
+    goto flags;
+  } else {
+    if (type != napi_undefined) {
+      REJECT_ERROR_RETURN("Timestamp must by specified with a number.",
+        BEAMCODER_INVALID_ARGS);
+    }
   }
-  c->status = napi_get_value_int64(env, value, &c->timestamp);
-  REJECT_RETURN;
 
-  if (c->streamIndex == -1) {
-    c->timestamp = c->timestamp * AV_TIME_BASE;
+  c->status = napi_get_named_property(env, argv[0], "time", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_number) {
+    if (c->streamIndex >= 0) {
+      REJECT_ERROR_RETURN("Cannot seek by time value on a specific stream. Try to unset 'stream_index'?",
+        BEAMCODER_INVALID_ARGS);
+    }
+    c->status = napi_get_value_double(env, value, &fracTime);
+    REJECT_RETURN;
+    c->timestamp = (int64_t) (fracTime * AV_TIME_BASE);
+    c->streamIndex = -1;
+    goto flags;
+  } else {
+    if (type != napi_undefined) {
+      REJECT_ERROR_RETURN("Time value must by specified with a number.",
+        BEAMCODER_INVALID_ARGS);
+    }
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "pos", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_number) {
+    if (c->streamIndex >= 0) {
+      REJECT_ERROR_RETURN("Cannot seek by byte position on a specific stream. Try to unset 'stream_index'?",
+        BEAMCODER_INVALID_ARGS);
+    }
+    c->status = napi_get_value_int64(env, value, &c->timestamp);
+    REJECT_RETURN;
+    c->flags = c->flags | AVSEEK_FLAG_BYTE;
+    goto flags;
+  } else {
+    if (type != napi_undefined) {
+      REJECT_ERROR_RETURN("Position value must by specified with a number.",
+        BEAMCODER_INVALID_ARGS);
+    }
+  }
+
+  c->status = napi_get_named_property(env, argv[0], "frame", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_number) {
+    if (c->streamIndex < 0) {
+      REJECT_ERROR_RETURN("Cannot seek by frame number unless a 'stream_index' is provided.",
+        BEAMCODER_INVALID_ARGS);
+    }
+    c->status = napi_get_value_int64(env, value, &c->timestamp);
+    REJECT_RETURN;
+    c->flags = c->flags | AVSEEK_FLAG_FRAME;
+    goto flags;
+  } else {
+    if (type != napi_undefined) {
+      REJECT_ERROR_RETURN("Frame number must by specified with a number.",
+        BEAMCODER_INVALID_ARGS);
+    }
+  }
+
+  if ((c->streamIndex >= 0) || (c->flags > 0)) {
+
+  } else {
+    c->status = napi_get_value_double(env, value, &fracTime);
+    REJECT_RETURN;
+    c->timestamp = (int64_t) (fracTime * AV_TIME_BASE);
+  }
+
+flags:
+  c->status = napi_get_named_property(env, argv[0], "any", &value);
+  REJECT_RETURN;
+  c->status = napi_typeof(env, value, &type);
+  REJECT_RETURN;
+  if (type == napi_boolean) {
+    c->status = napi_get_value_bool(env, value, &bValue);
+    REJECT_RETURN;
+    c->flags = (bValue) ? c->flags | AVSEEK_FLAG_ANY : c->flags;
   }
 
   c->status = napi_get_named_property(env, argv[0], "backward", &value);
@@ -354,46 +449,7 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
   if (type == napi_boolean) {
     c->status = napi_get_value_bool(env, value, &bValue);
     REJECT_RETURN;
-    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_BACKWARD : c->flags;
-  }
-
-  c->status = napi_get_named_property(env, argv[0], "byte", &value);
-  REJECT_RETURN;
-  c->status = napi_typeof(env, value, &type);
-  REJECT_RETURN;
-  if (type == napi_boolean) {
-    c->status = napi_get_value_bool(env, value, &bValue);
-    REJECT_RETURN;
-    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_BYTE : c->flags;
-  }
-
-  c->status = napi_get_named_property(env, argv[0], "any", &value);
-  REJECT_RETURN;
-  c->status = napi_typeof(env, value, &type);
-  REJECT_RETURN;
-  if (type == napi_boolean) {
-    c->status = napi_get_value_bool(env, value, &bValue);
-    REJECT_RETURN;
-    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_ANY : c->flags;
-  }
-
-  c->status = napi_get_named_property(env, argv[0], "frame", &value);
-  REJECT_RETURN;
-  c->status = napi_typeof(env, value, &type);
-  REJECT_RETURN;
-  if (type == napi_boolean) {
-    c->status = napi_get_value_bool(env, value, &bValue);
-    REJECT_RETURN;
-    c->flags = (bValue) ? c->flags & AVSEEK_FLAG_FRAME : c->flags;
-  }
-
-  c->status = napi_typeof(env, argv[0], &type);
-  REJECT_RETURN;
-  c->status = napi_is_array(env, argv[0], &isArray);
-  REJECT_RETURN;
-  if ((type != napi_object) || (isArray == true)) {
-    REJECT_ERROR_RETURN("Single argument options object must be an object and not an array.",
-      BEAMCODER_INVALID_ARGS);
+    c->flags = (bValue) ? c->flags | AVSEEK_FLAG_BACKWARD : c->flags;
   }
 
   c->status = napi_create_string_utf8(env, "SeekFrame", NAPI_AUTO_LENGTH, &resourceName);

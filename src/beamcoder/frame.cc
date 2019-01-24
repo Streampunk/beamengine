@@ -2012,7 +2012,7 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
       const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get((AVPixelFormat) f->frame->format);
       int ret, i;
       if (!desc)
-      NAPI_THROW_ERROR("Could not determine frame descriptor details.");
+        NAPI_THROW_ERROR("Could not determine frame descriptor details.");
 
       if (!f->frame->linesize[0]) {
         for( i = 1 ; i <= align ; i += i) {
@@ -2034,8 +2034,10 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
       int planes;
       int ret;
 
-      if (!f->frame->channels)
+      if (f->frame->channels < 2) { // Bump up from default of 1 if necessary
         f->frame->channels = av_get_channel_layout_nb_channels(f->frame->channel_layout);
+        // printf("Calculated channel number %i\n", f->frame->channels);
+      }
 
       channels = f->frame->channels;
       planes = planar ? channels : 1;
@@ -2050,6 +2052,65 @@ napi_value makeFrame(napi_env env, napi_callback_info info) {
       }
     }
   } // Format provided
+
+  return result;
+}
+
+napi_value alloc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, extFrame;
+  frameData* f;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, &result, nullptr);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, result, "_frame", &extFrame);
+  CHECK_STATUS;
+  status = napi_get_value_external(env, extFrame, (void**) &f);
+  CHECK_STATUS;
+
+  if (f->frame->format >= 0) {
+    if (f->frame->width > 0 && f->frame->height > 0) {
+      for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+        if (f->frame->linesize[x] > 0) {
+          int bufSize = f->frame->linesize[x] * f->frame->height + AV_INPUT_BUFFER_PADDING_SIZE;
+          f->frame->buf[x] = av_buffer_alloc(
+            (bufSize > AV_INPUT_BUFFER_MIN_SIZE) ? bufSize : AV_INPUT_BUFFER_MIN_SIZE);
+          f->frame->data[x] = f->frame->buf[x]->data;
+        } else {
+          f->frame->data[x] = nullptr;
+          f->frame->buf[x] = nullptr;
+        }
+      }
+    }
+    else if (f->frame->nb_samples > 0 && (f->frame->channel_layout || f->frame->channels > 0)) {
+      int planar = av_sample_fmt_is_planar((AVSampleFormat) f->frame->format);
+      if (planar) {
+        for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+          if (x < f->frame->channels) {
+            f->frame->buf[x] = av_buffer_alloc(f->frame->linesize[0]);
+            f->frame->data[x] = f->frame->buf[x]->data;
+          } else {
+            f->frame->buf[x] = nullptr;
+            f->frame->data[x] = nullptr;
+          }
+        }
+      }
+      else {
+        f->frame->buf[0] = av_buffer_alloc(f->frame->linesize[0]);
+        f->frame->data[0] = f->frame->buf[0]->data;
+        for ( int x = 1 ; x < AV_NUM_DATA_POINTERS ; x++ ) {
+          f->frame->buf[x] = nullptr;
+          f->frame->data[x] = nullptr;
+        }
+      }
+    }
+    else {
+      NAPI_THROW_ERROR("Data size for frame could not be determined as not video or audio.");
+    }
+  } else {
+    NAPI_THROW_ERROR("Format not set so data sizes for frame could not be computed.")
+  }
 
   return result;
 }
@@ -2148,9 +2209,10 @@ napi_status fromAVFrame(napi_env env, frameData* f, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), f },
     { "stream_index", nullptr, nullptr, nullptr, nullptr, undef, // Set for muxing
       (napi_property_attributes) (napi_writable | napi_enumerable), nullptr}, // 40
+    { "alloc", nullptr, alloc, nullptr, nullptr, nullptr, napi_enumerable, nullptr },
     { "_frame", nullptr, nullptr, nullptr, nullptr, extFrame, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFrame, 41, desc);
+  status = napi_define_properties(env, jsFrame, 42, desc);
   PASS_STATUS;
 
   for ( int x = 0 ; x < AV_NUM_DATA_POINTERS ; x++ ) {

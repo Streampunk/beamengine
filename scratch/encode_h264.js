@@ -46,20 +46,14 @@ async function run() {
   let outFile = fs.createWriteStream('wibble.h264');
 
   for ( let i = 0 ; i < 1000 ; i++ ) {
-    let frame = beamcoder.makeFrame({
+    let frame = beamcoder.frame({
       width: encParams.width,
       height: encParams.height,
       format: encParams.pix_fmt
-    });
+    }).alloc();
 
     let linesize = frame.linesize;
-
-    let [ ydata, bdata, cdata ]  = [
-      Buffer.alloc(linesize[0] * frame.height + 64),
-      Buffer.alloc(linesize[1]/2 * frame.height + 64),
-      Buffer.alloc(linesize[2]/2 * frame.height + 64)
-    ];
-
+    let [ ydata, bdata, cdata ] = frame.data;
     frame.pts = i;
 
     for ( let y = 0 ; y < frame.height ; y++ ) {
@@ -74,9 +68,6 @@ async function run() {
         cdata[y * linesize[1] + x] = 64 + x + i * 5;
       }
     }
-
-    frame.data = [ ydata, bdata, cdata ];
-    // console.log(frame.data);
 
     let packets = await encoder.encode(frame);
     console.log(i, packets.totalTime);

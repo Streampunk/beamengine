@@ -145,11 +145,11 @@ napi_value encoder(napi_env env, napi_callback_info info) {
 
   c->status = napi_has_named_property(env, args[0], "name", &hasName);
   REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "codecID", &hasID);
+  c->status = napi_has_named_property(env, args[0], "codec_id", &hasID);
   REJECT_RETURN;
 
   if (!(hasName || hasID)) {
-    REJECT_ERROR_RETURN("Decoder must be identified with a 'codecID' or a 'name'.",
+    REJECT_ERROR_RETURN("Decoder must be identified with a 'codec_id' or a 'name'.",
       BEAMCODER_INVALID_ARGS);
   }
 
@@ -163,7 +163,7 @@ napi_value encoder(napi_env env, napi_callback_info info) {
     REJECT_RETURN;
   }
   else {
-    c->status = napi_get_named_property(env, args[0], "codecID", &value);
+    c->status = napi_get_named_property(env, args[0], "codec_id", &value);
     REJECT_RETURN;
     c->status = napi_get_value_int32(env, value, &c->codecID);
     REJECT_RETURN;

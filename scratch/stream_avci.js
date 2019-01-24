@@ -55,7 +55,7 @@ async function run() {
   console.log(filterer);
 
   for ( let x = 0 ; x < 10 ; x++ ) {
-    let packet = await demuxer.readFrame();
+    let packet = await demuxer.read();
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
