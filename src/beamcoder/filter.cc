@@ -491,7 +491,7 @@ void filterComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   c->status = napi_create_int64(env, c->totalTime, &prop);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "totalTime", prop);
+  c->status = napi_set_named_property(env, result, "total_time", prop);
   REJECT_STATUS;
 
   napi_status status;
@@ -566,7 +566,7 @@ napi_value filter(napi_env env, napi_callback_info info) {
       REJECT_ERROR_RETURN("Source frame object requires a name.",
         BEAMCODER_INVALID_ARGS);
     }
-      
+
     napi_value frameVal;
     c->status = napi_get_named_property(env, item, "frame", &frameVal);
     REJECT_RETURN;

@@ -423,14 +423,6 @@ napi_value seekFrame(napi_env env, napi_callback_info info) {
     }
   }
 
-  if ((c->streamIndex >= 0) || (c->flags > 0)) {
-
-  } else {
-    c->status = napi_get_value_double(env, value, &fracTime);
-    REJECT_RETURN;
-    c->timestamp = (int64_t) (fracTime * AV_TIME_BASE);
-  }
-
 flags:
   c->status = napi_get_named_property(env, argv[0], "any", &value);
   REJECT_RETURN;

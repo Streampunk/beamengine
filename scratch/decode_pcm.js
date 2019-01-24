@@ -22,12 +22,12 @@
 const { beamcoder } = require('../index.js');
 
 async function run() {
-  let format = await beamcoder.demuxer('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
-  console.log(format.streams[1]);
-  let decoder = await beamcoder.decoder({ format: format, stream : 1 });
+  let demuxer = await beamcoder.demuxer('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
+  console.log(demuxer.streams[1]);
+  let decoder = await beamcoder.decoder({ format: demuxer, stream : 1 });
   console.log(decoder);
   for ( let x = 0 ; x < 100 ; x++ ) {
-    let packet = await format.read();
+    let packet = await demuxer.read();
     if (packet.stream == 1) {
       //console.log(packet);
       let frames = await decoder.decode(packet);

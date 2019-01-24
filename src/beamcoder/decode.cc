@@ -318,7 +318,7 @@ void decodeComplete(napi_env env, napi_status asyncStatus, void* data) {
 
   c->status = napi_create_int64(env, c->totalTime, &prop);
   REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "totalTime", prop);
+  c->status = napi_set_named_property(env, result, "total_time", prop);
   REJECT_STATUS;
 
   napi_status status;

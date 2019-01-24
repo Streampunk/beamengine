@@ -70,7 +70,7 @@ async function run() {
     }
   }
   let frames = await decoder.flush();
-  console.log('flush', frames.totalTime, frames.frames.length);
+  console.log('flush', frames.total_time, frames.frames.length);
 }
 
 run().catch(console.error);
