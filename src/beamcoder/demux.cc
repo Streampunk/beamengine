@@ -48,7 +48,7 @@ void demuxerExecute(napi_env env, void* data) {
     c->format->pb = avio_ctx;
   }
 
-  if ((ret = avformat_open_input(&c->format, c->filename, nullptr, nullptr))) {
+  if ((ret = avformat_open_input(&c->format, c->filename, nullptr, &c->options))) {
     c->status = BEAMCODER_ERROR_START;
     c->errorMsg = avErrorMsg("Problem opening input format: ", ret);
     return;
@@ -75,6 +75,11 @@ void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
   if (c->adaptor) {
     c->status = c->adaptor->finaliseBufs(env);
     REJECT_STATUS;
+  }
+
+  while ((tag = av_dict_get(c->options, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+    printf("DEBUG: On creating demuxer '%s', failed to set option %s.\n",
+      c->format->iformat->name, tag->key);
   }
 
   c->status = fromAVFormatContext(env, c->format, &result, false);
@@ -106,9 +111,10 @@ void demuxerComplete(napi_env env,  napi_status asyncStatus, void* data) {
 }
 
 napi_value demuxer(napi_env env, napi_callback_info info) {
-  napi_value resourceName, promise;
+  napi_value resourceName, promise, value;
   napi_valuetype type;
   size_t strLen;
+  bool isArray;
   demuxerCarrier* c = new demuxerCarrier;
 
   c->status = napi_create_promise(env, &c->_deferred, &promise);
@@ -127,6 +133,8 @@ napi_value demuxer(napi_env env, napi_callback_info info) {
 
   c->status = napi_typeof(env, args[0], &type);
   REJECT_RETURN;
+  c->status = napi_is_array(env, args[0], &isArray);
+  REJECT_RETURN;
 
   if (type == napi_string) {
     c->status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
@@ -134,13 +142,47 @@ napi_value demuxer(napi_env env, napi_callback_info info) {
     c->filename = (const char *) malloc((strLen + 1) * sizeof(char));
     c->status = napi_get_value_string_utf8(env, args[0], (char *) c->filename, strLen + 1, &strLen);
     REJECT_RETURN;
-  } else if (type == napi_object) {
+  } else if ((isArray == false) && (type == napi_object)) {
     napi_value adaptorValue;
     c->status = napi_get_named_property(env, args[0], "adaptor", &adaptorValue);
     REJECT_RETURN;
-
-    c->status = napi_get_value_external(env, adaptorValue, (void**)&c->adaptor);
+    c->status = napi_typeof(env, adaptorValue, &type);
     REJECT_RETURN;
+    if (type == napi_external) {
+      c->status = napi_get_value_external(env, adaptorValue, (void**)&c->adaptor);
+      REJECT_RETURN;
+    } else if (type != napi_undefined) {
+      REJECT_ERROR_RETURN("Adaptor must be of external type when specified.",
+       BEAMCODER_INVALID_ARGS);
+    }
+
+    c->status = napi_get_named_property(env, args[0], "url", &value);
+    REJECT_RETURN;
+    c->status = napi_typeof(env, value, &type);
+    REJECT_RETURN;
+    if (type == napi_string) {
+      c->status = napi_get_value_string_utf8(env, value, nullptr, 0, &strLen);
+      REJECT_RETURN;
+      c->filename = (const char *) malloc((strLen + 1) * sizeof(char));
+      c->status = napi_get_value_string_utf8(env, value, (char *) c->filename, strLen + 1, &strLen);
+      REJECT_RETURN;
+    }
+
+    c->status = napi_get_named_property(env, args[0], "options", &value);
+    REJECT_RETURN;
+    c->status = napi_typeof(env, value, &type);
+    REJECT_RETURN;
+    c->status = napi_is_array(env, value, &isArray);
+    REJECT_RETURN;
+    if ((isArray == false) && (type == napi_object)) {
+      c->status = makeAVDictionary(env, value, &c->options);
+      REJECT_RETURN;
+    }
+  }
+
+  if ((c->filename == nullptr) && (c->adaptor == nullptr)) {
+    REJECT_ERROR_RETURN("Neither a filename nor an adaptor have been provided.",
+      BEAMCODER_INVALID_ARGS);
   }
 
   c->status = napi_create_string_utf8(env, "Format", NAPI_AUTO_LENGTH, &resourceName);
@@ -258,8 +300,8 @@ void seekFrameExecute(napi_env env, void *data) {
   int ret;
 
   ret = av_seek_frame(c->format, c->streamIndex, c->timestamp, c->flags);
-  printf("Seek and ye shall %i, streamIndex = %i, timestamp = %i, flags = %i\n",
-    ret, c->streamIndex, c->timestamp, c->flags );
+  // printf("Seek and ye shall %i, streamIndex = %i, timestamp = %i, flags = %i\n",
+  //   ret, c->streamIndex, c->timestamp, c->flags );
   if (ret < 0) {
     c->status = BEAMCODER_ERROR_SEEK_FRAME;
     c->errorMsg = avErrorMsg("Problem seeking frame: ", ret);

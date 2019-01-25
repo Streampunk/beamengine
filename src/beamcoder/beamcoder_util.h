@@ -195,5 +195,6 @@ struct avBufRef {
 };
 
 napi_status fromAVClass(napi_env env, const AVClass* cls, napi_value* result);
+napi_status makeAVDictionary(napi_env env, napi_value options, AVDictionary** dict);
 
 #endif // BEAMCODER_UTIL_H

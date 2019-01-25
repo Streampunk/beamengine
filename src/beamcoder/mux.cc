@@ -145,50 +145,6 @@ napi_value muxer(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_status optionsToDict(napi_env env, AVDictionary** dict, napi_value options) {
-  napi_status status;
-  napi_value names, key, value, valueS;
-  char *keyStr, *valueStr;
-  size_t strLen;
-  uint32_t propCount;
-  int ret;
-
-  status = napi_get_property_names(env, options, &names);
-  PASS_STATUS;
-  status = napi_get_array_length(env, names, &propCount);
-  PASS_STATUS;
-  for ( uint32_t x = 0 ; x < propCount ; x++ ) {
-    status = napi_get_element(env, names, x, &key);
-    PASS_STATUS;
-    status = napi_get_property(env, options, key, &value);
-    PASS_STATUS;
-    status = napi_coerce_to_string(env, value, &valueS);
-    PASS_STATUS;
-
-    status = napi_get_value_string_utf8(env, key, nullptr, 0, &strLen);
-    PASS_STATUS;
-    keyStr = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, key, keyStr, strLen + 1, &strLen);
-    PASS_STATUS;
-
-    status = napi_get_value_string_utf8(env, valueS, nullptr, 0, &strLen);
-    PASS_STATUS;
-    valueStr = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, valueS, valueStr, strLen + 1, &strLen);
-    PASS_STATUS;
-
-    ret = av_dict_set(dict, keyStr, valueStr, 0);
-    free(keyStr);
-    free(valueStr);
-    if (ret < 0) {
-      napi_throw_error(env, nullptr, avErrorMsg("Failed to set a dictionary entry: ", ret));
-      return napi_pending_exception;
-    }
-  }
-
-  return napi_ok;
-}
-
 void openIOExecute(napi_env env, void* data) {
   openIOCarrier* c = (openIOCarrier*) data;
   int ret;
@@ -297,7 +253,7 @@ napi_value openIO(napi_env env, napi_callback_info info) {
     c->status = napi_is_array(env, prop, &isArray);
     REJECT_RETURN;
     if (!isArray && (type == napi_object)) {
-      c->status = optionsToDict(env, &c->options, prop);
+      c->status = makeAVDictionary(env, prop, &c->options);
       REJECT_RETURN;
     }
 
@@ -438,7 +394,8 @@ napi_value writeHeader(napi_env env, napi_callback_info info) {
     if (isArray || (type != napi_object)) { // Allow flat or nested options
       prop = args[0];
     }
-    c->status = optionsToDict(env, &c->options, prop);
+    c->status = makeAVDictionary(env, prop, &c->options);
+    REJECT_RETURN;
   }
 
   c->status = napi_create_string_utf8(env, "WriteHeader", NAPI_AUTO_LENGTH, &resourceName);
@@ -543,7 +500,8 @@ napi_value initOutput(napi_env env, napi_callback_info info) {
     if (isArray || (type != napi_object)) { // Allow flat or nested options
       prop = args[0];
     }
-    c->status = optionsToDict(env, &c->options, prop);
+    c->status = makeAVDictionary(env, prop, &c->options);
+    REJECT_RETURN;
   }
 
   c->status = napi_create_string_utf8(env, "InitOutput", NAPI_AUTO_LENGTH, &resourceName);

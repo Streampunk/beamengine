@@ -38,8 +38,8 @@ void decoderExecute(napi_env env, void* data);
 void decoderComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decoder(napi_env env, napi_callback_info info);
 
-void decodeExecute(napi_env env, void* data);
-void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
+// void decodeExecute(napi_env env, void* data);
+// void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decode(napi_env env, napi_callback_info info);
 napi_value flushDec(napi_env env, napi_callback_info info);
 
@@ -48,7 +48,7 @@ napi_value setDecProperties(napi_env env, napi_callback_info info);
 
 void decoderFinalizer(napi_env env, void* data, void* hint);
 
-struct decoderCarrier : carrier {
+/* struct decoderCarrier : carrier {
   AVCodecContext* decoder = nullptr;
   AVCodecParameters* params = nullptr;
   int streamIdx = -1;
@@ -61,7 +61,7 @@ struct decoderCarrier : carrier {
       avcodec_free_context(&decoder);
     }
   }
-};
+}; */
 
 struct decodeCarrier : carrier {
   AVCodecContext* decoder;

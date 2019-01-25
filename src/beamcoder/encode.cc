@@ -21,11 +21,13 @@
 
 #include "encode.h"
 
+// TODO consider flattenning - no need to be async
 void encoderExecute(napi_env env, void* data) {
   encoderCarrier* c = (encoderCarrier*) data;
   const AVCodec* codec = nullptr;
   const AVCodecDescriptor* codecDesc = nullptr;
   // int ret;
+  HR_TIME_POINT encodeStart = NOW;
 
   codec = (c->codecID == -1) ?
     avcodec_find_encoder_by_name(c->codecName) :
@@ -52,6 +54,8 @@ void encoderExecute(napi_env env, void* data) {
       printf("DEBUG: Failed to set context parameters from those provided.");
     }
   } */
+  c->totalTime = microTime(encodeStart);
+  // printf("Setting up an encoder took %i\n", c->totalTime);
 };
 
 void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {

@@ -1176,15 +1176,11 @@ napi_value getFmtCtxMetadata(napi_env env, napi_callback_info info) {
 
 napi_value setFmtCtxMetadata(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, names, key, value, valueS;
+  napi_value result;
   napi_valuetype type;
   AVFormatContext* fmtCtx;
   bool isArray;
-  uint32_t propCount;
   AVDictionary* dict = nullptr;
-  char* keyStr, *valueStr;
-  size_t strLen;
-  int ret;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1202,39 +1198,8 @@ napi_value setFmtCtxMetadata(napi_env env, napi_callback_info info) {
     NAPI_THROW_ERROR("Format context metadata can only be set with an object of tag names and values.");
   }
 
-  status = napi_get_property_names(env, args[0], &names);
+  status = makeAVDictionary(env, args[0], &dict);
   CHECK_STATUS;
-  status = napi_get_array_length(env, names, &propCount);
-  CHECK_STATUS;
-
-  // Replace all metadata values ... no partial operation
-  for ( uint32_t x = 0 ; x < propCount ; x++ ) {
-    status = napi_get_element(env, names, x, &key);
-    CHECK_STATUS;
-    status = napi_get_property(env, args[0], key, &value);
-    CHECK_STATUS;
-    status = napi_coerce_to_string(env, value, &valueS);
-    CHECK_STATUS;
-
-    status = napi_get_value_string_utf8(env, key, nullptr, 0, &strLen);
-    CHECK_STATUS;
-    keyStr = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, key, keyStr, strLen + 1, &strLen);
-    CHECK_STATUS;
-
-    status = napi_get_value_string_utf8(env, valueS, nullptr, 0, &strLen);
-    CHECK_STATUS;
-    valueStr = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, valueS, valueStr, strLen + 1, &strLen);
-    CHECK_STATUS;
-
-    ret = av_dict_set(&dict, keyStr, valueStr, 0);
-    free(keyStr);
-    free(valueStr);
-    if (ret < 0) {
-      NAPI_THROW_ERROR(avErrorMsg("Failed to set a dictionary entry: ", ret));
-    }
-  }
   fmtCtx->metadata = dict;
 
   status = napi_get_undefined(env, &result);
@@ -2115,15 +2080,11 @@ napi_value getStreamMetadata(napi_env env, napi_callback_info info) {
 
 napi_value setStreamMetadata(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, names, key, value, valueS;
+  napi_value result;
   napi_valuetype type;
   AVStream* stream;
   bool isArray;
-  uint32_t propCount;
   AVDictionary* dict = nullptr;
-  char* keyStr, *valueStr;
-  size_t strLen;
-  int ret;
 
   size_t argc = 1;
   napi_value args[1];
@@ -2141,39 +2102,8 @@ napi_value setStreamMetadata(napi_env env, napi_callback_info info) {
     NAPI_THROW_ERROR("Stream metadata can only be set with an object of tag names and values.");
   }
 
-  status = napi_get_property_names(env, args[0], &names);
+  status = makeAVDictionary(env, args[0], &dict);
   CHECK_STATUS;
-  status = napi_get_array_length(env, names, &propCount);
-  CHECK_STATUS;
-
-  // Replace all metadata values ... no partial operation
-  for ( uint32_t x = 0 ; x < propCount ; x++ ) {
-    status = napi_get_element(env, names, x, &key);
-    CHECK_STATUS;
-    status = napi_get_property(env, args[0], key, &value);
-    CHECK_STATUS;
-    status = napi_coerce_to_string(env, value, &valueS);
-    CHECK_STATUS;
-
-    status = napi_get_value_string_utf8(env, key, nullptr, 0, &strLen);
-    CHECK_STATUS;
-    keyStr = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, key, keyStr, strLen + 1, &strLen);
-    CHECK_STATUS;
-
-    status = napi_get_value_string_utf8(env, valueS, nullptr, 0, &strLen);
-    CHECK_STATUS;
-    valueStr = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, valueS, valueStr, strLen + 1, &strLen);
-    CHECK_STATUS;
-
-    ret = av_dict_set(&dict, keyStr, valueStr, 0);
-    free(keyStr);
-    free(valueStr);
-    if (ret < 0) {
-      NAPI_THROW_ERROR(avErrorMsg("Failed to set a dictionary entry: ", ret));
-    }
-  }
   stream->metadata = dict;
 
   status = napi_get_undefined(env, &result);

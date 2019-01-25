@@ -45,7 +45,7 @@ async function run() {
 
   let outFile = fs.createWriteStream('wibble.h264');
 
-  for ( let i = 0 ; i < 1000 ; i++ ) {
+  for ( let i = 0 ; i < 10 ; i++ ) {
     let frame = beamcoder.frame({
       width: encParams.width,
       height: encParams.height,

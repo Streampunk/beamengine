@@ -1603,14 +1603,10 @@ napi_value getFrameMetadata(napi_env env, napi_callback_info info) {
 
 napi_value setFrameMetadata(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, names, name, nValue;
+  napi_value result;
   napi_valuetype type;
   frameData* f;
-  uint32_t nameCount;
   AVDictionary* dict = nullptr;
-  char * key, * value;
-  size_t strLen;
-  int ret;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1630,35 +1626,8 @@ napi_value setFrameMetadata(napi_env env, napi_callback_info info) {
     NAPI_THROW_ERROR("Frame metadata property must be set with a object.");
   }
 
-  status = napi_get_property_names(env, args[0], &names);
+  status = makeAVDictionary(env, args[0], &dict);
   CHECK_STATUS;
-  status = napi_get_array_length(env, names, &nameCount);
-  CHECK_STATUS;
-  for ( uint32_t x = 0 ; x < nameCount ; x++ ) {
-    status = napi_get_element(env, names, x, &name);
-    CHECK_STATUS;
-    status = napi_get_value_string_utf8(env, name, nullptr, 0, &strLen);
-    CHECK_STATUS;
-    key = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, name, key, strLen + 1, &strLen);
-    CHECK_STATUS;
-
-    status = napi_get_property(env, args[0], name, &nValue);
-    CHECK_STATUS;
-    status = napi_coerce_to_string(env, nValue, &nValue);
-    CHECK_STATUS;
-    status = napi_get_value_string_utf8(env, nValue, nullptr, 0, &strLen);
-    CHECK_STATUS;
-    value = (char*) malloc(sizeof(char) * (strLen + 1));
-    status = napi_get_value_string_utf8(env, nValue, value, strLen + 1, &strLen);
-    CHECK_STATUS;
-
-    ret = av_dict_set(&dict, (const char *) key, (const char *) value, 0);
-    if (ret < 0) {
-      printf("DEBUG: Error setting metadata value on a frame.");
-    }
-  }
-
   f->frame->metadata = dict;
 done:
   status = napi_get_undefined(env, &result);

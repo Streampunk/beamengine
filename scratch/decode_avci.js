@@ -24,7 +24,7 @@ const { beamcoder } = require('../index.js');
 async function run() {
   let demuxer = await beamcoder.demuxer('../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
   console.log(demuxer.streams);
-  let decoder = await beamcoder.decoder({ name: 'h264' });
+  let decoder = beamcoder.decoder({ name: 'h264' });
   console.log(decoder);
   let packet = {};
   for ( let x = 0 ; x < 100 && packet != null; x++ ) {

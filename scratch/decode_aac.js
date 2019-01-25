@@ -22,10 +22,11 @@
 const { beamcoder } = require('../index.js');
 
 async function run() {
-  let demuxer = await beamcoder.demuxer('../media/bbb_1080p_c.ts');
-  let decoder = await beamcoder.decoder({ name: 'aac' });
+  let demuxer = await beamcoder.demuxer({ url: '../media/bbb_1080p_c.ts',
+    options: { fred: 'ginger' } });
+  let decoder = beamcoder.decoder({ name: 'aac' });
   let packet = {};
-  for ( let x = 0 ; packet !== null ; x++ ) {
+  for ( let x = 0 ; packet !== null && x < 3 ; x++ ) {
     packet = await demuxer.read();
     if (packet.stream_index == 1) {
       // console.log(packet);

@@ -21,11 +21,12 @@
 
 #include "decode.h"
 
-void decoderExecute(napi_env env, void* data) {
+/* void decoderExecute(napi_env env, void* data) {
   decoderCarrier* c = (decoderCarrier*) data;
   const AVCodec* codec = nullptr;
   int ret;
   const AVCodecDescriptor* codecDesc = nullptr;
+  HR_TIME_POINT decodeStart = NOW;
 
   codec = (c->codecID == -1) ?
     avcodec_find_decoder_by_name(c->codecName) :
@@ -52,9 +53,12 @@ void decoderExecute(napi_env env, void* data) {
       printf("DEBUG: Failed to set context parameters from those provided.");
     }
   }
-}
 
-void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
+  c->totalTime = microTime(decodeStart);
+  printf("Setting up a decoder took %i\n", c->totalTime);
+} */
+
+/* void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   decoderCarrier* c = (decoderCarrier*) data;
   napi_value result, value;
 
@@ -119,93 +123,166 @@ void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   FLOATING_STATUS;
 
   tidyCarrier(env, c);
-}
+} */
 
 napi_value decoder(napi_env env, napi_callback_info info) {
-  napi_value resourceName, promise, value, formatJS, formatExt;
+  napi_status status;
+  napi_value result, value, formatJS, formatExt;
   napi_valuetype type;
-  decoderCarrier* c = new decoderCarrier;
   bool isArray, hasName, hasID, hasFormat, hasStream;
   AVCodecID id = AV_CODEC_ID_NONE;
+  AVCodecContext* decoder = nullptr;
   AVFormatContext* format = nullptr;
-
-  c->status = napi_create_promise(env, &c->_deferred, &promise);
-  REJECT_RETURN;
+  const AVCodec* codec = nullptr;
+  int ret = 0, streamIdx = -1;
+  const AVCodecDescriptor* codecDesc = nullptr;
+  AVCodecParameters* params = nullptr;
+  char* codecName;
+  size_t codecNameLen = 0;
+  int32_t codecID = -1;
 
   size_t argc = 1;
   napi_value args[1];
 
-  c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  REJECT_RETURN;
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  CHECK_STATUS;
 
   if (argc != 1) {
-    REJECT_ERROR_RETURN("Decoder requires a single options object.",
-      BEAMCODER_INVALID_ARGS);
+    NAPI_THROW_ERROR("Decoder requires a single options object.");
   }
 
-  c->status = napi_typeof(env, args[0], &type);
-  REJECT_RETURN;
-  c->status = napi_is_array(env, args[0], &isArray);
-  REJECT_RETURN;
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
   if ((type != napi_object) || (isArray == true)) {
-    REJECT_ERROR_RETURN("Decoder must be configured with a single parameter, an options object.",
-      BEAMCODER_INVALID_ARGS);
+    NAPI_THROW_ERROR("Decoder must be configured with a single parameter, an options object.");
   }
 
-  c->status = napi_has_named_property(env, args[0], "name", &hasName);
-  REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "codec_id", &hasID);
-  REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "format", &hasFormat);
-  REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "stream", &hasStream);
-  REJECT_RETURN;
+  status = napi_has_named_property(env, args[0], "name", &hasName);
+  CHECK_STATUS;
+  status = napi_has_named_property(env, args[0], "codec_id", &hasID);
+  CHECK_STATUS;
+  status = napi_has_named_property(env, args[0], "format", &hasFormat);
+  CHECK_STATUS;
+  status = napi_has_named_property(env, args[0], "stream", &hasStream);
+  CHECK_STATUS;
 
   if (hasFormat && hasStream) {
-    c->status = napi_get_named_property(env, args[0], "format", &formatJS);
-    REJECT_RETURN;
-    c->status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
-    REJECT_RETURN;
-    c->status = napi_get_value_external(env, formatExt, (void**) &format);
-    REJECT_RETURN;
+    status = napi_get_named_property(env, args[0], "format", &formatJS);
+    CHECK_STATUS;
+    status = napi_get_named_property(env, formatJS, "_formatContext", &formatExt);
+    CHECK_STATUS;
+    status = napi_get_value_external(env, formatExt, (void**) &format);
+    CHECK_STATUS;
 
-    c->status = napi_get_named_property(env, args[0], "stream", &value);
-    REJECT_RETURN;
-    c->status = napi_get_value_int32(env, value, &c->streamIdx);
-    REJECT_RETURN;
-    if (c->streamIdx < 0 || c->streamIdx >= (int) format->nb_streams) {
-      REJECT_ERROR_RETURN("Stream index is out of bounds for the given format.",
-        BEAMCODER_ERROR_OUT_OF_BOUNDS);
+    status = napi_get_named_property(env, args[0], "stream", &value);
+    CHECK_STATUS;
+    status = napi_get_value_int32(env, value, &streamIdx);
+    CHECK_STATUS;
+    if (streamIdx < 0 || streamIdx >= (int) format->nb_streams) {
+      NAPI_THROW_ERROR("Stream index is out of bounds for the given format.");
     }
-    c->params = format->streams[c->streamIdx]->codecpar;
-    c->codecName = (char*) avcodec_get_name(c->params->codec_id);
-    c->codecNameLen = strlen(c->codecName);
+    params = format->streams[streamIdx]->codecpar;
+    codecName = (char*) avcodec_get_name(params->codec_id);
+    codecNameLen = strlen(codecName);
     goto create;
   }
 
   if (!(hasName || hasID)) {
-    REJECT_ERROR_RETURN("Decoder must be identified with a 'codec_id' or a 'name'.",
-      BEAMCODER_INVALID_ARGS);
+    NAPI_THROW_ERROR("Decoder must be identified with a 'codec_id' or a 'name'.");
   }
 
   if (hasName) {
-    c->status = napi_get_named_property(env, args[0], "name", &value);
-    REJECT_RETURN;
-    c->codecNameLen = 64;
-    c->codecName = (char*) malloc(sizeof(char) * (c->codecNameLen + 1));
-    c->status = napi_get_value_string_utf8(env, value, c->codecName,
-      64, &c->codecNameLen);
-    REJECT_RETURN;
+    status = napi_get_named_property(env, args[0], "name", &value);
+    CHECK_STATUS;
+    codecNameLen = 64;
+    codecName = (char*) malloc(sizeof(char) * (codecNameLen + 1));
+    status = napi_get_value_string_utf8(env, value, codecName,
+      64, &codecNameLen);
+    CHECK_STATUS;
   }
   else {
-    c->status = napi_get_named_property(env, args[0], "codec_id", &value);
-    REJECT_RETURN;
-    c->status = napi_get_value_int32(env, value, (int32_t*) &c->codecID);
-    REJECT_RETURN;
+    status = napi_get_named_property(env, args[0], "codec_id", &value);
+    CHECK_STATUS;
+    status = napi_get_value_int32(env, value, (int32_t*) &codecID);
+    CHECK_STATUS;
   }
 
 create:
-  c->status = napi_create_reference(env, args[0], 1, &c->passthru);
+  codec = (codecID == -1) ?
+    avcodec_find_decoder_by_name(codecName) :
+    avcodec_find_decoder((AVCodecID) codecID);
+  if ((codec == nullptr) && (codecID == -1)) { // one more go via codec descriptor
+    codecDesc = avcodec_descriptor_get_by_name(codecName);
+    if (codecDesc != nullptr) {
+      codec = avcodec_find_decoder(codecDesc->id);
+    }
+  }
+  if (codec == nullptr) {
+    NAPI_THROW_ERROR("Failed to find a decoder from it's name.");
+  }
+  decoder = avcodec_alloc_context3(codec);
+  if (decoder == nullptr) {
+    NAPI_THROW_ERROR("Problem allocating decoder context.");
+  }
+  if (params != nullptr) {
+    if ((ret = avcodec_parameters_to_context(decoder, params))) {
+      printf("DEBUG: Failed to set context parameters from those provided.");
+    }
+  }
+
+  status = napi_create_object(env, &result);
+  CHECK_BAIL;
+
+  status = beam_set_string_utf8(env, result, "type", "decoder");
+  CHECK_BAIL;
+  status = beam_set_string_utf8(env, result, "name",
+    (char*) avcodec_get_name(decoder->codec_id));
+  CHECK_BAIL;
+
+  /* c->status = napi_get_reference_value(env, c->passthru, &value);
+  REJECT_STATUS; */
+  status = setCodecFromProps(env, decoder, args[0], false);
+  CHECK_BAIL;
+
+  // TODO is this needed?
+  if (streamIdx != -1) {
+    status = napi_create_int32(env, streamIdx, &value);
+    CHECK_BAIL;
+    status = napi_set_named_property(env, result, "stream", value);
+    CHECK_BAIL;
+  }
+
+  status = napi_create_external(env, decoder, decoderFinalizer, nullptr, &value);
+  CHECK_BAIL;
+  status = napi_set_named_property(env, result, "_decoder", value);
+  CHECK_BAIL;
+
+  status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
+    getDecProperties, nullptr, &value);
+  CHECK_BAIL;
+  status = napi_set_named_property(env, result, "getProperties", value);
+  CHECK_BAIL;
+
+  status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
+    setDecProperties, nullptr, &value);
+  CHECK_BAIL;
+  status = napi_set_named_property(env, result, "setProperties", value);
+  CHECK_BAIL;
+
+  status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
+  CHECK_BAIL;
+  status = napi_set_named_property(env, result, "decode", value);
+  CHECK_BAIL;
+
+  status = napi_create_function(env, "flush", NAPI_AUTO_LENGTH,
+    flushDec, nullptr, &value);
+  CHECK_BAIL;
+  status = napi_set_named_property(env, result, "flush", value);
+  CHECK_BAIL;
+
+  /* c->status = napi_create_reference(env, args[0], 1, &c->passthru);
   REJECT_RETURN;
 
   c->status = napi_create_string_utf8(env, "Decoder", NAPI_AUTO_LENGTH, &resourceName);
@@ -214,9 +291,15 @@ create:
     decoderComplete, c, &c->_request);
   REJECT_RETURN;
   c->status = napi_queue_async_work(env, c->_request);
-  REJECT_RETURN;
+  REJECT_RETURN; */
+  if (decoder != nullptr) return result;
 
-  return promise;
+bail:
+  if (decoder != nullptr) {
+    avcodec_close(decoder);
+    avcodec_free_context(&decoder);
+  }
+  return nullptr;
 }
 
 void decoderFinalizer(napi_env env, void* data, void* hint) {

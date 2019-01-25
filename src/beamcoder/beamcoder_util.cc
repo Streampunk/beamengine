@@ -2743,6 +2743,54 @@ napi_status fromAVClass(napi_env env, const AVClass* cls, napi_value* result) {
   return napi_ok;
 }
 
+napi_status makeAVDictionary(napi_env env, napi_value options, AVDictionary** metadata) {
+  napi_status status;
+  napi_value names, key, value, valueS;
+  AVDictionary* dict = nullptr;
+  uint32_t propCount;
+  char *keyStr, *valueStr;
+  size_t strLen;
+  int ret;
+
+  status = napi_get_property_names(env, options, &names);
+  PASS_STATUS;
+  status = napi_get_array_length(env, names, &propCount);
+  PASS_STATUS;
+
+  // Replace all metadata values ... no partial operation
+  for ( uint32_t x = 0 ; x < propCount ; x++ ) {
+    status = napi_get_element(env, names, x, &key);
+    PASS_STATUS;
+    status = napi_get_property(env, options, key, &value);
+    PASS_STATUS;
+    status = napi_coerce_to_string(env, value, &valueS);
+    PASS_STATUS;
+
+    status = napi_get_value_string_utf8(env, key, nullptr, 0, &strLen);
+    PASS_STATUS;
+    keyStr = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, key, keyStr, strLen + 1, &strLen);
+    PASS_STATUS;
+
+    status = napi_get_value_string_utf8(env, valueS, nullptr, 0, &strLen);
+    PASS_STATUS;
+    valueStr = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, valueS, valueStr, strLen + 1, &strLen);
+    PASS_STATUS;
+
+    ret = av_dict_set(&dict, keyStr, valueStr, 0);
+    free(keyStr);
+    free(valueStr);
+    if (ret < 0) {
+      printf("DEBUG: %s\n", avErrorMsg("Problem setting dictionary entry: ", ret));
+      return napi_invalid_arg;
+    }
+  }
+
+  *metadata = dict;
+  return napi_ok;
+}
+
 std::unordered_map<int, std::string> beam_field_order_fmap = {
   { AV_FIELD_PROGRESSIVE, "progressive" },
   { AV_FIELD_TT, "top coded first, top displayed first" },
