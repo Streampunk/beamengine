@@ -23,6 +23,8 @@
 #include "beamcoder_util.h"
 #include "frame.h"
 #include <map>
+#include <deque>
+#include <inttypes.h>
 
 extern "C" {
   #include <libavfilter/avfilter.h>
@@ -37,8 +39,9 @@ public:
   srcContexts() {}
   ~srcContexts() {}
 
-  void add(const std::string &name, AVFilterContext *context) {
-    mSrcContexts.insert(std::make_pair(name, context));
+  bool add(const std::string &name, AVFilterContext *context) {
+    auto result = mSrcContexts.emplace(name, context);
+    return result.second;
   }
 
   AVFilterContext *getContext(const std::string &name) const {
@@ -54,6 +57,7 @@ private:
 };
 
 struct filtererCarrier : carrier {
+  std::string filterType;
   std::vector<std::string> inName;
   std::vector<std::string> inParams;
   std::string filterSpec;
@@ -92,7 +96,7 @@ void filtererExecute(napi_env env, void* data) {
     goto end;
   }
 
-  const AVFilter *buffersink = avfilter_get_by_name("buffersink");
+  const AVFilter *buffersink = avfilter_get_by_name(0 == c->filterType.compare("audio")?"abuffersink":"buffersink");
   ret = avfilter_graph_create_filter(&c->sinkCtx, buffersink, "out", NULL, NULL, c->filterGraph);
   if (ret < 0) {
     c->status = BEAMCODER_ERROR_ENOMEM;
@@ -106,7 +110,7 @@ void filtererExecute(napi_env env, void* data) {
 
   c->srcCtxs = new srcContexts;
   for (size_t i = 0; i < c->inParams.size(); ++i) {
-    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+    const AVFilter *buffersrc  = avfilter_get_by_name(0 == c->filterType.compare("audio")?"abuffer":"buffer");
     AVFilterContext *srcCtx = nullptr;
     ret = avfilter_graph_create_filter(&srcCtx, buffersrc, "in", c->inParams[i].c_str(), NULL, c->filterGraph);
     if (ret < 0) {
@@ -119,7 +123,11 @@ void filtererExecute(napi_env env, void* data) {
     outputs[i]->pad_idx    = 0;
     outputs[i]->next       = i < c->inParams.size() - 1 ? outputs[i + 1] : NULL;
 
-    c->srcCtxs->add(c->inName[i], srcCtx);
+    if (!c->srcCtxs->add(c->inName[i], srcCtx)) {
+      c->status = BEAMCODER_ERROR_EINVAL;
+      c->errorMsg = "Filter sources must have unique names.";
+      goto end;
+    }
   }
 
   if ((ret = avfilter_graph_parse_ptr(c->filterGraph, c->filterSpec.c_str(), &inputs, outputs, NULL)) < 0) {
@@ -212,14 +220,30 @@ napi_value filterer(napi_env env, napi_callback_info info) {
       BEAMCODER_INVALID_ARGS);
   }
 
-  bool hasInParams, hasFilterSpec;
+  bool hasFilterType, hasInParams, hasFilterSpec;
+  c->status = napi_has_named_property(env, args[0], "filterType", &hasFilterType);
+  REJECT_RETURN;
   c->status = napi_has_named_property(env, args[0], "inputParams", &hasInParams);
   REJECT_RETURN;
   c->status = napi_has_named_property(env, args[0], "filterSpec", &hasFilterSpec);
   REJECT_RETURN;
 
-  if (!(hasInParams && hasFilterSpec)) {
-    REJECT_ERROR_RETURN("Filterer parameter object requires inputParams and filterSpec to be defined.",
+  if (!(hasFilterType && hasInParams && hasFilterSpec)) {
+    REJECT_ERROR_RETURN("Filterer parameter object requires type, inputParams and filterSpec to be defined.",
+      BEAMCODER_INVALID_ARGS);
+  }
+
+  napi_value filterTypeVal;
+  c->status = napi_get_named_property(env, args[0], "filterType", &filterTypeVal);
+  REJECT_RETURN;
+  size_t filterTypeLen;
+  c->status = napi_get_value_string_utf8(env, filterTypeVal, nullptr, 0, &filterTypeLen);
+  REJECT_RETURN;
+  c->filterType.resize(filterTypeLen);
+  c->status = napi_get_value_string_utf8(env, filterTypeVal, (char *)c->filterType.data(), filterTypeLen+1, nullptr);
+  REJECT_RETURN;
+  if ((0 != c->filterType.compare("audio")) && (0 != c->filterType.compare("video"))) {
+    REJECT_ERROR_RETURN("Filterer expects filterType of audio or video.",
       BEAMCODER_INVALID_ARGS);
   }
 
@@ -242,6 +266,9 @@ napi_value filterer(napi_env env, napi_callback_info info) {
     REJECT_RETURN;
 
     std::string name;
+    uint32_t sampleRate;
+    std::string sampleFormat;
+    std::string channelLayout;
     uint32_t width;
     uint32_t height;
     std::string pixFmt;
@@ -262,40 +289,89 @@ napi_value filterer(napi_env env, napi_callback_info info) {
       size_t nameLen;
       c->status = napi_get_value_string_utf8(env, nameVal, nullptr, 0, &nameLen);
       REJECT_RETURN;
-      name.resize(nameLen+1);
+      name.resize(nameLen);
       c->status = napi_get_value_string_utf8(env, nameVal, (char *)name.data(), nameLen+1, nullptr);
       REJECT_RETURN;
       c->inName.push_back(name);
     } else
       c->inName.push_back("in");
 
-    napi_value widthVal;
-    c->status = napi_get_named_property(env, inParamsVal, "width", &widthVal);
-    REJECT_RETURN;
-    c->status = napi_get_value_uint32(env, widthVal, &width);
-    REJECT_RETURN;
-    napi_value heightVal;
-    c->status = napi_get_named_property(env, inParamsVal, "height", &heightVal);
-    REJECT_RETURN;
-    c->status = napi_get_value_uint32(env, heightVal, &height);
-    REJECT_RETURN;
+    uint32_t arrayLen;
+    if (0 == c->filterType.compare("audio")) {
+      napi_value sampleRateVal;
+      c->status = napi_get_named_property(env, inParamsVal, "sampleRate", &sampleRateVal);
+      REJECT_RETURN;
+      c->status = napi_get_value_uint32(env, sampleRateVal, &sampleRate);
+      REJECT_RETURN;
 
-    napi_value pixFmtVal;
-    c->status = napi_get_named_property(env, inParamsVal, "pixFmt", &pixFmtVal);
-    REJECT_RETURN;
-    size_t pixFmtLen;
-    c->status = napi_get_value_string_utf8(env, pixFmtVal, nullptr, 0, &pixFmtLen);
-    REJECT_RETURN;
-    pixFmt.resize(pixFmtLen+1);
-    c->status = napi_get_value_string_utf8(env, pixFmtVal, (char *)pixFmt.data(), pixFmtLen+1, nullptr);
-    REJECT_RETURN;
+      napi_value sampleFmtVal;
+      c->status = napi_get_named_property(env, inParamsVal, "sampleFormat", &sampleFmtVal);
+      REJECT_RETURN;
+      size_t sampleFmtLen;
+      c->status = napi_get_value_string_utf8(env, sampleFmtVal, nullptr, 0, &sampleFmtLen);
+      REJECT_RETURN;
+      pixFmt.resize(sampleFmtLen);
+      c->status = napi_get_value_string_utf8(env, sampleFmtVal, (char *)sampleFormat.data(), sampleFmtLen+1, nullptr);
+      REJECT_RETURN;
+
+      napi_value channelLayoutVal;
+      c->status = napi_get_named_property(env, inParamsVal, "channelLayout", &channelLayoutVal);
+      REJECT_RETURN;
+      size_t channelLayoutLen;
+      c->status = napi_get_value_string_utf8(env, channelLayoutVal, nullptr, 0, &channelLayoutLen);
+      REJECT_RETURN;
+      channelLayout.resize(channelLayoutLen);
+      c->status = napi_get_value_string_utf8(env, channelLayoutVal, (char *)channelLayout.data(), channelLayoutLen+1, nullptr);
+      REJECT_RETURN;
+    } else {
+      napi_value widthVal;
+      c->status = napi_get_named_property(env, inParamsVal, "width", &widthVal);
+      REJECT_RETURN;
+      c->status = napi_get_value_uint32(env, widthVal, &width);
+      REJECT_RETURN;
+      napi_value heightVal;
+      c->status = napi_get_named_property(env, inParamsVal, "height", &heightVal);
+      REJECT_RETURN;
+      c->status = napi_get_value_uint32(env, heightVal, &height);
+      REJECT_RETURN;
+
+      napi_value pixFmtVal;
+      c->status = napi_get_named_property(env, inParamsVal, "pixelFormat", &pixFmtVal);
+      REJECT_RETURN;
+      size_t pixFmtLen;
+      c->status = napi_get_value_string_utf8(env, pixFmtVal, nullptr, 0, &pixFmtLen);
+      REJECT_RETURN;
+      pixFmt.resize(pixFmtLen);
+      c->status = napi_get_value_string_utf8(env, pixFmtVal, (char *)pixFmt.data(), pixFmtLen+1, nullptr);
+      REJECT_RETURN;
+
+      napi_value pixelAspectVal;
+      c->status = napi_get_named_property(env, inParamsVal, "pixelAspect", &pixelAspectVal);
+      REJECT_RETURN;
+      c->status = napi_is_array(env, pixelAspectVal, &isArray);
+      REJECT_RETURN;
+      if (isArray) {
+        c->status = napi_get_array_length(env, pixelAspectVal, &arrayLen);
+        REJECT_RETURN;
+      }
+      if (!(isArray && (2 == arrayLen))) {
+        REJECT_ERROR_RETURN("Filterer inputParams pixelAspect must be an array with 2 values representing a rational number.",
+          BEAMCODER_INVALID_ARGS);
+      }
+      for (uint32_t i = 0; i < arrayLen; ++i) {
+        napi_value arrayVal;
+        c->status = napi_get_element(env, pixelAspectVal, i, &arrayVal);
+        REJECT_RETURN;
+        c->status = napi_get_value_int32(env, arrayVal, (0==i)?&pixelAspect.num:&pixelAspect.den);
+        REJECT_RETURN;
+      }
+    }
 
     napi_value timeBaseVal;
     c->status = napi_get_named_property(env, inParamsVal, "timeBase", &timeBaseVal);
     REJECT_RETURN;
     c->status = napi_is_array(env, timeBaseVal, &isArray);
     REJECT_RETURN;
-    uint32_t arrayLen;
     if (isArray) {
       c->status = napi_get_array_length(env, timeBaseVal, &arrayLen);
       REJECT_RETURN;
@@ -312,32 +388,18 @@ napi_value filterer(napi_env env, napi_callback_info info) {
       REJECT_RETURN;
     }
 
-    napi_value pixelAspectVal;
-    c->status = napi_get_named_property(env, inParamsVal, "pixelAspect", &pixelAspectVal);
-    REJECT_RETURN;
-    c->status = napi_is_array(env, pixelAspectVal, &isArray);
-    REJECT_RETURN;
-    if (isArray) {
-      c->status = napi_get_array_length(env, pixelAspectVal, &arrayLen);
-      REJECT_RETURN;
-    }
-    if (!(isArray && (2 == arrayLen))) {
-      REJECT_ERROR_RETURN("Filterer inputParams pixelAspect must be an array with 2 values representing a rational number.",
-        BEAMCODER_INVALID_ARGS);
-    }
-    for (uint32_t i = 0; i < arrayLen; ++i) {
-      napi_value arrayVal;
-      c->status = napi_get_element(env, pixelAspectVal, i, &arrayVal);
-      REJECT_RETURN;
-      c->status = napi_get_value_int32(env, arrayVal, (0==i)?&pixelAspect.num:&pixelAspect.den);
-      REJECT_RETURN;
-    }
-
     char args[512];
-    snprintf(args, sizeof(args),
-            "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-            width, height, av_get_pix_fmt(pixFmt.c_str()),
-            timeBase.num, timeBase.den, pixelAspect.num, pixelAspect.den);
+    if (0 == c->filterType.compare("audio")) {
+      snprintf(args, sizeof(args),
+              "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%llx",
+              timeBase.num, timeBase.den, sampleRate,
+              sampleFormat.c_str(), av_get_channel_layout(channelLayout.c_str()));
+    } else {
+      snprintf(args, sizeof(args),
+              "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
+              width, height, av_get_pix_fmt(pixFmt.c_str()),
+              timeBase.num, timeBase.den, pixelAspect.num, pixelAspect.den);
+    }
     c->inParams.push_back(args);
   }
 
@@ -347,7 +409,7 @@ napi_value filterer(napi_env env, napi_callback_info info) {
   size_t specLen;
   c->status = napi_get_value_string_utf8(env, filterSpecJS, nullptr, 0, &specLen);
   REJECT_RETURN;
-  c->filterSpec.resize(specLen+1);
+  c->filterSpec.resize(specLen);
   c->status = napi_get_value_string_utf8(env, filterSpecJS, (char *)c->filterSpec.data(), specLen+1, nullptr);
   REJECT_RETURN;
 
@@ -366,7 +428,7 @@ napi_value filterer(napi_env env, napi_callback_info info) {
 struct filterCarrier : carrier {
   srcContexts *srcCtxs;
   AVFilterContext *sinkCtx = nullptr;
-  std::map<std::string, AVFrame *> srcFrames;
+  std::map<std::string, std::deque<AVFrame *> > srcFrames;
   std::vector<AVFrame *> dstFrames;
   ~filterCarrier() {
     // printf("Filter carrier destructor.\n");
@@ -428,17 +490,23 @@ void filterExecute(napi_env env, void* data) {
   int ret = 0;
   HR_TIME_POINT filterStart = NOW;
 
-  for (auto it = c->srcFrames.cbegin(); it != c->srcFrames.cend(); ++it) {
+  for (auto it = c->srcFrames.begin(); it != c->srcFrames.end(); ++it) {
     AVFilterContext *srcCtx = c->srcCtxs->getContext(it->first);
     if (!srcCtx) {
       c->status = BEAMCODER_INVALID_ARGS;
       c->errorMsg = "Frame name not found in source contexts.";
       return;
     }
-    if (av_buffersrc_add_frame_flags(srcCtx, it->second, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
-      c->status = BEAMCODER_ERROR_ENOMEM;
-      c->errorMsg = "Error while feeding the filtergraph.";
-      return;
+
+    std::deque<AVFrame *> frames = it->second;
+    while (frames.size() > 0) {
+      ret = av_buffersrc_add_frame_flags(srcCtx, frames.front(), AV_BUFFERSRC_FLAG_KEEP_REF);
+      if (ret < 0) {
+        c->status = BEAMCODER_ERROR_FILTER_ADD_FRAME;
+        c->errorMsg = "Error while feeding the filtergraph.";
+        return;
+      }
+      frames.pop_front();
     }
   }
 
@@ -448,7 +516,7 @@ void filterExecute(napi_env env, void* data) {
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
       break;
     if (ret < 0) {
-      c->status = BEAMCODER_ERROR_ENOMEM;
+      c->status = BEAMCODER_ERROR_FILTER_GET_FRAME;
       c->errorMsg = "Error while filtering.";
       break;
     }
@@ -537,11 +605,10 @@ napi_value filter(napi_env env, napi_callback_info info) {
     REJECT_ERROR_RETURN("Expected an array of source frame objects.",
       BEAMCODER_INVALID_ARGS);
 
-  uint32_t srcFramesLen;
-  c->status = napi_get_array_length(env, args[0], &srcFramesLen);
+  uint32_t srcsLen;
+  c->status = napi_get_array_length(env, args[0], &srcsLen);
   REJECT_RETURN;
-
-  for (uint32_t i = 0; i < srcFramesLen; ++i) {
+  for (uint32_t i = 0; i < srcsLen; ++i) {
     napi_value item;
     c->status = napi_get_element(env, args[0], i, &item);
     REJECT_RETURN;
@@ -557,7 +624,7 @@ napi_value filter(napi_env env, napi_callback_info info) {
       size_t nameLen;
       c->status = napi_get_value_string_utf8(env, nameVal, nullptr, 0, &nameLen);
       REJECT_RETURN;
-      name.resize(nameLen+1);
+      name.resize(nameLen);
       c->status = napi_get_value_string_utf8(env, nameVal, (char *)name.data(), nameLen+1, nullptr);
       REJECT_RETURN;
     } else if (0 == i) {
@@ -567,12 +634,41 @@ napi_value filter(napi_env env, napi_callback_info info) {
         BEAMCODER_INVALID_ARGS);
     }
 
-    napi_value frameVal;
-    c->status = napi_get_named_property(env, item, "frame", &frameVal);
+    napi_value framesVal;
+    c->status = napi_get_named_property(env, item, "frames", &framesVal);
     REJECT_RETURN;
-    AVFrame *frame = getFrame(env, frameVal);
 
-    c->srcFrames.insert(std::make_pair(name, frame));
+    napi_value framesArrVal;
+    c->status = napi_get_named_property(env, framesVal, "frames", &framesArrVal);
+    REJECT_RETURN;
+
+    bool isArray;
+    c->status = napi_is_array(env, framesArrVal, &isArray);
+    REJECT_RETURN;
+    if (!isArray)
+      REJECT_ERROR_RETURN("Expected an array of frame objects.",
+        BEAMCODER_INVALID_ARGS);
+
+    uint32_t framesLen;
+    c->status = napi_get_array_length(env, framesArrVal, &framesLen);
+    REJECT_RETURN;
+    std::deque<AVFrame *> frames;
+    for (uint32_t f = 0; f < framesLen; ++f) {
+      napi_value item;
+      c->status = napi_get_element(env, framesArrVal, f, &item);
+      REJECT_RETURN;
+      c->status = isFrame(env, item);
+      if (c->status != napi_ok) {
+        REJECT_ERROR_RETURN("Values in array must by of type frame.",
+          BEAMCODER_INVALID_ARGS);
+      }
+      frames.push_back(getFrame(env, item));
+    }
+    auto result = c->srcFrames.emplace(name, frames);
+    if (!result.second) {
+      REJECT_ERROR_RETURN("Frame names must be unique.",
+        BEAMCODER_INVALID_ARGS);
+    }
   }
 
   c->status = napi_create_string_utf8(env, "Filter", NAPI_AUTO_LENGTH, &resourceName);
