@@ -92,7 +92,7 @@
   c->status = napi_create_external(env, c->decoder, decoderFinalizer, nullptr, &value);
   REJECT_STATUS;
   c->decoder = nullptr;
-  c->status = napi_set_named_property(env, result, "_decoder", value);
+  c->status = napi_set_named_property(env, result, "_CodecContext", value);
   REJECT_STATUS;
 
   c->status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
@@ -232,18 +232,18 @@ create:
     }
   }
 
-  status = napi_create_object(env, &result);
-  CHECK_BAIL;
+  /*status = napi_create_object(env, &result);
+  CHECK_BAIL; */
 
-  status = beam_set_string_utf8(env, result, "type", "decoder");
+/*  status = beam_set_string_utf8(env, result, "type", "decoder");
   CHECK_BAIL;
   status = beam_set_string_utf8(env, result, "name",
     (char*) avcodec_get_name(decoder->codec_id));
-  CHECK_BAIL;
+  CHECK_BAIL; */
 
   /* c->status = napi_get_reference_value(env, c->passthru, &value);
   REJECT_STATUS; */
-  status = setCodecFromProps(env, decoder, args[0], false);
+  status = fromAVCodecContext(env, decoder, &result, false);
   CHECK_BAIL;
 
   // TODO is this needed?
@@ -254,10 +254,10 @@ create:
     CHECK_BAIL;
   }
 
-  status = napi_create_external(env, decoder, decoderFinalizer, nullptr, &value);
+  /* status = napi_create_external(env, decoder, decoderFinalizer, nullptr, &value);
   CHECK_BAIL;
-  status = napi_set_named_property(env, result, "_decoder", value);
-  CHECK_BAIL;
+  status = napi_set_named_property(env, result, "_CodecContext", value);
+  CHECK_BAIL; */
 
   status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
     getDecProperties, nullptr, &value);
@@ -426,7 +426,7 @@ napi_value decode(napi_env env, napi_callback_info info) {
 
   c->status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  c->status = napi_get_named_property(env, decoderJS, "_CodecContext", &decoderExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, decoderExt, (void**) &c->decoder);
   REJECT_RETURN;
@@ -552,7 +552,7 @@ napi_value flushDec(napi_env env, napi_callback_info info) {
 
   c->status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  c->status = napi_get_named_property(env, decoderJS, "_CodecContext", &decoderExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, decoderExt, (void**) &c->decoder);
   REJECT_RETURN;
@@ -585,7 +585,7 @@ napi_value getDecProperties(napi_env env, napi_callback_info info) {
 
   status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
   CHECK_STATUS;
-  status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  status = napi_get_named_property(env, decoderJS, "_CodecContext", &decoderExt);
   CHECK_STATUS;
   status = napi_get_value_external(env, decoderExt, (void**) &decoder);
   CHECK_STATUS;
@@ -613,7 +613,7 @@ napi_value setDecProperties(napi_env env, napi_callback_info info) {
 
   status = napi_get_cb_info(env, info, &argc, args, &decoderJS, nullptr);
   CHECK_STATUS;
-  status = napi_get_named_property(env, decoderJS, "_decoder", &decoderExt);
+  status = napi_get_named_property(env, decoderJS, "_CodecContext", &decoderExt);
   CHECK_STATUS;
   status = napi_get_value_external(env, decoderExt, (void**) &decoder);
   CHECK_STATUS;

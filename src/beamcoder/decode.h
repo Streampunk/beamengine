@@ -25,6 +25,7 @@
 #include "beamcoder_util.h"
 #include "packet.h"
 #include "frame.h"
+#include "codec.h"
 #include <vector>
 
 extern "C" {
@@ -34,12 +35,12 @@ extern "C" {
   #include <libavformat/avformat.h>
 }
 
-void decoderExecute(napi_env env, void* data);
-void decoderComplete(napi_env env, napi_status asyncStatus, void* data);
+// void decoderExecute(napi_env env, void* data);
+// void decoderComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decoder(napi_env env, napi_callback_info info);
 
-// void decodeExecute(napi_env env, void* data);
-// void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
+void decodeExecute(napi_env env, void* data);
+void decodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decode(napi_env env, napi_callback_info info);
 napi_value flushDec(napi_env env, napi_callback_info info);
 
