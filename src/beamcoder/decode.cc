@@ -127,7 +127,7 @@
 
 napi_value decoder(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, value, formatJS, formatExt;
+  napi_value result, value, formatJS, formatExt, global, jsObject, assign;
   napi_valuetype type;
   bool isArray, hasName, hasID, hasFormat, hasStream;
   AVCodecID id = AV_CODEC_ID_NONE;
@@ -245,6 +245,16 @@ create:
   REJECT_STATUS; */
   status = fromAVCodecContext(env, decoder, &result, false);
   CHECK_BAIL;
+
+  status = napi_get_global(env, &global);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, global, "Object", &jsObject);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, jsObject, "assign", &assign);
+  CHECK_STATUS;
+  const napi_value fargs[] = { result, args[0] };
+  status = napi_call_function(env, result, assign, 2, fargs, &result);
+  CHECK_STATUS;
 
   // TODO is this needed?
   if (streamIdx != -1) {

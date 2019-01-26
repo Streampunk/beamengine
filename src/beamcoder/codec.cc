@@ -1112,6 +1112,20 @@ napi_value setCodecCtxTicksPerFrame(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getCodecCtxDelay(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVCodecContext* codec;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  status = napi_create_int32(env, codec->delay, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
 napi_value getCodecCtxWidth(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1194,7 +1208,7 @@ napi_value setCodecCtxHeight(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_value getCodecCtxDelay(napi_env env, napi_callback_info info) {
+napi_value getCodecCtxCodedWidth(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   AVCodecContext* codec;
@@ -1202,13 +1216,189 @@ napi_value getCodecCtxDelay(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
   CHECK_STATUS;
-  status = napi_create_int32(env, codec->delay, &result);
+  status = napi_create_int32(env, codec->coded_width, &result);
   CHECK_STATUS;
 
   return result;
 }
 
+napi_value setCodecCtxCodedWidth(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVCodecContext* codec;
 
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the coded_width property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("A number is required to set the coded_width property.");
+  }
+
+  status = napi_get_value_int32(env, args[0], &codec->coded_width);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getCodecCtxCodedHeight(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVCodecContext* codec;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  status = napi_create_int32(env, codec->coded_height, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setCodecCtxCodedHeight(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVCodecContext* codec;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the coded_height property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("A number is required to set the coded_height property.");
+  }
+
+  status = napi_get_value_int32(env, args[0], &codec->coded_height);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getCodecCtxGopSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVCodecContext* codec;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  status = napi_create_int32(env, codec->gop_size, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setCodecCtxGopSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVCodecContext* codec;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the gop_size property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("A number is required to set the gop_size property.");
+  }
+
+  status = napi_get_value_int32(env, args[0], &codec->gop_size);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getCodecCtxPixFmt(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVCodecContext* codec;
+  const char* pixFmtName;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
+  CHECK_STATUS;
+
+  pixFmtName = av_get_pix_fmt_name(codec->pix_fmt);
+  if (pixFmtName != nullptr) {
+    status = napi_create_string_utf8(env,
+      (char*) av_get_pix_fmt_name(codec->pix_fmt), NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setCodecCtxPixFmt(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVCodecContext* codec;
+  char* name;
+  size_t strLen;
+  AVPixelFormat pixFmt;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &codec);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the width property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    codec->pix_fmt = AV_PIX_FMT_NONE;
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("A string is required to set the pix_fmt property.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  pixFmt = av_get_pix_fmt((const char *) name);
+  free(name);
+  CHECK_STATUS;
+  if (pixFmt != AV_PIX_FMT_NONE) {
+    codec->pix_fmt = pixFmt;
+  } else {
+    NAPI_THROW_ERROR("Pixel format name is not known.");
+  }
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
 
 napi_value failDecoding(napi_env env, napi_callback_info info) {
   NAPI_THROW_ERROR("Cannot set property when decoding.");
@@ -1239,9 +1429,9 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
 
   napi_property_descriptor desc[] = {
     { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
-    { "codec_id", nullptr, nullptr, getCodecCtxCodecID, nullptr, nullptr,
+    { "codec_id", nullptr, nullptr, getCodecCtxCodecID, nop, nullptr,
       napi_enumerable, codec},
-    { "name", nullptr, nullptr, getCodecCtxName, nullptr, nullptr,
+    { "name", nullptr, nullptr, getCodecCtxName, nop, nullptr,
       napi_enumerable, codec},
     { "long_name", nullptr, nullptr, getCodecCtxLongName, nullptr, nullptr,
       napi_enumerable, codec},
@@ -1259,9 +1449,10 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
     { "global_quality", nullptr, nullptr, getCodecCtxGlobalQ,
       encoding ? setCodecCtxGlobalQ : failDecoding, nullptr,
       encoding ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, codec},
+    // 10
     { "compression_level", nullptr, nullptr, getCodecCtxCompLvl,
       encoding ? setCodecCtxCompLvl : failDecoding, nullptr,
-      encoding ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, codec}, // 10
+      encoding ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, codec},
     { "flags", nullptr, nullptr, getCodecCtxFlags, setCodecCtxFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), codec},
     { "flags2", nullptr, nullptr, getCodecCtxFlags2, setCodecCtxFlags2, nullptr,
@@ -1280,9 +1471,24 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
       (napi_property_attributes) (napi_writable | napi_enumerable), codec},
     { "height", nullptr, nullptr, getCodecCtxHeight, setCodecCtxHeight, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), codec},
+    { "coded_width", nullptr, nullptr,
+      encoding ? nullptr : getCodecCtxCodedWidth,
+      encoding ? failEncoding : setCodecCtxCodedWidth, nullptr,
+      encoding ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), codec},
+    // 20
+    { "coded_height", nullptr, nullptr,
+      encoding ? nullptr : getCodecCtxCodedHeight,
+      encoding ? failEncoding : setCodecCtxCodedHeight, nullptr,
+      encoding ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), codec},
+    { "gop_size" , nullptr, nullptr,
+       encoding ? getCodecCtxGopSize : nullptr,
+       encoding ? setCodecCtxGopSize : failDecoding, nullptr,
+       encoding ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, codec},
+    { "pix_fmt", nullptr, nullptr, getCodecCtxPixFmt, setCodecCtxPixFmt, nullptr,
+       (napi_property_attributes) (napi_writable | napi_enumerable), codec},
     { "_CodecContext", nullptr, nullptr, nullptr, nullptr, extCodec, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsCodec, 19, desc);
+  status = napi_define_properties(env, jsCodec, 23, desc);
   PASS_STATUS;
 
   *result = jsCodec;
