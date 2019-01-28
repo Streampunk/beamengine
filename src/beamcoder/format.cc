@@ -2245,13 +2245,11 @@ napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   AVStream* stream;
-  codecParData* cpd = new codecParData;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
   CHECK_STATUS;
 
-  cpd->codecPars = stream->codecpar;
-  status = fromAVCodecParameters(env, cpd, &result);
+  status = fromAVCodecParameters(env, stream->codecpar, false, &result);
   CHECK_STATUS;
   return result;
 }
@@ -2262,7 +2260,6 @@ napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
   napi_valuetype type;
   AVStream* stream;
   bool isArray;
-  codecParData* cpd;
 
   size_t argc = 1;
   napi_value args[1];
@@ -2288,9 +2285,8 @@ napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
     status = napi_get_named_property(env, jsCodecPar, "_codecPar", &extCodecPar);
     CHECK_STATUS;
   }
-  status = napi_get_value_external(env, extCodecPar, (void**) &cpd);
+  status = napi_get_value_external(env, extCodecPar, (void**) &stream->codecpar);
   CHECK_STATUS;
-  stream->codecpar = cpd->codecPars;
 
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
