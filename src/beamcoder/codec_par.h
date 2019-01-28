@@ -29,17 +29,9 @@ extern "C" {
   #include <libavcodec/avcodec.h>
 }
 
-void codecParDataFinalizer(napi_env env, void* data, void* hint);
-
-struct codecParData {
-  AVCodecParameters* codecPars = nullptr;
-  // napi_ref codecParRef = nullptr;
-  ~codecParData() {
-    avcodec_parameters_free(&codecPars);
-  }
-};
+void codecParamsFinalizer(napi_env env, void* data, void* hint);
 
 napi_value makeCodecParameters(napi_env env, napi_callback_info info);
-napi_status fromAVCodecParameters(napi_env env, codecParData* frame, napi_value* result);
+napi_status fromAVCodecParameters(napi_env env, AVCodecParameters* c, bool ownAlloc, napi_value* result);
 
 #endif // CODEC_PAR_H

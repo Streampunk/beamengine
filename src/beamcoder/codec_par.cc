@@ -24,13 +24,13 @@
 napi_value getCodecParCodecType(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  enumName = av_get_media_type_string(c->codecPars->codec_type);
+  enumName = av_get_media_type_string(c->codec_type);
   status = napi_create_string_utf8(env,
     (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
@@ -43,7 +43,7 @@ napi_value setCodecParCodecType(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   int mtype;
   char * typeName;
   size_t typeNameLen;
@@ -68,7 +68,7 @@ napi_value setCodecParCodecType(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   mtype = beam_lookup_enum(beam_avmedia_type->inverse, typeName);
-  c->codecPars->codec_type = (mtype == BEAM_ENUM_UNKNOWN) ?
+  c->codec_type = (mtype == BEAM_ENUM_UNKNOWN) ?
     AVMEDIA_TYPE_UNKNOWN : (AVMediaType) mtype;
 
 //SET_BODY codec_type AVMediaType CodecType
@@ -80,12 +80,12 @@ napi_value setCodecParCodecType(napi_env env, napi_callback_info info) {
 napi_value getCodecParCodecID(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->codec_id, &result);
+  status = napi_create_int32(env, c->codec_id, &result);
   CHECK_STATUS;
 
   return result;
@@ -95,7 +95,7 @@ napi_value setCodecParCodecID(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -111,7 +111,7 @@ napi_value setCodecParCodecID(napi_env env, napi_callback_info info) {
     NAPI_THROW_ERROR("Codec parameters codec_id must be set by a number.");
   }
 
-  status = napi_get_value_int32(env, args[0], (int32_t*) &c->codecPars->codec_id);
+  status = napi_get_value_int32(env, args[0], (int32_t*) &c->codec_id);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -122,12 +122,12 @@ napi_value setCodecParCodecID(napi_env env, napi_callback_info info) {
 napi_value getCodecParName(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_string_utf8(env, (char*) avcodec_get_name(c->codecPars->codec_id),
+  status = napi_create_string_utf8(env, (char*) avcodec_get_name(c->codec_id),
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
 
@@ -138,7 +138,7 @@ napi_value setCodecParName(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* codecName;
   size_t nameLen;
   const AVCodecDescriptor* codecDesc;
@@ -167,7 +167,7 @@ napi_value setCodecParName(napi_env env, napi_callback_info info) {
   if (codecDesc == nullptr) {
     NAPI_THROW_ERROR("Codec parameter codec_name does not match a known codec.");
   }
-  c->codecPars->codec_id = codecDesc->id;
+  c->codec_id = codecDesc->id;
 
   free(codecName);
 
@@ -179,13 +179,13 @@ napi_value setCodecParName(napi_env env, napi_callback_info info) {
 napi_value getCodecParCodecTag(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   char* fourcc = (char*) malloc(sizeof(char) * AV_FOURCC_MAX_STRING_SIZE);
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  fourcc = av_fourcc_make_string(fourcc, c->codecPars->codec_tag);
+  fourcc = av_fourcc_make_string(fourcc, c->codec_tag);
   status = napi_create_string_utf8(env, fourcc, NAPI_AUTO_LENGTH, &result);
   free(fourcc);
   CHECK_STATUS;
@@ -198,7 +198,7 @@ napi_value getCodecParCodecTag(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -220,23 +220,23 @@ napi_value getCodecParCodecTag(napi_env env, napi_callback_info info) {
 napi_value getCodecParFormat(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* fmtName = nullptr;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  switch (c->codecPars->codec_type) {
+  switch (c->codec_type) {
     case AVMEDIA_TYPE_VIDEO:
-      fmtName = av_get_pix_fmt_name((AVPixelFormat) c->codecPars->format);
+      fmtName = av_get_pix_fmt_name((AVPixelFormat) c->format);
       break;
     case AVMEDIA_TYPE_AUDIO:
-      fmtName = av_get_sample_fmt_name((AVSampleFormat) c->codecPars->format);
+      fmtName = av_get_sample_fmt_name((AVSampleFormat) c->format);
       break;
     default: // Might not have media type set
-      fmtName = av_get_pix_fmt_name((AVPixelFormat) c->codecPars->format);
+      fmtName = av_get_pix_fmt_name((AVPixelFormat) c->format);
       if (fmtName == nullptr) {
-        fmtName = av_get_sample_fmt_name((AVSampleFormat) c->codecPars->format);
+        fmtName = av_get_sample_fmt_name((AVSampleFormat) c->format);
       }
       break;
   }
@@ -255,7 +255,7 @@ napi_value setCodecParFormat(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* formatName;
   size_t nameLen;
   int format;
@@ -280,7 +280,7 @@ napi_value setCodecParFormat(napi_env env, napi_callback_info info) {
   status = napi_get_value_string_utf8(env, args[0], formatName, nameLen + 1, &nameLen);
   CHECK_STATUS;
 
-  switch (c->codecPars->codec_type) {
+  switch (c->codec_type) {
     case AVMEDIA_TYPE_VIDEO:
       format = (int) av_get_pix_fmt((const char *) formatName);
       break;
@@ -294,7 +294,7 @@ napi_value setCodecParFormat(napi_env env, napi_callback_info info) {
       }
       break;
   }
-  c->codecPars->format = format;
+  c->format = format;
 
   free(formatName);
 
@@ -306,12 +306,12 @@ napi_value setCodecParFormat(napi_env env, napi_callback_info info) {
 napi_value getCodecParBitRate(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int64(env, c->codecPars->bit_rate, &result);
+  status = napi_create_int64(env, c->bit_rate, &result);
   CHECK_STATUS;
 
   return result;
@@ -321,7 +321,7 @@ napi_value setCodecParBitRate(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -336,7 +336,7 @@ napi_value setCodecParBitRate(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameters bit_rate must be set with a number.");
   }
-  status = napi_get_value_int64(env, args[0], &c->codecPars->bit_rate);
+  status = napi_get_value_int64(env, args[0], &c->bit_rate);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -347,18 +347,18 @@ napi_value setCodecParBitRate(napi_env env, napi_callback_info info) {
 napi_value getCodecParSmpAspectRt(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, element;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
   status = napi_create_array(env, &result);
   CHECK_STATUS;
-  status = napi_create_int32(env, c->codecPars->sample_aspect_ratio.num, &element);
+  status = napi_create_int32(env, c->sample_aspect_ratio.num, &element);
   CHECK_STATUS;
   status = napi_set_element(env, result, 0, element);
   CHECK_STATUS;
-  status = napi_create_int32(env, c->codecPars->sample_aspect_ratio.den, &element);
+  status = napi_create_int32(env, c->sample_aspect_ratio.den, &element);
   CHECK_STATUS;
   status = napi_set_element(env, result, 1, element);
   CHECK_STATUS;
@@ -370,7 +370,7 @@ napi_value setCodecParSmpAspectRt(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, num, den;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   bool isArray;
 
   size_t argc = 1;
@@ -405,9 +405,9 @@ napi_value setCodecParSmpAspectRt(napi_env env, napi_callback_info info) {
   }
   CHECK_STATUS;
 
-  status = napi_get_value_int32(env, num, &c->codecPars->sample_aspect_ratio.num);
+  status = napi_get_value_int32(env, num, &c->sample_aspect_ratio.num);
   CHECK_STATUS;
-  status = napi_get_value_int32(env, den, &c->codecPars->sample_aspect_ratio.den);
+  status = napi_get_value_int32(env, den, &c->sample_aspect_ratio.den);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -418,13 +418,13 @@ napi_value setCodecParSmpAspectRt(napi_env env, napi_callback_info info) {
 napi_value getCodecParFieldOrder(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
   status = napi_create_string_utf8(env,
-    (char*) beam_lookup_name(beam_field_order->forward, c->codecPars->field_order),
+    (char*) beam_lookup_name(beam_field_order->forward, c->field_order),
     NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
 
@@ -435,7 +435,7 @@ napi_value setCodecParFieldOrder(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   int enumValue;
@@ -464,7 +464,7 @@ napi_value setCodecParFieldOrder(napi_env env, napi_callback_info info) {
   if (enumValue == BEAM_ENUM_UNKNOWN) {
     NAPI_THROW_ERROR("Codec parameters field_order value unrecognised. Did you mean e.g. 'progressive'?")
   }
-  c->codecPars->field_order = (AVFieldOrder) enumValue;
+  c->field_order = (AVFieldOrder) enumValue;
 
   free(enumString);
 
@@ -476,13 +476,13 @@ napi_value setCodecParFieldOrder(napi_env env, napi_callback_info info) {
 napi_value getCodecParColorRange(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  enumName = av_color_range_name(c->codecPars->color_range);
+  enumName = av_color_range_name(c->color_range);
   status = napi_create_string_utf8(env,
     (enumName != nullptr) ? (char*) enumName : "unknown", NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
@@ -494,7 +494,7 @@ napi_value setCodecParColorRange(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   int enumValue;
@@ -523,7 +523,7 @@ napi_value setCodecParColorRange(napi_env env, napi_callback_info info) {
   if (enumValue < 0) {
     NAPI_THROW_ERROR("Codec parameter color_range is not recognised. One of 'tv' or 'pc'?");
   }
-  c->codecPars->color_range = (AVColorRange) enumValue;
+  c->color_range = (AVColorRange) enumValue;
 
   free(enumString);
 
@@ -535,13 +535,13 @@ napi_value setCodecParColorRange(napi_env env, napi_callback_info info) {
 napi_value getCodecParColorPrims(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  enumName = av_color_primaries_name(c->codecPars->color_primaries);
+  enumName = av_color_primaries_name(c->color_primaries);
   status = napi_create_string_utf8(env,
     (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
@@ -554,7 +554,7 @@ napi_value setCodecParColorPrims(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   int enumValue;
@@ -583,7 +583,7 @@ napi_value setCodecParColorPrims(napi_env env, napi_callback_info info) {
   if (enumValue < 0) {
     NAPI_THROW_ERROR("Codec parameter color_primaries is not recognised. Did you mean e.g. 'bt709'?");
   }
-  c->codecPars->color_primaries = (AVColorPrimaries) enumValue;
+  c->color_primaries = (AVColorPrimaries) enumValue;
 
   free(enumString);
 
@@ -595,13 +595,13 @@ napi_value setCodecParColorPrims(napi_env env, napi_callback_info info) {
 napi_value getCodecParColorTrc(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  enumName = av_color_transfer_name(c->codecPars->color_trc);
+  enumName = av_color_transfer_name(c->color_trc);
   status = napi_create_string_utf8(env,
     (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
@@ -614,7 +614,7 @@ napi_value setCodecParColorTrc(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   int enumValue;
@@ -643,7 +643,7 @@ napi_value setCodecParColorTrc(napi_env env, napi_callback_info info) {
   if (enumValue < 0) {
     NAPI_THROW_ERROR("Codec parameter color_trc is not recognised. Did you mean e.g. 'bt709'?");
   }
-  c->codecPars->color_trc = (AVColorTransferCharacteristic) enumValue;
+  c->color_trc = (AVColorTransferCharacteristic) enumValue;
 
   free(enumString);
 
@@ -655,13 +655,13 @@ napi_value setCodecParColorTrc(napi_env env, napi_callback_info info) {
 napi_value getCodecParColorSpace(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  enumName = av_color_space_name(c->codecPars->color_space);
+  enumName = av_color_space_name(c->color_space);
   status = napi_create_string_utf8(env,
     (enumName != nullptr) ? (char*) enumName : "unknown",
     NAPI_AUTO_LENGTH, &result);
@@ -674,7 +674,7 @@ napi_value setCodecParColorSpace(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   int enumValue;
@@ -703,7 +703,7 @@ napi_value setCodecParColorSpace(napi_env env, napi_callback_info info) {
   if (enumValue < 0) {
     NAPI_THROW_ERROR("Codec parameter color_space is not recognised. Did you mean e.g. 'bt709'?");
   }
-  c->codecPars->color_space = (AVColorSpace) enumValue;
+  c->color_space = (AVColorSpace) enumValue;
 
   free(enumString);
 
@@ -715,13 +715,13 @@ napi_value setCodecParColorSpace(napi_env env, napi_callback_info info) {
 napi_value getCodecParChromaLoc(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* enumName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  enumName = av_chroma_location_name(c->codecPars->chroma_location);
+  enumName = av_chroma_location_name(c->chroma_location);
   status = napi_create_string_utf8(env,
     (enumName != nullptr) ? (char*) enumName : "unspecified",
     NAPI_AUTO_LENGTH, &result);
@@ -734,7 +734,7 @@ napi_value setCodecParChromaLoc(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   int enumValue;
@@ -763,7 +763,7 @@ napi_value setCodecParChromaLoc(napi_env env, napi_callback_info info) {
   if (enumValue < 0) {
     NAPI_THROW_ERROR("Codec parameter chroma_location is not recognised. Did you mean e.g. 'left'?");
   }
-  c->codecPars->chroma_location = (AVChromaLocation) enumValue;
+  c->chroma_location = (AVChromaLocation) enumValue;
 
   free(enumString);
 
@@ -775,14 +775,14 @@ napi_value setCodecParChromaLoc(napi_env env, napi_callback_info info) {
 napi_value getCodecParChanLayout(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   char enumName[64];
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  av_get_channel_layout_string(enumName, 64, c->codecPars->channels,
-    c->codecPars->channel_layout);
+  av_get_channel_layout_string(enumName, 64, c->channels,
+    c->channel_layout);
   status = napi_create_string_utf8(env, enumName, NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
 
@@ -793,7 +793,7 @@ napi_value setCodecParChanLayout(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
 
@@ -816,7 +816,7 @@ napi_value setCodecParChanLayout(napi_env env, napi_callback_info info) {
   status = napi_get_value_string_utf8(env, args[0], enumString, strLen + 1, &strLen);
   CHECK_STATUS;
 
-  c->codecPars->channel_layout = av_get_channel_layout((const char *) enumString);
+  c->channel_layout = av_get_channel_layout((const char *) enumString);
   free(enumString);
 
   status = napi_get_undefined(env, &result);
@@ -827,12 +827,12 @@ napi_value setCodecParChanLayout(napi_env env, napi_callback_info info) {
 napi_value getCodecParBitsPerCodedSmp(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->bits_per_coded_sample, &result);
+  status = napi_create_int32(env, c->bits_per_coded_sample, &result);
   CHECK_STATUS;
   return result;
 }
@@ -841,7 +841,7 @@ napi_value setCodecParBitsPerCodedSmp(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -856,7 +856,7 @@ napi_value setCodecParBitsPerCodedSmp(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter bits_per_coded_sample must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->bits_per_coded_sample);
+  status = napi_get_value_int32(env, args[0], &c->bits_per_coded_sample);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -867,12 +867,12 @@ napi_value setCodecParBitsPerCodedSmp(napi_env env, napi_callback_info info) {
 napi_value getCodecParBitsPerRawSmp(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->bits_per_raw_sample, &result);
+  status = napi_create_int32(env, c->bits_per_raw_sample, &result);
   CHECK_STATUS;
   return result;
 }
@@ -881,7 +881,7 @@ napi_value setCodecParBitsPerRawSmp(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -896,7 +896,7 @@ napi_value setCodecParBitsPerRawSmp(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter bits_per_raw_sample must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->bits_per_raw_sample);
+  status = napi_get_value_int32(env, args[0], &c->bits_per_raw_sample);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -907,12 +907,12 @@ napi_value setCodecParBitsPerRawSmp(napi_env env, napi_callback_info info) {
 napi_value getCodecParLevel(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->level, &result);
+  status = napi_create_int32(env, c->level, &result);
   CHECK_STATUS;
   return result;
 }
@@ -921,7 +921,7 @@ napi_value setCodecParLevel(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -936,7 +936,7 @@ napi_value setCodecParLevel(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter level must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->level);
+  status = napi_get_value_int32(env, args[0], &c->level);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -947,12 +947,12 @@ napi_value setCodecParLevel(napi_env env, napi_callback_info info) {
 napi_value getCodecParWidth(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->width, &result);
+  status = napi_create_int32(env, c->width, &result);
   CHECK_STATUS;
   return result;
 }
@@ -961,7 +961,7 @@ napi_value setCodecParWidth(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -976,7 +976,7 @@ napi_value setCodecParWidth(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter width must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->width);
+  status = napi_get_value_int32(env, args[0], &c->width);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -987,12 +987,12 @@ napi_value setCodecParWidth(napi_env env, napi_callback_info info) {
 napi_value getCodecParHeight(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->height, &result);
+  status = napi_create_int32(env, c->height, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1001,7 +1001,7 @@ napi_value setCodecParHeight(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1016,7 +1016,7 @@ napi_value setCodecParHeight(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter height must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->height);
+  status = napi_get_value_int32(env, args[0], &c->height);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1027,12 +1027,12 @@ napi_value setCodecParHeight(napi_env env, napi_callback_info info) {
 napi_value getCodecParVideoDelay(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->video_delay, &result);
+  status = napi_create_int32(env, c->video_delay, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1041,7 +1041,7 @@ napi_value setCodecParVideoDelay(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1056,7 +1056,7 @@ napi_value setCodecParVideoDelay(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter video_delay must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->video_delay);
+  status = napi_get_value_int32(env, args[0], &c->video_delay);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1068,12 +1068,12 @@ napi_value setCodecParVideoDelay(napi_env env, napi_callback_info info) {
 napi_value getCodecParChannels(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->channels, &result);
+  status = napi_create_int32(env, c->channels, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1082,7 +1082,7 @@ napi_value setCodecParChannels(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1097,7 +1097,7 @@ napi_value setCodecParChannels(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter channels must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->channels);
+  status = napi_get_value_int32(env, args[0], &c->channels);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1108,12 +1108,12 @@ napi_value setCodecParChannels(napi_env env, napi_callback_info info) {
 napi_value getCodecParSampleRate(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->sample_rate, &result);
+  status = napi_create_int32(env, c->sample_rate, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1122,7 +1122,7 @@ napi_value setCodecParSampleRate(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1137,7 +1137,7 @@ napi_value setCodecParSampleRate(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter sample_rate must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->sample_rate);
+  status = napi_get_value_int32(env, args[0], &c->sample_rate);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1148,12 +1148,12 @@ napi_value setCodecParSampleRate(napi_env env, napi_callback_info info) {
 napi_value getCodecParBlockAlign(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->block_align, &result);
+  status = napi_create_int32(env, c->block_align, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1162,7 +1162,7 @@ napi_value setCodecParBlockAlign(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1177,7 +1177,7 @@ napi_value setCodecParBlockAlign(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter block_align must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->block_align);
+  status = napi_get_value_int32(env, args[0], &c->block_align);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1189,12 +1189,12 @@ napi_value setCodecParBlockAlign(napi_env env, napi_callback_info info) {
 napi_value getCodecParFrameSize(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->frame_size, &result);
+  status = napi_create_int32(env, c->frame_size, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1203,7 +1203,7 @@ napi_value setCodecParFrameSize(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1218,7 +1218,7 @@ napi_value setCodecParFrameSize(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter frame_size must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->frame_size);
+  status = napi_get_value_int32(env, args[0], &c->frame_size);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1229,12 +1229,12 @@ napi_value setCodecParFrameSize(napi_env env, napi_callback_info info) {
 napi_value getCodecParInitialPad(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->initial_padding, &result);
+  status = napi_create_int32(env, c->initial_padding, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1243,7 +1243,7 @@ napi_value setCodecParInitialPad(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1258,7 +1258,7 @@ napi_value setCodecParInitialPad(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter initial_padding must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->initial_padding);
+  status = napi_get_value_int32(env, args[0], &c->initial_padding);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1269,12 +1269,12 @@ napi_value setCodecParInitialPad(napi_env env, napi_callback_info info) {
 napi_value getCodecParTrailingPad(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->trailing_padding, &result);
+  status = napi_create_int32(env, c->trailing_padding, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1283,7 +1283,7 @@ napi_value setCodecParTrailingPad(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1298,7 +1298,7 @@ napi_value setCodecParTrailingPad(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter trailing_padding must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->trailing_padding);
+  status = napi_get_value_int32(env, args[0], &c->trailing_padding);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1309,12 +1309,12 @@ napi_value setCodecParTrailingPad(napi_env env, napi_callback_info info) {
 napi_value getCodecParSeekPreroll(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  status = napi_create_int32(env, c->codecPars->seek_preroll, &result);
+  status = napi_create_int32(env, c->seek_preroll, &result);
   CHECK_STATUS;
   return result;
 }
@@ -1323,7 +1323,7 @@ napi_value setCodecParSeekPreroll(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
 
   size_t argc = 1;
   napi_value args[1];
@@ -1338,7 +1338,7 @@ napi_value setCodecParSeekPreroll(napi_env env, napi_callback_info info) {
   if (type != napi_number) {
     NAPI_THROW_ERROR("Codec parameter seek_preroll must be set with a number.");
   }
-  status = napi_get_value_int32(env, args[0], &c->codecPars->seek_preroll);
+  status = napi_get_value_int32(env, args[0], &c->seek_preroll);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1349,18 +1349,18 @@ napi_value setCodecParSeekPreroll(napi_env env, napi_callback_info info) {
 napi_value getCodecParProfile(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
-  codecParData* c;
+  AVCodecParameters* c;
   const char* profName;
 
   status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &c);
   CHECK_STATUS;
 
-  profName = avcodec_profile_name(c->codecPars->codec_id, c->codecPars->profile);
+  profName = avcodec_profile_name(c->codec_id, c->profile);
   if (profName != nullptr) {
     status = napi_create_string_utf8(env, (char*) profName, NAPI_AUTO_LENGTH, &result);
     CHECK_STATUS;
   } else {
-    status = napi_create_int32(env, c->codecPars->profile, &result);
+    status = napi_create_int32(env, c->profile, &result);
     CHECK_STATUS;
   }
 
@@ -1371,7 +1371,7 @@ napi_value setCodecParProfile(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
   napi_valuetype type;
-  codecParData* c;
+  AVCodecParameters* c;
   char* enumString;
   size_t strLen;
   const AVProfile* profile;
@@ -1388,7 +1388,7 @@ napi_value setCodecParProfile(napi_env env, napi_callback_info info) {
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
   if (type == napi_number) {
-    status = napi_get_value_int32(env, args[0], &c->codecPars->profile);
+    status = napi_get_value_int32(env, args[0], &c->profile);
     CHECK_STATUS;
     goto done;
   }
@@ -1402,12 +1402,12 @@ napi_value setCodecParProfile(napi_env env, napi_callback_info info) {
   status = napi_get_value_string_utf8(env, args[0], enumString, strLen + 1, &strLen);
   CHECK_STATUS;
 
-  codecDesc = avcodec_descriptor_get(c->codecPars->codec_id);
+  codecDesc = avcodec_descriptor_get(c->codec_id);
   if (codecDesc == nullptr) goto done;
   profile = codecDesc->profiles;
   while (profile->profile != FF_PROFILE_UNKNOWN) {
     if (strcmp(enumString, profile->name) == 0) {
-      c->codecPars->profile = profile->profile;
+      c->profile = profile->profile;
       break;
     }
     profile = profile + 1;
@@ -1426,8 +1426,7 @@ napi_value makeCodecParameters(napi_env env, napi_callback_info info) {
   napi_value result, global, jsObject, assign;
   napi_valuetype type;
   bool isArray;
-  codecParData* c = new codecParData;
-  c->codecPars = avcodec_parameters_alloc();
+  AVCodecParameters* c = avcodec_parameters_alloc();
 
   size_t argc = 1;
   napi_value args[1];
@@ -1447,7 +1446,7 @@ napi_value makeCodecParameters(napi_env env, napi_callback_info info) {
     }
   }
 
-  status = fromAVCodecParameters(env, c, &result);
+  status = fromAVCodecParameters(env, c, true, &result);
   CHECK_STATUS;
 
   if (argc == 1) {
@@ -1465,7 +1464,7 @@ napi_value makeCodecParameters(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_status fromAVCodecParameters(napi_env env, codecParData* c, napi_value* result) {
+napi_status fromAVCodecParameters(napi_env env, AVCodecParameters* c, bool ownAlloc, napi_value* result) {
   napi_status status;
   napi_value jsCodecPar, extCodecPar, typeName;
 
@@ -1473,7 +1472,7 @@ napi_status fromAVCodecParameters(napi_env env, codecParData* c, napi_value* res
   PASS_STATUS;
   status = napi_create_string_utf8(env, "CodecParameters", NAPI_AUTO_LENGTH, &typeName);
   PASS_STATUS;
-  status = napi_create_external(env, c, codecParDataFinalizer, nullptr, &extCodecPar);
+  status = napi_create_external(env, c, ownAlloc?codecParamsFinalizer:nullptr, nullptr, &extCodecPar);
   PASS_STATUS;
 
   napi_property_descriptor desc[] = {
@@ -1544,7 +1543,7 @@ napi_status fromAVCodecParameters(napi_env env, codecParData* c, napi_value* res
   return napi_ok;
 };
 
-void codecParDataFinalizer(napi_env env, void* data, void* hint) {
-  codecParData* c = (codecParData*) data;
-  delete c;
+void codecParamsFinalizer(napi_env env, void* data, void* hint) {
+  AVCodecParameters* c = (AVCodecParameters*) data;
+  avcodec_parameters_free(&c);
 }
