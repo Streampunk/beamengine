@@ -35,8 +35,6 @@ extern "C" {
   #include <libavformat/avformat.h>
 }
 
-// void decoderExecute(napi_env env, void* data);
-// void decoderComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value decoder(napi_env env, napi_callback_info info);
 
 void decodeExecute(napi_env env, void* data);

@@ -21,110 +21,6 @@
 
 #include "decode.h"
 
-/* void decoderExecute(napi_env env, void* data) {
-  decoderCarrier* c = (decoderCarrier*) data;
-  const AVCodec* codec = nullptr;
-  int ret;
-  const AVCodecDescriptor* codecDesc = nullptr;
-  HR_TIME_POINT decodeStart = NOW;
-
-  codec = (c->codecID == -1) ?
-    avcodec_find_decoder_by_name(c->codecName) :
-    avcodec_find_decoder((AVCodecID) c->codecID);
-  if ((codec == nullptr) && (c->codecID == -1)) { // one more go via codec descriptor
-    codecDesc = avcodec_descriptor_get_by_name(c->codecName);
-    if (codecDesc != nullptr) {
-      codec = avcodec_find_decoder(codecDesc->id);
-    }
-  }
-  if (codec == nullptr) {
-    c->status = BEAMCODER_ERROR_ALLOC_DECODER;
-    c->errorMsg = "Failed to find a decoder from it's name.";
-    return;
-  }
-  c->decoder = avcodec_alloc_context3(codec);
-  if (c->decoder == nullptr) {
-    c->status = BEAMCODER_ERROR_ALLOC_DECODER;
-    c->errorMsg = "Problem allocating decoder context.";
-    return;
-  }
-  if (c->params != nullptr) {
-    if ((ret = avcodec_parameters_to_context(c->decoder, c->params))) {
-      printf("DEBUG: Failed to set context parameters from those provided.");
-    }
-  }
-
-  c->totalTime = microTime(decodeStart);
-  printf("Setting up a decoder took %i\n", c->totalTime);
-} */
-
-/* void decoderComplete(napi_env env, napi_status asyncStatus, void* data) {
-  decoderCarrier* c = (decoderCarrier*) data;
-  napi_value result, value;
-
-  if (asyncStatus != napi_ok) {
-    c->status = asyncStatus;
-    c->errorMsg = "Decoder allocator failed to complete.";
-  }
-  REJECT_STATUS;
-
-  c->status = napi_create_object(env, &result);
-  REJECT_STATUS;
-
-  c->status = beam_set_string_utf8(env, result, "type", "decoder");
-  REJECT_STATUS;
-  c->status = beam_set_string_utf8(env, result, "name",
-    (char*) avcodec_get_name(c->decoder->codec_id));
-  REJECT_STATUS;
-
-  c->status = napi_get_reference_value(env, c->passthru, &value);
-  REJECT_STATUS;
-  c->status = setCodecFromProps(env, c->decoder, value, false);
-  REJECT_STATUS;
-
-  if (c->streamIdx != -1) {
-    c->status = napi_create_int32(env, c->streamIdx, &value);
-    REJECT_STATUS;
-    c->status = napi_set_named_property(env, result, "stream", value);
-    REJECT_STATUS;
-  }
-
-  c->status = napi_create_external(env, c->decoder, decoderFinalizer, nullptr, &value);
-  REJECT_STATUS;
-  c->decoder = nullptr;
-  c->status = napi_set_named_property(env, result, "_CodecContext", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
-    getDecProperties, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "getProperties", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
-    setDecProperties, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "setProperties", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "decode", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "flush", NAPI_AUTO_LENGTH,
-    flushDec, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "flush", value);
-  REJECT_STATUS;
-
-  napi_status status;
-  status = napi_resolve_deferred(env, c->_deferred, result);
-  FLOATING_STATUS;
-
-  tidyCarrier(env, c);
-} */
-
 napi_value decoder(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, value, formatJS, formatExt, global, jsObject, assign;
@@ -232,29 +128,18 @@ create:
     }
   }
 
-  /*status = napi_create_object(env, &result);
-  CHECK_BAIL; */
-
-/*  status = beam_set_string_utf8(env, result, "type", "decoder");
-  CHECK_BAIL;
-  status = beam_set_string_utf8(env, result, "name",
-    (char*) avcodec_get_name(decoder->codec_id));
-  CHECK_BAIL; */
-
-  /* c->status = napi_get_reference_value(env, c->passthru, &value);
-  REJECT_STATUS; */
   status = fromAVCodecContext(env, decoder, &result, false);
   CHECK_BAIL;
 
   status = napi_get_global(env, &global);
-  CHECK_STATUS;
+  CHECK_BAIL;
   status = napi_get_named_property(env, global, "Object", &jsObject);
-  CHECK_STATUS;
+  CHECK_BAIL;
   status = napi_get_named_property(env, jsObject, "assign", &assign);
-  CHECK_STATUS;
+  CHECK_BAIL;
   const napi_value fargs[] = { result, args[0] };
   status = napi_call_function(env, result, assign, 2, fargs, &result);
-  CHECK_STATUS;
+  CHECK_BAIL;
 
   // TODO is this needed?
   if (streamIdx != -1) {
@@ -264,44 +149,6 @@ create:
     CHECK_BAIL;
   }
 
-  /* status = napi_create_external(env, decoder, decoderFinalizer, nullptr, &value);
-  CHECK_BAIL;
-  status = napi_set_named_property(env, result, "_CodecContext", value);
-  CHECK_BAIL; */
-
-  /* status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
-    getDecProperties, nullptr, &value);
-  CHECK_BAIL;
-  status = napi_set_named_property(env, result, "getProperties", value);
-  CHECK_BAIL; */
-
-  /* status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
-    setDecProperties, nullptr, &value);
-  CHECK_BAIL;
-  status = napi_set_named_property(env, result, "setProperties", value);
-  CHECK_BAIL; */
-
-  /* status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
-  CHECK_BAIL;
-  status = napi_set_named_property(env, result, "decode", value);
-  CHECK_BAIL;
-
-  status = napi_create_function(env, "flush", NAPI_AUTO_LENGTH,
-    flushDec, nullptr, &value);
-  CHECK_BAIL;
-  status = napi_set_named_property(env, result, "flush", value);
-  CHECK_BAIL; */
-
-  /* c->status = napi_create_reference(env, args[0], 1, &c->passthru);
-  REJECT_RETURN;
-
-  c->status = napi_create_string_utf8(env, "Decoder", NAPI_AUTO_LENGTH, &resourceName);
-  REJECT_RETURN;
-  c->status = napi_create_async_work(env, nullptr, resourceName, decoderExecute,
-    decoderComplete, c, &c->_request);
-  REJECT_RETURN;
-  c->status = napi_queue_async_work(env, c->_request);
-  REJECT_RETURN; */
   if (decoder != nullptr) return result;
 
 bail:

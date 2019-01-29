@@ -21,33 +21,76 @@
 
 #include "encode.h"
 
-// TODO consider flattenning - no need to be async
-void encoderExecute(napi_env env, void* data) {
-  encoderCarrier* c = (encoderCarrier*) data;
+napi_value encoder(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value value, result, global, jsObject, assign;
+  napi_valuetype type;
+  bool isArray, hasName, hasID;
+  char* codecName;
+  size_t codecNameLen = 0;
+  int32_t codecID = -1;
   const AVCodec* codec = nullptr;
   const AVCodecDescriptor* codecDesc = nullptr;
-  // int ret;
-  HR_TIME_POINT encodeStart = NOW;
+  AVCodecContext* encoder;
 
-  c->codec = (c->codecID == -1) ?
-    avcodec_find_encoder_by_name(c->codecName) :
-    avcodec_find_encoder((AVCodecID) c->codecID);
-  if ((c->codec == nullptr) && (c->codecID == -1)) { // one more go via codec descriptor
-    codecDesc = avcodec_descriptor_get_by_name(c->codecName);
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  CHECK_STATUS;
+
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Encoder requires a single options object.");
+  }
+
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if ((type != napi_object) || (isArray == true)) {
+    NAPI_THROW_ERROR("Encoder must be configured with a single parameter, an options object.");
+  }
+
+  status = napi_has_named_property(env, args[0], "name", &hasName);
+  CHECK_STATUS;
+  status = napi_has_named_property(env, args[0], "codec_id", &hasID);
+  CHECK_STATUS;
+
+  if (!(hasName || hasID)) {
+    NAPI_THROW_ERROR("Decoder must be identified with a 'codec_id' or a 'name'.");
+  }
+
+  if (hasName) {
+    status = napi_get_named_property(env, args[0], "name", &value);
+    CHECK_STATUS;
+    codecNameLen = 64;
+    codecName = (char*) malloc(sizeof(char) * (codecNameLen + 1));
+    status = napi_get_value_string_utf8(env, value, codecName,
+      codecNameLen, &codecNameLen);
+    CHECK_STATUS;
+  }
+  else {
+    status = napi_get_named_property(env, args[0], "codec_id", &value);
+    CHECK_STATUS;
+    status = napi_get_value_int32(env, value, &codecID);
+    CHECK_STATUS;
+  }
+
+  codec = (codecID == -1) ?
+    avcodec_find_encoder_by_name(codecName) :
+    avcodec_find_encoder((AVCodecID) codecID);
+  if ((codec == nullptr) && (codecID == -1)) { // one more go via codec descriptor
+    codecDesc = avcodec_descriptor_get_by_name(codecName);
     if (codecDesc != nullptr) {
-      c->codec = avcodec_find_encoder(codecDesc->id);
+      codec = avcodec_find_encoder(codecDesc->id);
     }
   }
-  if (c->codec == nullptr) {
-    c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
-    c->errorMsg = "Failed to find an encoder from it's name or ID.";
-    return;
+  if (codec == nullptr) {
+    NAPI_THROW_ERROR("Failed to find an encoder from it's name or ID.");
   }
-  c->encoder = avcodec_alloc_context3(c->codec);
-  if (c->encoder == nullptr) {
-    c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
-    c->errorMsg = "Problem allocating encoder context.";
-    return;
+  encoder = avcodec_alloc_context3(codec);
+  if (encoder == nullptr) {
+    NAPI_THROW_ERROR("Problem allocating encoder context.");
   }
   // c->encoder->codec = c->codec;
   /* if (c->params != nullptr) {
@@ -55,140 +98,27 @@ void encoderExecute(napi_env env, void* data) {
       printf("DEBUG: Failed to set context parameters from those provided.");
     }
   } */
-  c->totalTime = microTime(encodeStart);
-  // printf("Setting up an encoder took %i\n", c->totalTime);
-};
+  status = fromAVCodecContext(env, encoder, &result, true);
+  CHECK_BAIL;
 
-void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {
-  encoderCarrier* c = (encoderCarrier*) data;
-  napi_value result;
+  status = napi_get_global(env, &global);
+  CHECK_BAIL;
+  status = napi_get_named_property(env, global, "Object", &jsObject);
+  CHECK_BAIL;
+  status = napi_get_named_property(env, jsObject, "assign", &assign);
+  CHECK_BAIL;
+  const napi_value fargs[] = { result, args[0] };
+  status = napi_call_function(env, result, assign, 2, fargs, &result);
+  CHECK_BAIL;
 
-  if (asyncStatus != napi_ok) {
-    c->status = asyncStatus;
-    c->errorMsg = "Encoder allocator failed to complete.";
+  if (encoder != nullptr) return result;
+
+bail:
+  if (decoder != nullptr) {
+    avcodec_close(encoder);
+    avcodec_free_context(&encoder);
   }
-  REJECT_STATUS;
-
-  /* c->status = napi_create_object(env, &result);
-  REJECT_STATUS;
-
-  c->status = beam_set_string_utf8(env, result, "type", "encoder");
-  REJECT_STATUS;
-  c->status = beam_set_string_utf8(env, result, "name", (char*) c->encoder->codec->name);
-  REJECT_STATUS; */
-
-  // c->status = napi_get_reference_value(env, c->passthru, &value);
-  // REJECT_STATUS;
-  // c->status = setCodecFromProps(env, c->encoder, value, true);
-  //REJECT_STATUS;
-  c->status = fromAVCodecContext(env, c->encoder, &result, true);
-  c->encoder = nullptr;
-  REJECT_STATUS;
-
-  /* c->status = napi_create_external(env, c->encoder, encoderFinalizer, nullptr, &value);
-  REJECT_STATUS;
-  c->encoder = nullptr;
-  c->status = napi_set_named_property(env, result, "_encoder", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
-    getEncProperties, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "getProperties", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
-    setEncProperties, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "setProperties", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "encode", NAPI_AUTO_LENGTH,
-    encode, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "encode", value);
-  REJECT_STATUS;
-
-  c->status = napi_create_function(env, "flush", NAPI_AUTO_LENGTH,
-    flushEnc, nullptr, &value);
-  REJECT_STATUS;
-  c->status = napi_set_named_property(env, result, "flush", value);
-  REJECT_STATUS; */
-
-  napi_status status;
-  status = napi_resolve_deferred(env, c->_deferred, result);
-  FLOATING_STATUS;
-
-  tidyCarrier(env, c);
-};
-
-napi_value encoder(napi_env env, napi_callback_info info) {
-  napi_value resourceName, promise, value;
-  napi_valuetype type;
-  encoderCarrier* c = new encoderCarrier;
-  bool isArray, hasName, hasID;
-
-  c->status = napi_create_promise(env, &c->_deferred, &promise);
-  REJECT_RETURN;
-
-  size_t argc = 1;
-  napi_value args[1];
-
-  c->status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  REJECT_RETURN;
-
-  if (argc != 1) {
-    REJECT_ERROR_RETURN("Encoder requires a single options object.",
-      BEAMCODER_INVALID_ARGS);
-  }
-
-  c->status = napi_typeof(env, args[0], &type);
-  REJECT_RETURN;
-  c->status = napi_is_array(env, args[0], &isArray);
-  REJECT_RETURN;
-  if ((type != napi_object) || (isArray == true)) {
-    REJECT_ERROR_RETURN("Encoder must be configured with a single parameter, an options object.",
-      BEAMCODER_INVALID_ARGS);
-  }
-
-  c->status = napi_has_named_property(env, args[0], "name", &hasName);
-  REJECT_RETURN;
-  c->status = napi_has_named_property(env, args[0], "codec_id", &hasID);
-  REJECT_RETURN;
-
-  if (!(hasName || hasID)) {
-    REJECT_ERROR_RETURN("Decoder must be identified with a 'codec_id' or a 'name'.",
-      BEAMCODER_INVALID_ARGS);
-  }
-
-  if (hasName) {
-    c->status = napi_get_named_property(env, args[0], "name", &value);
-    REJECT_RETURN;
-    c->codecNameLen = 64;
-    c->codecName = (char*) malloc(sizeof(char) * (c->codecNameLen + 1));
-    c->status = napi_get_value_string_utf8(env, value, c->codecName,
-      c->codecNameLen, &c->codecNameLen);
-    REJECT_RETURN;
-  }
-  else {
-    c->status = napi_get_named_property(env, args[0], "codec_id", &value);
-    REJECT_RETURN;
-    c->status = napi_get_value_int32(env, value, &c->codecID);
-    REJECT_RETURN;
-  }
-
-  c->status = napi_create_reference(env, args[0], 1, &c->passthru);
-  REJECT_RETURN;
-
-  c->status = napi_create_string_utf8(env, "Encoder", NAPI_AUTO_LENGTH, &resourceName);
-  REJECT_RETURN;
-  c->status = napi_create_async_work(env, nullptr, resourceName, encoderExecute,
-    encoderComplete, c, &c->_request);
-  REJECT_RETURN;
-  c->status = napi_queue_async_work(env, c->_request);
-  REJECT_RETURN;
-
-  return promise;
+  return nullptr;
 };
 
 void encoderFinalizer(napi_env env, void* data, void* hint) {

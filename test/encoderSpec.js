@@ -22,8 +22,8 @@
 const test = require('tape');
 const { beamcoder } = require('../index.js');
 
-test('Creating an encoder', async t => {
-  let enc = await beamcoder.encoder({ name: 'h264' });
+test('Creating an encoder', t => {
+  let enc = beamcoder.encoder({ name: 'h264' });
   t.ok(enc, 'is truthy.');
   t.equal(enc.name, 'libx264', 'has the expected name.');
   t.equal(enc.codec_id, 27, 'has the expected codec_id.');

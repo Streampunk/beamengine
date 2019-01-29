@@ -34,8 +34,6 @@ extern "C" {
   #include <libavformat/avformat.h>
 }
 
-void encoderExecute(napi_env env, void* data);
-void encoderComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value encoder(napi_env env, napi_callback_info info);
 
 void encodeExecute(napi_env env, void* data);
@@ -45,7 +43,7 @@ napi_value flushEnc(napi_env env, napi_callback_info info);
 
 void encoderFinalizer(napi_env env, void* data, void* hint);
 
-struct encoderCarrier : carrier {
+/* struct encoderCarrier : carrier {
   AVCodecContext* encoder;
   // AVCodecParameters* params = nullptr;
   const AVCodec* codec = nullptr;
@@ -58,7 +56,7 @@ struct encoderCarrier : carrier {
       avcodec_free_context(&encoder);
     }
 }
-};
+}; */
 
 struct encodeCarrier : carrier {
   AVCodecContext* encoder;
