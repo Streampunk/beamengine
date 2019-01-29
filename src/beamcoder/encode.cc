@@ -23,15 +23,17 @@
 
 napi_value encoder(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value value, result, global, jsObject, assign;
+  napi_value value, result, global, jsObject, assign, jsParams;
   napi_valuetype type;
-  bool isArray, hasName, hasID;
+  bool isArray, hasName, hasID, hasParams;
   char* codecName;
   size_t codecNameLen = 0;
   int32_t codecID = -1;
   const AVCodec* codec = nullptr;
   const AVCodecDescriptor* codecDesc = nullptr;
   AVCodecContext* encoder;
+  AVCodecParameters* codecParams = nullptr;
+  int ret;
 
   size_t argc = 1;
   napi_value args[1];
@@ -55,11 +57,29 @@ napi_value encoder(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   status = napi_has_named_property(env, args[0], "codec_id", &hasID);
   CHECK_STATUS;
+  status = napi_has_named_property(env, args[0], "params", &hasParams);
+  CHECK_STATUS;
 
-  if (!(hasName || hasID)) {
-    NAPI_THROW_ERROR("Decoder must be identified with a 'codec_id' or a 'name'.");
+  if (!(hasName || hasID || hasParams)) {
+    NAPI_THROW_ERROR("Decoder must be identified with a 'codec_id', a 'name' or 'params'.");
   }
 
+  if (hasParams) {
+    status = napi_get_named_property(env, args[0], "params", &value);
+    CHECK_STATUS;
+    status = napi_get_named_property(env, value, "_codecPar", &jsParams);
+    CHECK_STATUS;
+    status = napi_typeof(env, jsParams, &type);
+    CHECK_STATUS;
+    if (type != napi_external) {
+      NAPI_THROW_ERROR("The provided parameters do not appear to be a valid codec parameters object.");
+    }
+    status = napi_get_value_external(env, jsParams, (void**) &codecParams);
+    CHECK_STATUS;
+    codecName = nullptr;
+    codecID = codecParams->codec_id;
+    goto create;
+  }
   if (hasName) {
     status = napi_get_named_property(env, args[0], "name", &value);
     CHECK_STATUS;
@@ -76,6 +96,7 @@ napi_value encoder(napi_env env, napi_callback_info info) {
     CHECK_STATUS;
   }
 
+create:
   codec = (codecID == -1) ?
     avcodec_find_encoder_by_name(codecName) :
     avcodec_find_encoder((AVCodecID) codecID);
@@ -92,12 +113,14 @@ napi_value encoder(napi_env env, napi_callback_info info) {
   if (encoder == nullptr) {
     NAPI_THROW_ERROR("Problem allocating encoder context.");
   }
-  // c->encoder->codec = c->codec;
-  /* if (c->params != nullptr) {
-    if ((ret = avcodec_parameters_to_context(c->decoder, c->params))) {
-      printf("DEBUG: Failed to set context parameters from those provided.");
+  printf("About to get in here %i\n", codecParams == nullptr);
+  if (codecParams != nullptr) {
+    if ((ret = avcodec_parameters_to_context(encoder, (const AVCodecParameters*) codecParams))) {
+      NAPI_THROW_ERROR(avErrorMsg("Failed to set encoder paramters from provided params: ", ret));
     }
-  } */
+    printf("Params to context result: %i\n", ret);
+  }
+
   status = fromAVCodecContext(env, encoder, &result, true);
   CHECK_BAIL;
 

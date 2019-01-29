@@ -31,3 +31,29 @@ test('Creating an encoder', t => {
   t.equal(enc.type, 'encoder', 'has expected type name.');
   t.end();
 });
+
+test('Checking the A properties:', t => {
+  let enc = beamcoder.encoder({ name: 'h264' });
+
+  t.deepEqual(enc.active_thread_type, { FRAME: false, SLICE: false},
+    'active_thread_type has expected default.');
+  t.throws(() => { enc.active_thread_type = { FRAME: true }; }, /User cannot/,
+    'active_thread_type cannot be set.');
+
+  t.notOk(enc.apply_cropping, 'apply_cropping not defined for encoding.');
+  t.throws(() => { enc.apply_cropping = 0; }, /encoding/,
+    'apply_cropping setting does not throw.');
+
+  t.equals(enc.audio_service_type, 'main',
+    'audio_service_type has expected default value.');
+  t.doesNotThrow(() => { enc.audio_service_type = 'dialogue'; },
+    'audio_service_type can be updated.');
+  t.equals(enc.audio_service_type, 'dialogue',
+    'audio_service_type has been updated.');
+  t.throws(() => { enc.audio_service_type = 'wibble'; },
+    'audio_service_type throws with unknown value.');
+
+  t.end();
+});
+
+// TODO properties B to Z

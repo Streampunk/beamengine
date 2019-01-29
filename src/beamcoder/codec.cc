@@ -3949,7 +3949,7 @@ napi_value setCodecCtxAudioSvcType(napi_env env, napi_callback_info info) {
   if (enumValue != BEAM_ENUM_UNKNOWN) {
     codec->audio_service_type = (AVAudioServiceType) enumValue;
   } else {
-    NAPI_THROW_ERROR("Unknown value for audio_service_type.");
+    NAPI_THROW_ERROR("Unknown value for audio_service_type. Default is 'main'.");
   }
 
   status = napi_get_undefined(env, &result);
@@ -7314,9 +7314,11 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
       encoding ? encode : decode, nullptr, nullptr, nullptr, napi_enumerable, codec},
     { "flush", nullptr,
       encoding ? flushEnc : flushDec, nullptr, nullptr, nullptr, napi_enumerable, codec},
+    { "params", nullptr, nullptr, nullptr, nop, undef, // Set for muxing
+      napi_writable, nullptr},
     { "_CodecContext", nullptr, nullptr, nullptr, nullptr, extCodec, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsCodec, 135, desc);
+  status = napi_define_properties(env, jsCodec, 136, desc);
   PASS_STATUS;
 
   *result = jsCodec;
