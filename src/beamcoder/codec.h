@@ -24,6 +24,7 @@
 
 #include "node_api.h"
 #include "beamcoder_util.h"
+#include "decode.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -32,5 +33,7 @@ extern "C" {
 void codecContextFinalizer(napi_env env, void* data, void* hint);
 napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
     napi_value* result, bool encoding);
+napi_status fromAVCodecDescriptor(napi_env env, const AVCodecDescriptor* codecDesc,
+    napi_value *result);
 
 #endif // BEAM_CODEC_H

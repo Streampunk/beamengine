@@ -507,27 +507,7 @@ napi_status fromAVCodec(napi_env env, const AVCodec* codec, napi_value *result) 
 
   codecDesc = avcodec_descriptor_get(codec->id);
   if (codecDesc != nullptr) {
-    status = napi_create_object(env, &element);
-    PASS_STATUS;
-    status = beam_set_string_utf8(env, element, "type", "CodecDescriptor");
-    PASS_STATUS;
-    status = beam_set_string_utf8(env, element, "name", (char*) codecDesc->name);
-    PASS_STATUS;
-    status = napi_create_object(env, &props);
-    PASS_STATUS;
-    status = beam_set_bool(env, props, "INTRA_ONLY", codecDesc->props & AV_CODEC_PROP_INTRA_ONLY);
-    PASS_STATUS;
-    status = beam_set_bool(env, props, "LOSSY", codecDesc->props & AV_CODEC_PROP_LOSSY);
-    PASS_STATUS;
-    status = beam_set_bool(env, props, "LOSSLESS", codecDesc->props & AV_CODEC_PROP_LOSSLESS);
-    PASS_STATUS;
-    status = beam_set_bool(env, props, "REORDER", codecDesc->props & AV_CODEC_PROP_REORDER);
-    PASS_STATUS;
-    status = beam_set_bool(env, props, "BITMAP_SUB", codecDesc->props & AV_CODEC_PROP_BITMAP_SUB);
-    PASS_STATUS;
-    status = beam_set_bool(env, props, "TEXT_SUB", codecDesc->props & AV_CODEC_PROP_TEXT_SUB);
-    PASS_STATUS;
-    status = napi_set_named_property(env, element, "props", props);
+    status = fromAVCodecDescriptor(env, codecDesc, &element);
     PASS_STATUS;
     status = napi_set_named_property(env, value, "descriptor", element);
     PASS_STATUS;

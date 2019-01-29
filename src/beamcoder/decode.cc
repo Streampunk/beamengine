@@ -269,19 +269,19 @@ create:
   status = napi_set_named_property(env, result, "_CodecContext", value);
   CHECK_BAIL; */
 
-  status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
+  /* status = napi_create_function(env, "getProperties", NAPI_AUTO_LENGTH,
     getDecProperties, nullptr, &value);
   CHECK_BAIL;
   status = napi_set_named_property(env, result, "getProperties", value);
-  CHECK_BAIL;
+  CHECK_BAIL; */
 
-  status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
+  /* status = napi_create_function(env, "setProperties", NAPI_AUTO_LENGTH,
     setDecProperties, nullptr, &value);
   CHECK_BAIL;
   status = napi_set_named_property(env, result, "setProperties", value);
-  CHECK_BAIL;
+  CHECK_BAIL; */
 
-  status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
+  /* status = napi_create_function(env, "decode", NAPI_AUTO_LENGTH, decode, nullptr, &value);
   CHECK_BAIL;
   status = napi_set_named_property(env, result, "decode", value);
   CHECK_BAIL;
@@ -290,7 +290,7 @@ create:
     flushDec, nullptr, &value);
   CHECK_BAIL;
   status = napi_set_named_property(env, result, "flush", value);
-  CHECK_BAIL;
+  CHECK_BAIL; */
 
   /* c->status = napi_create_reference(env, args[0], 1, &c->passthru);
   REJECT_RETURN;
