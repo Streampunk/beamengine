@@ -29,26 +29,27 @@ void encoderExecute(napi_env env, void* data) {
   // int ret;
   HR_TIME_POINT encodeStart = NOW;
 
-  codec = (c->codecID == -1) ?
+  c->codec = (c->codecID == -1) ?
     avcodec_find_encoder_by_name(c->codecName) :
     avcodec_find_encoder((AVCodecID) c->codecID);
-  if ((codec == nullptr) && (c->codecID == -1)) { // one more go via codec descriptor
+  if ((c->codec == nullptr) && (c->codecID == -1)) { // one more go via codec descriptor
     codecDesc = avcodec_descriptor_get_by_name(c->codecName);
     if (codecDesc != nullptr) {
-      codec = avcodec_find_encoder(codecDesc->id);
+      c->codec = avcodec_find_encoder(codecDesc->id);
     }
   }
-  if (codec == nullptr) {
+  if (c->codec == nullptr) {
     c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
     c->errorMsg = "Failed to find an encoder from it's name or ID.";
     return;
   }
-  c->encoder = avcodec_alloc_context3(codec);
+  c->encoder = avcodec_alloc_context3(c->codec);
   if (c->encoder == nullptr) {
     c->status = BEAMCODER_ERROR_ALLOC_ENCODER;
     c->errorMsg = "Problem allocating encoder context.";
     return;
   }
+  // c->encoder->codec = c->codec;
   /* if (c->params != nullptr) {
     if ((ret = avcodec_parameters_to_context(c->decoder, c->params))) {
       printf("DEBUG: Failed to set context parameters from those provided.");
@@ -60,7 +61,7 @@ void encoderExecute(napi_env env, void* data) {
 
 void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   encoderCarrier* c = (encoderCarrier*) data;
-  napi_value result, value;
+  napi_value result;
 
   if (asyncStatus != napi_ok) {
     c->status = asyncStatus;
@@ -68,20 +69,23 @@ void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {
   }
   REJECT_STATUS;
 
-  c->status = napi_create_object(env, &result);
+  /* c->status = napi_create_object(env, &result);
   REJECT_STATUS;
 
   c->status = beam_set_string_utf8(env, result, "type", "encoder");
   REJECT_STATUS;
   c->status = beam_set_string_utf8(env, result, "name", (char*) c->encoder->codec->name);
+  REJECT_STATUS; */
+
+  // c->status = napi_get_reference_value(env, c->passthru, &value);
+  // REJECT_STATUS;
+  // c->status = setCodecFromProps(env, c->encoder, value, true);
+  //REJECT_STATUS;
+  c->status = fromAVCodecContext(env, c->encoder, &result, true);
+  c->encoder = nullptr;
   REJECT_STATUS;
 
-  c->status = napi_get_reference_value(env, c->passthru, &value);
-  REJECT_STATUS;
-  c->status = setCodecFromProps(env, c->encoder, value, true);
-  REJECT_STATUS;
-
-  c->status = napi_create_external(env, c->encoder, encoderFinalizer, nullptr, &value);
+  /* c->status = napi_create_external(env, c->encoder, encoderFinalizer, nullptr, &value);
   REJECT_STATUS;
   c->encoder = nullptr;
   c->status = napi_set_named_property(env, result, "_encoder", value);
@@ -109,7 +113,7 @@ void encoderComplete(napi_env env, napi_status asyncStatus, void* data) {
     flushEnc, nullptr, &value);
   REJECT_STATUS;
   c->status = napi_set_named_property(env, result, "flush", value);
-  REJECT_STATUS;
+  REJECT_STATUS; */
 
   napi_status status;
   status = napi_resolve_deferred(env, c->_deferred, result);
@@ -386,7 +390,7 @@ napi_value encode(napi_env env, napi_callback_info info) {
   return promise;
 };
 
-napi_value getEncProperties(napi_env env, napi_callback_info info) {
+/* napi_value getEncProperties(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, encoderJS, encoderExt;
   AVCodecContext* encoder;
@@ -411,9 +415,9 @@ napi_value getEncProperties(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   return result;
-};
+}; */
 
-napi_value setEncProperties(napi_env env, napi_callback_info info) {
+/* napi_value setEncProperties(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, encoderJS, encoderExt;
   napi_valuetype type;
@@ -443,8 +447,7 @@ napi_value setEncProperties(napi_env env, napi_callback_info info) {
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
-};
-
+}; */
 
 napi_status isFrame(napi_env env, napi_value packet) {
   napi_status status;

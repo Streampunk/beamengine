@@ -19,22 +19,15 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-#ifndef BEAM_CODEC_H
-#define BEAM_CODEC_H
+const test = require('tape');
+const { beamcoder } = require('../index.js');
 
-#include "node_api.h"
-#include "beamcoder_util.h"
-#include "decode.h"
-#include "encode.h"
-
-extern "C" {
-  #include <libavcodec/avcodec.h>
-}
-
-void codecContextFinalizer(napi_env env, void* data, void* hint);
-napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
-    napi_value* result, bool encoding);
-napi_status fromAVCodecDescriptor(napi_env env, const AVCodecDescriptor* codecDesc,
-    napi_value *result);
-
-#endif // BEAM_CODEC_H
+test('Creating an encoder', async t => {
+  let enc = await beamcoder.encoder({ name: 'h264' });
+  t.ok(enc, 'is truthy.');
+  t.equal(enc.name, 'libx264', 'has the expected name.');
+  t.equal(enc.codec_id, 27, 'has the expected codec_id.');
+  t.ok(typeof enc._CodecContext == 'object', 'external value present.');
+  t.equal(enc.type, 'encoder', 'has expected type name.');
+  t.end();
+});

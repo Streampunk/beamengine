@@ -25,6 +25,7 @@
 #include "beamcoder_util.h"
 #include "frame.h"
 #include "packet.h"
+#include "codec.h"
 #include <vector>
 
 extern "C" {
@@ -42,14 +43,12 @@ void encodeComplete(napi_env env, napi_status asyncStatus, void* data);
 napi_value encode(napi_env env, napi_callback_info info);
 napi_value flushEnc(napi_env env, napi_callback_info info);
 
-napi_value getEncProperties(napi_env env, napi_callback_info info);
-napi_value setEncProperties(napi_env env, napi_callback_info info);
-
 void encoderFinalizer(napi_env env, void* data, void* hint);
 
 struct encoderCarrier : carrier {
   AVCodecContext* encoder;
   // AVCodecParameters* params = nullptr;
+  const AVCodec* codec = nullptr;
   char* codecName;
   size_t codecNameLen = 0;
   int32_t codecID = -1;

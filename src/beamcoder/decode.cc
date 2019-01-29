@@ -585,7 +585,7 @@ napi_value flushDec(napi_env env, napi_callback_info info) {
   return promise;
 }
 
-napi_value getDecProperties(napi_env env, napi_callback_info info) {
+/* napi_value getDecProperties(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, decoderJS, decoderExt;
   AVCodecContext* decoder;
@@ -610,9 +610,9 @@ napi_value getDecProperties(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   return result;
-}
+} */
 
-napi_value setDecProperties(napi_env env, napi_callback_info info) {
+/* napi_value setDecProperties(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result, decoderJS, decoderExt;
   napi_valuetype type;
@@ -642,4 +642,4 @@ napi_value setDecProperties(napi_env env, napi_callback_info info) {
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
-};
+}; */

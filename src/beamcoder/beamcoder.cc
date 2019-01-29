@@ -252,40 +252,6 @@ napi_value licenses(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_value testSetProps(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVCodec* codec;
-  AVCodecContext* codecCtx;
-  bool encoding = false;
-
-  size_t argc = 2;
-  napi_value args[2];
-  status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  CHECK_STATUS;
-
-  if (argc < 1) NAPI_THROW_ERROR("Arguments object must be provided.");
-
-  if (argc == 2) {
-    status = napi_get_value_bool(env, args[1], &encoding);
-    // If it fails, PA!
-  }
-
-  codec = avcodec_find_encoder_by_name("libx264");
-  codecCtx = avcodec_alloc_context3(codec);
-
-  // av_opt_set_int(codecCtx->priv_data, "motion-est", 1, 0);
-
-  status = setCodecFromProps(env, codecCtx, args[0], encoding);
-  CHECK_STATUS;
-
-  status = napi_create_object(env, &result);
-  CHECK_STATUS;
-
-  status = getPropsFromCodec(env, result, codecCtx, encoding);
-  return result;
-}
-
 napi_status fromAVCodec(napi_env env, const AVCodec* codec, napi_value *result) {
   napi_status status;
   napi_value array, element, subel, value, props, nullval;

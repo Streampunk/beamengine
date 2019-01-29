@@ -7310,8 +7310,10 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
       encoding ? nullptr : getCodecCtxExtraHwFrames,
       encoding ? failEncoding : setCodecCtxExtraHwFrames, nullptr,
       encoding ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), codec},
-    { "decode", nullptr, decode, nullptr, nullptr, nullptr, napi_enumerable, codec},
-    { "flush", nullptr, flushDec, nullptr, nullptr, nullptr, napi_enumerable, codec},
+    { encoding ? "encode" : "decode", nullptr,
+      encoding ? encode : decode, nullptr, nullptr, nullptr, napi_enumerable, codec},
+    { "flush", nullptr,
+      encoding ? flushEnc : flushDec, nullptr, nullptr, nullptr, napi_enumerable, codec},
     { "_CodecContext", nullptr, nullptr, nullptr, nullptr, extCodec, napi_default, nullptr }
   };
   status = napi_define_properties(env, jsCodec, 135, desc);

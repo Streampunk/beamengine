@@ -123,11 +123,6 @@ int32_t rejectStatus(napi_env env, carrier* c, char* file, int32_t line);
 napi_value nop(napi_env env, napi_callback_info info);
 char* avErrorMsg(const char* base, int avErrorCode);
 
-napi_status getPropsFromCodec(napi_env env, napi_value target,
-    AVCodecContext* codec, bool encoding);
-napi_status setCodecFromProps(napi_env env, AVCodecContext* codec,
-    napi_value props, bool encoding);
-
 napi_status beam_set_uint32(napi_env env, napi_value target, char* name, uint32_t value);
 napi_status beam_get_uint32(napi_env env, napi_value target, char* name, uint32_t* value);
 napi_status beam_set_int32(napi_env env, napi_value target, char* name, int32_t value);
