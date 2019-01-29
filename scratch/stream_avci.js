@@ -23,17 +23,20 @@ const { beamcoder, createDemuxer } = require('../index.js');
 const fs = require('fs');
 
 async function run() {
-  const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
-  let demuxer = await createDemuxer(srcStream);
+  // const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
+  // let demuxer = await createDemuxer(srcStream);
+  let demuxer = await createDemuxer('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
+  // console.log(demuxer);
 
   let decoder = await beamcoder.decoder({ name: 'h264' });
+  // console.log(decoder);
 
   const vidStream = demuxer.streams[0];
   let filterer = await beamcoder.filterer({
     filterType: 'video',
     inputParams: [
       {
-        name: '0:v',
+        name: 'in0:v',
         width: vidStream.codecpar.width,
         height: vidStream.codecpar.height,
         pixelFormat: vidStream.codecpar.format,
@@ -41,7 +44,7 @@ async function run() {
         pixelAspect: vidStream.sample_aspect_ratio,
       },
       {
-        name: '1:v',
+        name: 'in1:v',
         width: vidStream.codecpar.width,
         height: vidStream.codecpar.height,
         pixelFormat: vidStream.codecpar.format,
@@ -49,11 +52,11 @@ async function run() {
         pixelAspect: vidStream.sample_aspect_ratio,
       }
     ],
-    filterSpec: '[0:v] scale=1280:720 [left]; [1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out]'
+    outputNames: [ 'out0:v' ],
+    filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]'
   });
-
-  console.log(decoder);
-  console.log(filterer);
+  // console.log(filterer.graph.filters);
+  console.log(filterer.graph.dump());
 
   let encParams = {
     name: 'libx264',
@@ -74,25 +77,24 @@ async function run() {
   };
 
   let encoder = await beamcoder.encoder(encParams);
-  console.log(encoder);
-  console.log(encoder.getProperties());
+  // console.log(encoder);
 
   let outFile = fs.createWriteStream('wibble.h264');
 
-  for ( let x = 0 ; x < 100000 ; x++ ) {
+  for ( let x = 0 ; x < 1000 ; x++ ) {
     let packet = await demuxer.read();
     if (packet.stream_index == 0) {
       // console.log(packet);
       let frames = await decoder.decode(packet);
       // console.log(frames);
       let filtFrames = await filterer.filter([
-        { name: '0:v', frames: frames },
-        { name: '1:v', frames: frames },
+        { name: 'in0:v', frames: frames },
+        { name: 'in1:v', frames: frames },
       ]);
       // console.log(filtFrames);
 
-      let packets = await encoder.encode(filtFrames.frames[0]);
-      console.log(x, packets.totalTime);
+      let packets = await encoder.encode(filtFrames[0].frames[0]);
+      // console.log(x, packets.totalTime);
       packets.packets.forEach(x => outFile.write(x.data));
     }
   }
