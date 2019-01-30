@@ -276,7 +276,7 @@ napi_value encode(napi_env env, napi_callback_info info) {
 
   c->status = napi_get_cb_info(env, info, &argc, args, &encoderJS, nullptr);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, encoderJS, "_encoder", &encoderExt);
+  c->status = napi_get_named_property(env, encoderJS, "_CodecContext", &encoderExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, encoderExt, (void**) &c->encoder);
   REJECT_RETURN;
@@ -462,7 +462,7 @@ napi_value flushEnc(napi_env env, napi_callback_info info) {
 
   c->status = napi_get_cb_info(env, info, &argc, args, &encoderJS, nullptr);
   REJECT_RETURN;
-  c->status = napi_get_named_property(env, encoderJS, "_encoder", &encoderExt);
+  c->status = napi_get_named_property(env, encoderJS, "_CodecContext", &encoderExt);
   REJECT_RETURN;
   c->status = napi_get_value_external(env, encoderExt, (void**) &c->encoder);
   REJECT_RETURN;
