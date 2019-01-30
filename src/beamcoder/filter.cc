@@ -33,6 +33,711 @@ extern "C" {
   #include <libavfilter/buffersrc.h>
 }
 
+napi_value getFilterName(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilter* filter;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env, filter->name, NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getFilterDesc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilter* filter;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env, filter->description, NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_status fromAVFilterPad(napi_env env, const AVFilterPad* filterPads, uint32_t padsIndex, napi_value* result) {
+  napi_status status;
+  napi_value nameVal, typeVal;
+
+  status = napi_create_object(env, result);
+  PASS_STATUS;
+
+  status = napi_create_string_utf8(env, avfilter_pad_get_name(filterPads, padsIndex), NAPI_AUTO_LENGTH, &nameVal);
+  PASS_STATUS;
+
+  status = napi_create_string_utf8(env, av_get_media_type_string(avfilter_pad_get_type(filterPads, padsIndex)), 
+                                   NAPI_AUTO_LENGTH, &typeVal);
+  PASS_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "name", nullptr, nullptr, nullptr, nullptr, nameVal, napi_enumerable, nullptr },
+    { "type", nullptr, nullptr, nullptr, nullptr, typeVal, napi_enumerable, nullptr }
+  };
+  status = napi_define_properties(env, *result, 2, desc);
+  PASS_STATUS;
+
+  return napi_ok;
+}
+
+napi_value getFilterInputPads(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  AVFilter* filter;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
+  CHECK_STATUS;
+
+  uint32_t numInputs = avfilter_pad_count(filter->inputs);
+  if (0 == numInputs) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for (uint32_t i = 0; i < numInputs; ++i) {
+      status = fromAVFilterPad(env, filter->inputs, i, &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, i, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value getFilterOutputPads(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  AVFilter* filter;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
+  CHECK_STATUS;
+
+  uint32_t numOutputs = avfilter_pad_count(filter->outputs);
+  if (0 == numOutputs) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for (uint32_t i = 0; i < numOutputs; ++i) {
+      status = fromAVFilterPad(env, filter->outputs, i, &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, i, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value getFilterPrivClass(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilter* filter;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
+  CHECK_STATUS;
+
+  if (filter->priv_class != nullptr)
+    status = fromAVClass(env, filter->priv_class, &result);
+  else
+    status = napi_get_null(env, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getFilterFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilter* filter;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+
+  status = beam_set_bool(env, result, "DYNAMIC_INPUTS",
+    (filter->flags & AVFILTER_FLAG_DYNAMIC_INPUTS) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DYNAMIC_OUTPUTS",
+    (filter->flags & AVFILTER_FLAG_DYNAMIC_OUTPUTS) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "SLICE_THREADS",
+    (filter->flags & AVFILTER_FLAG_SLICE_THREADS) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "SUPPORT_TIMELINE_GENERIC",
+    (filter->flags & AVFILTER_FLAG_SUPPORT_TIMELINE_GENERIC) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "SUPPORT_TIMELINE_INTERNAL",
+    (filter->flags & AVFILTER_FLAG_SUPPORT_TIMELINE_INTERNAL) != 0);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "SUPPORT_TIMELINE",
+    (filter->flags & (AVFILTER_FLAG_SUPPORT_TIMELINE_GENERIC | AVFILTER_FLAG_SUPPORT_TIMELINE_INTERNAL)) != 0);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_status fromAVFilter(napi_env env, const AVFilter* filter, napi_value* result) {
+  napi_status status;
+  napi_value typeName;
+
+  status = napi_create_object(env, result);
+  PASS_STATUS;
+  status = napi_create_string_utf8(env, "Filter", NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
+    { "name", nullptr, nullptr, getFilterName, nullptr, nullptr, napi_enumerable, (void*)filter },
+    { "description", nullptr, nullptr, getFilterDesc, nullptr, nullptr, napi_enumerable, (void*)filter },
+    { "input_pads", nullptr, nullptr, getFilterInputPads, nullptr, nullptr, napi_enumerable, (void*)filter },
+    { "output_pads", nullptr, nullptr, getFilterOutputPads, nullptr, nullptr, napi_enumerable, (void*)filter },
+    { "priv_class", nullptr, nullptr, getFilterPrivClass, nullptr, nullptr, napi_enumerable, (void*)filter },
+    { "flags", nullptr, nullptr, getFilterFlags, nullptr, nullptr, napi_enumerable, (void*)filter }
+  };
+  status = napi_define_properties(env, *result, 7, desc);
+  PASS_STATUS;
+
+  return napi_ok;
+}
+
+napi_value getFilter(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  status = fromAVFilter(env, filterContext->filter, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getFilterContextName(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env, filterContext->name, NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getFiltCtxInputPads(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  uint32_t numInputs = avfilter_pad_count(filterContext->input_pads);
+  if (0 == numInputs) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for (uint32_t i = 0; i < numInputs; ++i) {
+      status = fromAVFilterPad(env, filterContext->input_pads, i, &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, i, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value getLinkSrc(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value strVal;
+  status = napi_create_string_utf8(env, filterLink->src->name, NAPI_AUTO_LENGTH, &strVal);
+  CHECK_STATUS;
+
+  return strVal;
+}
+
+napi_value getLinkSrcPad(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value strVal;
+  status = napi_create_string_utf8(env, avfilter_pad_get_name(filterLink->srcpad, 0), NAPI_AUTO_LENGTH, &strVal);
+  CHECK_STATUS;
+
+  return strVal;
+}
+
+napi_value getLinkDst(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value strVal;
+  status = napi_create_string_utf8(env, filterLink->dst->name, NAPI_AUTO_LENGTH, &strVal);
+  CHECK_STATUS;
+
+  return strVal;
+}
+
+napi_value getLinkDstPad(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value strVal;
+  status = napi_create_string_utf8(env, avfilter_pad_get_name(filterLink->dstpad, 0), NAPI_AUTO_LENGTH, &strVal);
+  CHECK_STATUS;
+
+  return strVal;
+}
+
+napi_value getLinkMediaType(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value strVal;
+  status = napi_create_string_utf8(env, av_get_media_type_string(filterLink->type), NAPI_AUTO_LENGTH, &strVal);
+  CHECK_STATUS;
+
+  return strVal;
+}
+
+napi_value getLinkVidWidth(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value widthVal;
+  status = napi_create_int32(env, filterLink->w, &widthVal);
+  CHECK_STATUS;
+
+  return widthVal;
+}
+
+napi_value getLinkVidHeight(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value heightVal;
+  status = napi_create_int32(env, filterLink->h, &heightVal);
+  CHECK_STATUS;
+
+  return heightVal;
+}
+
+napi_value getLinkSAR(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value pair, element;
+  status = napi_create_array(env, &pair);
+  CHECK_STATUS;
+  status = napi_create_int32(env, filterLink->sample_aspect_ratio.num, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, pair, 0, element);
+  CHECK_STATUS;
+  status = napi_create_int32(env, filterLink->sample_aspect_ratio.den, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, pair, 1, element);
+  CHECK_STATUS;
+
+  return pair;
+}
+
+napi_value getLinkChannelLayout(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  char channelLayoutStr[30];
+  av_get_channel_layout_string(channelLayoutStr, 30, -1, filterLink->channel_layout);
+
+  napi_value channelLayoutVal;
+  status = napi_create_string_utf8(env, channelLayoutStr, NAPI_AUTO_LENGTH, &channelLayoutVal);
+  CHECK_STATUS;
+
+  return channelLayoutVal;
+}
+
+napi_value getLinkSampleRate(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value sampleRateVal;
+  status = napi_create_int32(env, filterLink->sample_rate, &sampleRateVal);
+  CHECK_STATUS;
+
+  return sampleRateVal;
+}
+
+napi_value getLinkFormat(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  char *formatName;
+  switch (filterLink->type) {
+  case AVMEDIA_TYPE_VIDEO:
+    formatName = (char*)av_get_pix_fmt_name((AVPixelFormat)filterLink->format);
+    break;
+  case AVMEDIA_TYPE_AUDIO:
+    formatName = (char*)av_get_sample_fmt_name((AVSampleFormat)filterLink->format);
+    break;
+  default:
+    formatName = "unrecognised";
+  };
+
+  napi_value formatVal;
+  status = napi_create_string_utf8(env, formatName, NAPI_AUTO_LENGTH, &formatVal);
+  CHECK_STATUS;
+
+  return formatVal;
+}
+
+napi_value getLinkTimeBase(napi_env env, napi_callback_info info) {
+  napi_status status;
+  AVFilterLink* filterLink;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterLink);
+  CHECK_STATUS;
+
+  napi_value pair, element;
+  status = napi_create_array(env, &pair);
+  CHECK_STATUS;
+  status = napi_create_int32(env, filterLink->time_base.num, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, pair, 0, element);
+  CHECK_STATUS;
+  status = napi_create_int32(env, filterLink->time_base.den, &element);
+  CHECK_STATUS;
+  status = napi_set_element(env, pair, 1, element);
+  CHECK_STATUS;
+
+  return pair;
+}
+
+napi_status fromAVFilterLink(napi_env env, const AVFilterLink* link, napi_value* result) {
+
+  napi_status status = napi_create_object(env, result);
+  PASS_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "src", nullptr, nullptr, getLinkSrc, nullptr, nullptr, napi_enumerable, (void*)link },
+    { "srcpad", nullptr, nullptr, getLinkSrcPad, nullptr, nullptr, napi_enumerable, (void*)link },
+    { "dst", nullptr, nullptr, getLinkDst, nullptr, nullptr, napi_enumerable, (void*)link },
+    { "dstpad", nullptr, nullptr, getLinkDstPad, nullptr, nullptr, napi_enumerable, (void*)link },
+    { "type", nullptr, nullptr, getLinkMediaType, nullptr, nullptr, napi_enumerable, (void*)link },
+    { "w", nullptr, nullptr, getLinkVidWidth, nullptr, nullptr, 
+      (AVMEDIA_TYPE_VIDEO == link->type) ? napi_enumerable : napi_default, (void*)link },
+    { "h", nullptr, nullptr, getLinkVidHeight, nullptr, nullptr,
+      (AVMEDIA_TYPE_VIDEO == link->type) ? napi_enumerable : napi_default, (void*)link },
+    { "sample_aspect_ratio", nullptr, nullptr, getLinkSAR, nullptr, nullptr,
+      (AVMEDIA_TYPE_VIDEO == link->type) ? napi_enumerable : napi_default, (void*)link },
+    { "channel_layout", nullptr, nullptr, getLinkChannelLayout, nullptr, nullptr,
+      (AVMEDIA_TYPE_AUDIO == link->type) ? napi_enumerable : napi_default, (void*)link },
+    { "sample_rate", nullptr, nullptr, getLinkSampleRate, nullptr, nullptr,
+      (AVMEDIA_TYPE_AUDIO == link->type) ? napi_enumerable : napi_default, (void*)link },
+    { "format", nullptr, nullptr, getLinkFormat, nullptr, nullptr, napi_enumerable, (void*)link },
+    { "time_base", nullptr, nullptr, getLinkTimeBase, nullptr, nullptr, napi_enumerable, (void*)link }
+  };
+  status = napi_define_properties(env, *result, 12, desc);
+  PASS_STATUS;
+
+  return napi_ok;
+}
+
+napi_value getFiltCtxInputs(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  uint32_t numInputs = filterContext->nb_inputs;
+  if (0 == numInputs) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for (uint32_t i = 0; i < numInputs; ++i) {
+      status = fromAVFilterLink(env, filterContext->inputs[i], &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, i, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value getFiltCtxOutputPads(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  uint32_t numOutputs = avfilter_pad_count(filterContext->output_pads);
+  if (0 == numOutputs) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for (uint32_t i = 0; i < numOutputs; ++i) {
+      status = fromAVFilterPad(env, filterContext->output_pads, i, &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, i, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value getFiltCtxOutputs(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value array, element;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  uint32_t numOutputs = filterContext->nb_outputs;
+  if (0 == numOutputs) {
+    status = napi_get_null(env, &array);
+  } else {
+    status = napi_create_array(env, &array);
+    CHECK_STATUS;
+    for (uint32_t i = 0; i < numOutputs; ++i) {
+      status = fromAVFilterLink(env, filterContext->outputs[i], &element);
+      CHECK_STATUS;
+      status = napi_set_element(env, array, i, element);
+      CHECK_STATUS;
+    }
+  }
+
+  CHECK_STATUS;
+  return array;
+}
+
+napi_value getNumThreads(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  status = napi_create_uint32(env, filterContext->nb_threads, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getReady(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  status = napi_create_uint32(env, filterContext->ready, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getExtraHwFrames(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterContext* filterContext;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, filterContext->extra_hw_frames, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_status fromAVFilterCtx(napi_env env, AVFilterContext* filtCtx, napi_value* result) {
+  napi_status status;
+  napi_value typeName;
+
+  status = napi_create_object(env, result);
+  PASS_STATUS;
+  status = napi_create_string_utf8(env, "FilterContext", NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
+    { "filter", nullptr, nullptr, getFilter, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "name", nullptr, nullptr, getFilterContextName, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "input_pads", nullptr, nullptr, getFiltCtxInputPads, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "inputs", nullptr, nullptr, getFiltCtxInputs, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "output_pads", nullptr, nullptr, getFiltCtxOutputPads, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "outputs", nullptr, nullptr, getFiltCtxOutputs, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "nb_threads", nullptr, nullptr, getNumThreads, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "ready", nullptr, nullptr, getReady, nullptr, nullptr, napi_enumerable, filtCtx },
+    { "extra_hw_frames", nullptr, nullptr, getExtraHwFrames, nullptr, nullptr, napi_enumerable, filtCtx }
+  };
+  status = napi_define_properties(env, *result, 10, desc);
+  PASS_STATUS;
+
+  return napi_ok;
+}
+
+napi_value getGraphFilters(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element;
+  AVFilterGraph* filterGraph;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+
+  for ( uint32_t f = 0 ; f < filterGraph->nb_filters ; ++f ) {
+    if (filterGraph->filters[f] == nullptr) continue;
+    status = fromAVFilterCtx(env, filterGraph->filters[f], &element);
+    CHECK_STATUS;
+    status = napi_set_element(env, result, f, element);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value getGraphScaleOpts(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterGraph* filterGraph;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
+  CHECK_STATUS;
+
+  // printf("sws_scale_opts: \'%s\'\n", filterGraph->scale_sws_opts);
+  if (nullptr == filterGraph->scale_sws_opts)
+    status = napi_get_null(env, &result);
+  else
+    status = napi_create_string_utf8(env, filterGraph->scale_sws_opts, NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getGraphThreads(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterGraph* filterGraph;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, filterGraph->nb_threads, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value dumpGraph(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFilterGraph* filterGraph;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    avfilter_graph_dump(filterGraph, nullptr),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getFilterGraph(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, typeName;
+  AVFilterGraph* filterGraph;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = napi_create_string_utf8(env, "filterGraph", NAPI_AUTO_LENGTH, &typeName);
+  CHECK_STATUS;
+
+  napi_property_descriptor desc[] = {
+    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
+    { "filters", nullptr, nullptr, getGraphFilters, nullptr, nullptr, napi_enumerable, filterGraph },
+    { "scale_sws_opts", nullptr, nullptr, getGraphScaleOpts, nullptr, nullptr, napi_enumerable, filterGraph },
+    { "nb_threads", nullptr, nullptr, getGraphThreads, nullptr, nullptr, napi_enumerable, filterGraph },
+    { "dump", nullptr, dumpGraph, nullptr, nullptr, nullptr, napi_enumerable, filterGraph }
+  };
+
+  status = napi_define_properties(env, result, 5, desc);
+  CHECK_STATUS;
+
+  return result;
+}
+
 class filtContexts {
 public:
   filtContexts() {}
@@ -164,258 +869,6 @@ end:
   avfilter_inout_free(inputs);
   avfilter_inout_free(outputs);
   delete outputs;
-}
-
-napi_value getFilterName(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilter* filter;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
-  CHECK_STATUS;
-
-  status = napi_create_string_utf8(env, filter->name, NAPI_AUTO_LENGTH, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getFilterDesc(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilter* filter;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
-  CHECK_STATUS;
-
-  status = napi_create_string_utf8(env, filter->description, NAPI_AUTO_LENGTH, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getFilterPrivClass(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilter* filter;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filter);
-  CHECK_STATUS;
-
-  if (filter->priv_class != nullptr)
-    status = fromAVClass(env, filter->priv_class, &result);
-  else
-    status = napi_get_null(env, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_status fromAVFilter(napi_env env, const AVFilter* filter, napi_value* result) {
-  napi_status status;
-  napi_value typeName;
-
-  status = napi_create_object(env, result);
-  PASS_STATUS;
-  status = napi_create_string_utf8(env, "Filter", NAPI_AUTO_LENGTH, &typeName);
-  PASS_STATUS;
-
-  napi_property_descriptor desc[] = {
-    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
-    { "name", nullptr, nullptr, getFilterName, nullptr, nullptr, napi_enumerable, (void*)filter },
-    { "description", nullptr, nullptr, getFilterDesc, nullptr, nullptr, napi_enumerable, (void*)filter },
-    { "priv_class", nullptr, nullptr, getFilterPrivClass, nullptr, nullptr, napi_enumerable, (void*)filter },
-  };
-  status = napi_define_properties(env, *result, 4, desc);
-  PASS_STATUS;
-
-  return napi_ok;
-}
-
-napi_value getFilter(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = fromAVFilter(env, filterContext->filter, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getFilterContextName(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = napi_create_string_utf8(env, filterContext->name, NAPI_AUTO_LENGTH, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getNumInputs(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = napi_create_uint32(env, filterContext->nb_inputs, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getNumOutputs(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = napi_create_uint32(env, filterContext->nb_outputs, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getNumThreads(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = napi_create_uint32(env, filterContext->nb_threads, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getReady(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = napi_create_uint32(env, filterContext->ready, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getExtraHwFrames(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterContext* filterContext;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterContext);
-  CHECK_STATUS;
-
-  status = napi_create_int32(env, filterContext->extra_hw_frames, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_status fromAVFilterCtx(napi_env env, AVFilterContext* filtCtx, napi_value* result) {
-  napi_status status;
-  napi_value typeName;
-
-  status = napi_create_object(env, result);
-  PASS_STATUS;
-  status = napi_create_string_utf8(env, "FilterContext", NAPI_AUTO_LENGTH, &typeName);
-  PASS_STATUS;
-
-  napi_property_descriptor desc[] = {
-    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
-    { "filter", nullptr, nullptr, getFilter, nullptr, nullptr, napi_enumerable, filtCtx },
-    { "name", nullptr, nullptr, getFilterContextName, nullptr, nullptr, napi_enumerable, filtCtx },
-    { "nb_inputs", nullptr, nullptr, getNumInputs, nullptr, nullptr, napi_enumerable, filtCtx },
-    { "nb_outputs", nullptr, nullptr, getNumOutputs, nullptr, nullptr, napi_enumerable, filtCtx },
-    { "nb_threads", nullptr, nullptr, getNumThreads, nullptr, nullptr, napi_enumerable, filtCtx },
-    { "ready", nullptr, nullptr, getReady, nullptr, nullptr, napi_enumerable, filtCtx },
-    { "extra_hw_frames", nullptr, nullptr, getExtraHwFrames, nullptr, nullptr, napi_enumerable, filtCtx }
-  };
-  status = napi_define_properties(env, *result, 8, desc);
-  PASS_STATUS;
-
-  return napi_ok;
-}
-
-napi_value getGraphFilters(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result, element;
-  AVFilterGraph* filterGraph;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
-  CHECK_STATUS;
-
-  status = napi_create_array(env, &result);
-  CHECK_STATUS;
-
-  for ( uint32_t f = 0 ; f < filterGraph->nb_filters ; ++f ) {
-    if (filterGraph->filters[f] == nullptr) continue;
-    status = fromAVFilterCtx(env, filterGraph->filters[f], &element);
-    CHECK_STATUS;
-    status = napi_set_element(env, result, f, element);
-    CHECK_STATUS;
-  }
-
-  return result;
-}
-
-napi_value dumpGraph(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result;
-  AVFilterGraph* filterGraph;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
-  CHECK_STATUS;
-
-  status = napi_create_string_utf8(env,
-    avfilter_graph_dump(filterGraph, nullptr),
-    NAPI_AUTO_LENGTH, &result);
-  CHECK_STATUS;
-
-  return result;
-}
-
-napi_value getFilterGraph(napi_env env, napi_callback_info info) {
-  napi_status status;
-  napi_value result, typeName;
-  AVFilterGraph* filterGraph;
-
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &filterGraph);
-  CHECK_STATUS;
-
-  status = napi_create_object(env, &result);
-  CHECK_STATUS;
-  status = napi_create_string_utf8(env, "filterGraph", NAPI_AUTO_LENGTH, &typeName);
-  CHECK_STATUS;
-
-  napi_property_descriptor desc[] = {
-    { "type", nullptr, nullptr, nullptr, nullptr, typeName, napi_enumerable, nullptr },
-    { "filters", nullptr, nullptr, getGraphFilters, nullptr, nullptr, napi_enumerable, filterGraph },
-    { "dump", nullptr, dumpGraph, nullptr, nullptr, nullptr, napi_enumerable, filterGraph }
-  };
-
-  status = napi_define_properties(env, result, 3, desc);
-  CHECK_STATUS;
-
-  return result;
 }
 
 void filtererComplete(napi_env env, napi_status asyncStatus, void* data) {

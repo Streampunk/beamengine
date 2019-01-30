@@ -21,6 +21,7 @@
 
 const { beamcoder, createDemuxer } = require('../index.js');
 const fs = require('fs');
+const util = require('util');
 
 async function run() {
   const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
@@ -44,6 +45,9 @@ async function run() {
     ],
     filterSpec: '[0:a] aresample=8000, aformat=sample_fmts=s16:channel_layouts=mono'
   });
+  console.log(filterer.graph);
+  console.log(util.inspect(filterer.graph.filters[2], {depth: null}));
+  console.log(filterer.graph.dump());
 
   for ( let x = 0 ; x < 10 ; x++ ) {
     let packet = await demuxer.read();

@@ -21,6 +21,7 @@
 
 const { beamcoder, createDemuxer } = require('../index.js');
 const fs = require('fs');
+const util = require('util');
 
 async function run() {
   // const srcStream = fs.createReadStream('../../media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf');
@@ -55,7 +56,8 @@ async function run() {
     outputNames: [ 'out0:v' ],
     filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]'
   });
-  // console.log(filterer.graph.filters);
+  console.log(filterer.graph);
+  console.log(util.inspect(filterer.graph.filters[5], {depth: null}));
   console.log(filterer.graph.dump());
 
   let encParams = {
@@ -76,7 +78,7 @@ async function run() {
     }
   };
 
-  let encoder = await beamcoder.encoder(encParams);
+  let encoder = beamcoder.encoder(encParams);
   // console.log(encoder);
 
   let outFile = fs.createWriteStream('wibble.h264');
