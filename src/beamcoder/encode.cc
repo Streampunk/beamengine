@@ -76,8 +76,8 @@ napi_value encoder(napi_env env, napi_callback_info info) {
     }
     status = napi_get_value_external(env, jsParams, (void**) &codecParams);
     CHECK_STATUS;
-    codecName = nullptr;
-    codecID = codecParams->codec_id;
+    codecName = (char*) avcodec_get_name(codecParams->codec_id);
+    codecNameLen = strlen(codecName);
     goto create;
   }
   if (hasName) {

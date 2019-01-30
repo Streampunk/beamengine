@@ -3092,13 +3092,10 @@ napi_value getCodecCtxColorPrim(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   colPrimName = av_color_primaries_name(codec->color_primaries);
-  if (colPrimName != nullptr) {
-    status = napi_create_string_utf8(env, (char*) colPrimName, NAPI_AUTO_LENGTH, &result);
-    CHECK_STATUS;
-  } else {
-    status = napi_get_null(env, &result);
-    CHECK_STATUS;
-  }
+  status = napi_create_string_utf8(env,
+    (colPrimName != nullptr) ? (char*) colPrimName : "unknown",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
 
   return result;
 }
@@ -3160,13 +3157,10 @@ napi_value getCodecCtxColorTrc(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   colTrcName = av_color_transfer_name(codec->color_trc);
-  if (colTrcName != nullptr) {
-    status = napi_create_string_utf8(env, (char*) colTrcName, NAPI_AUTO_LENGTH, &result);
-    CHECK_STATUS;
-  } else {
-    status = napi_get_null(env, &result);
-    CHECK_STATUS;
-  }
+  status = napi_create_string_utf8(env,
+    (colTrcName != nullptr) ? (char*) colTrcName : "unknown",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
 
   return result;
 }
@@ -3228,13 +3222,10 @@ napi_value getCodecCtxColorspace(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   colspaceName = av_color_space_name(codec->colorspace);
-  if (colspaceName != nullptr) {
-    status = napi_create_string_utf8(env, (char*) colspaceName, NAPI_AUTO_LENGTH, &result);
-    CHECK_STATUS;
-  } else {
-    status = napi_get_null(env, &result);
-    CHECK_STATUS;
-  }
+  status = napi_create_string_utf8(env,
+    (colspaceName != nullptr) ? (char*) colspaceName : "unknown",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
 
   return result;
 }
@@ -3296,13 +3287,10 @@ napi_value getCodecCtxColorRange(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   colRangeName = av_color_range_name(codec->color_range);
-  if (colRangeName != nullptr) {
-    status = napi_create_string_utf8(env, (char*) colRangeName, NAPI_AUTO_LENGTH, &result);
-    CHECK_STATUS;
-  } else {
-    status = napi_get_null(env, &result);
-    CHECK_STATUS;
-  }
+  status = napi_create_string_utf8(env,
+    (colRangeName != nullptr) ? (char*) colRangeName : "unknown",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
 
   return result;
 }
@@ -3364,13 +3352,10 @@ napi_value getCodecCtxChromaLoc(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   chromaLocName = av_chroma_location_name(codec->chroma_sample_location);
-  if (chromaLocName != nullptr) {
-    status = napi_create_string_utf8(env, (char*) chromaLocName, NAPI_AUTO_LENGTH, &result);
-    CHECK_STATUS;
-  } else {
-    status = napi_get_null(env, &result);
-    CHECK_STATUS;
-  }
+  status = napi_create_string_utf8(env,
+    (chromaLocName != nullptr) ? (char*) chromaLocName : "unspecified",
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
 
   return result;
 }
@@ -3430,7 +3415,8 @@ napi_value getCodecCtxFieldOrder(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
   CHECK_STATUS;
   status = napi_create_string_utf8(env,
-    beam_lookup_name(beam_field_order->forward, codec->field_order), NAPI_AUTO_LENGTH, &result);
+    beam_lookup_name(beam_field_order->forward, codec->field_order),
+    NAPI_AUTO_LENGTH, &result);
   CHECK_STATUS;
 
   return result;
@@ -3467,7 +3453,7 @@ napi_value setCodecCtxFieldOrder(napi_env env, napi_callback_info info) {
   if (enumValue != BEAM_ENUM_UNKNOWN) {
     codec->field_order = (AVFieldOrder) enumValue;
   } else {
-    NAPI_THROW_ERROR("Unknown value for field_order.");
+    NAPI_THROW_ERROR("Unknown value for field_order. Did you mean e.g. 'progressive'?");
   }
 
   status = napi_get_undefined(env, &result);
@@ -5684,10 +5670,10 @@ napi_value getCodecCtxProfile(napi_env env, napi_callback_info info) {
   profileName = av_get_profile_name(codec->codec, codec->profile);
   if (profileName != nullptr) {
     status = napi_create_string_utf8(env,
-      (char*) av_get_profile_name(codec->codec, codec->profile), NAPI_AUTO_LENGTH, &result);
+      (char*) profileName, NAPI_AUTO_LENGTH, &result);
     CHECK_STATUS;
   } else {
-    status = napi_get_null(env, &result);
+    status = napi_create_int32(env, codec->profile, &result);
     CHECK_STATUS;
   }
 
@@ -5717,6 +5703,11 @@ napi_value setCodecCtxProfile(napi_env env, napi_callback_info info) {
     codec->profile = FF_PROFILE_UNKNOWN;
     goto done;
   }
+  if (type == napi_number) {
+    status = napi_get_value_int32(env, args[0], &codec->profile);
+    CHECK_STATUS;
+    goto done;
+  }
   if (type != napi_string) {
     NAPI_THROW_ERROR("A string is required to set the profile property.");
   }
@@ -5737,7 +5728,7 @@ napi_value setCodecCtxProfile(napi_env env, napi_callback_info info) {
   }
   free(name);
   if (!foundProfile) {
-    NAPI_THROW_ERROR("Unknown profile name.");
+    NAPI_THROW_ERROR("Unknown profile name. Set to 'null' for unknown.");
   }
 
 done:
@@ -5775,6 +5766,10 @@ napi_value setCodecCtxLevel(napi_env env, napi_callback_info info) {
   }
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    codec->level = FF_LEVEL_UNKNOWN;
+    goto done;
+  }
   if (type != napi_number) {
     NAPI_THROW_ERROR("A number is required to set the level property.");
   }
@@ -5782,6 +5777,7 @@ napi_value setCodecCtxLevel(napi_env env, napi_callback_info info) {
   status = napi_get_value_int32(env, args[0], &codec->level);
   CHECK_STATUS;
 
+done:
   status = napi_get_undefined(env, &result);
   CHECK_STATUS;
   return result;
@@ -7314,11 +7310,13 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
       encoding ? encode : decode, nullptr, nullptr, nullptr, napi_enumerable, codec},
     { "flush", nullptr,
       encoding ? flushEnc : flushDec, nullptr, nullptr, nullptr, napi_enumerable, codec},
+    { "extractParams", nullptr, extractParams, nullptr, nullptr, nullptr, napi_enumerable, nullptr},
+    { "useParams", nullptr, useParams, nullptr, nullptr, nullptr, napi_enumerable, nullptr},
     { "params", nullptr, nullptr, nullptr, nop, undef, // Set for muxing
       napi_writable, nullptr},
     { "_CodecContext", nullptr, nullptr, nullptr, nullptr, extCodec, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsCodec, 136, desc);
+  status = napi_define_properties(env, jsCodec, 138, desc);
   PASS_STATUS;
 
   *result = jsCodec;
@@ -7388,3 +7386,78 @@ napi_status fromAVCodecDescriptor(napi_env env, const AVCodecDescriptor* codecDe
   *result = props;
   return napi_ok;
 }
+
+napi_value extractParams(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, jsCodec, extCodec;
+  AVCodecContext* codecCtx;
+  AVCodecParameters* codecPar = nullptr;
+  int ret;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, &jsCodec, nullptr);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, jsCodec, "_CodecContext", &extCodec);
+  CHECK_STATUS;
+  status = napi_get_value_external(env, extCodec, (void**) &codecCtx);
+  CHECK_STATUS;
+
+  codecPar = avcodec_parameters_alloc();
+  if ((ret = avcodec_parameters_from_context(codecPar, codecCtx))) {
+    NAPI_THROW_ERROR(avErrorMsg("Failed to extract parameters from codec context: ", ret));
+  }
+
+  status = fromAVCodecParameters(env, codecPar, true, &result);
+  CHECK_STATUS;
+
+  return result;
+};
+
+napi_value useParams(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value jsCodec, extCodec, extPars;
+  napi_valuetype type;
+  AVCodecContext* codecCtx;
+  AVCodecParameters* codecPar = nullptr;
+  int ret;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, &jsCodec, nullptr);
+  CHECK_STATUS;
+  status = napi_get_named_property(env, jsCodec, "_CodecContext", &extCodec);
+  CHECK_STATUS;
+  status = napi_get_value_external(env, extCodec, (void**) &codecCtx);
+  CHECK_STATUS;
+
+  if (argc < 1) {
+    NAPI_THROW_ERROR("Parameters to use must be provided with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Parameters to use must be provided as an object.");
+  }
+  status = napi_get_named_property(env, args[0], "_codecPar", &extPars);
+  CHECK_STATUS;
+  status = napi_typeof(env, extPars, &type);
+  CHECK_STATUS;
+  if (type != napi_external) {
+    NAPI_THROW_ERROR("Value used to provide codec parameters does not contain those parameters.");
+  }
+  status = napi_get_value_external(env, extPars, (void**) &codecPar);
+  CHECK_STATUS;
+
+  if (codecCtx->codec_id != codecPar->codec_id) {
+    NAPI_THROW_ERROR("Codec identifier for codec parameters and codec context differ.");
+  }
+  if (codecCtx->codec_type != codecPar->codec_type) {
+    NAPI_THROW_ERROR("Codec type for codec parameters and codec context differ.");
+  }
+  if ((ret = avcodec_parameters_to_context(codecCtx, codecPar))) {
+    NAPI_THROW_ERROR(avErrorMsg("Problem using parameters to set up codec context: ", ret));
+  }
+
+  return jsCodec;
+};

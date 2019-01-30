@@ -23,9 +23,9 @@
 
 napi_value decoder(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, value, formatJS, formatExt, global, jsObject, assign;
+  napi_value result, value, formatJS, formatExt, global, jsObject, assign, jsParams;
   napi_valuetype type;
-  bool isArray, hasName, hasID, hasFormat, hasStream;
+  bool isArray, hasName, hasID, hasFormat, hasStream, hasParams;
   AVCodecID id = AV_CODEC_ID_NONE;
   AVCodecContext* decoder = nullptr;
   AVFormatContext* format = nullptr;
@@ -63,6 +63,8 @@ napi_value decoder(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   status = napi_has_named_property(env, args[0], "stream", &hasStream);
   CHECK_STATUS;
+  status = napi_has_named_property(env, args[0], "params", &hasParams);
+  CHECK_STATUS;
 
   if (hasFormat && hasStream) {
     status = napi_get_named_property(env, args[0], "format", &formatJS);
@@ -80,6 +82,23 @@ napi_value decoder(napi_env env, napi_callback_info info) {
       NAPI_THROW_ERROR("Stream index is out of bounds for the given format.");
     }
     params = format->streams[streamIdx]->codecpar;
+    codecName = (char*) avcodec_get_name(params->codec_id);
+    codecNameLen = strlen(codecName);
+    goto create;
+  }
+
+  if (hasParams) {
+    status = napi_get_named_property(env, args[0], "params", &value);
+    CHECK_STATUS;
+    status = napi_get_named_property(env, value, "_codecPar", &jsParams);
+    CHECK_STATUS;
+    status = napi_typeof(env, jsParams, &type);
+    CHECK_STATUS;
+    if (type != napi_external) {
+      NAPI_THROW_ERROR("The provided parameters do not appear to be a valid codec parameters object.");
+    }
+    status = napi_get_value_external(env, jsParams, (void**) &params);
+    CHECK_STATUS;
     codecName = (char*) avcodec_get_name(params->codec_id);
     codecNameLen = strlen(codecName);
     goto create;
