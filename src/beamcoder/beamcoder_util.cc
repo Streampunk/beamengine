@@ -731,3 +731,17 @@ std::unordered_map<int, std::string> beam_option_type_fmap = {
   { AV_OPT_TYPE_BOOL, "bool" }
 };
 const beamEnum* beam_option_type = new beamEnum(beam_option_type_fmap);
+
+std::unordered_map<int, std::string> beam_avoid_neg_ts_fmap = {
+  { AVFMT_AVOID_NEG_TS_AUTO, "auto" },
+  { AVFMT_AVOID_NEG_TS_MAKE_NON_NEGATIVE, "make_non_negative" },
+  { AVFMT_AVOID_NEG_TS_MAKE_ZERO, "make_zero" }
+};
+const beamEnum* beam_avoid_neg_ts = new beamEnum(beam_avoid_neg_ts_fmap);
+
+std::unordered_map<int, std::string> beam_avfmt_duration_fmap = {
+  { AVFMT_DURATION_FROM_PTS, "from_pts" },
+  { AVFMT_DURATION_FROM_STREAM, "from_stream" },
+  { AVFMT_DURATION_FROM_BITRATE, "from_bitrate" }
+};
+// const beamEnum* beam_avfmt_duration = new beamEnum(beam_avfmt_duration_fmap);

@@ -35,6 +35,7 @@ extern "C" {
   #include <libavutil/pixdesc.h>
   #include <libavutil/opt.h>
   #include <libavcodec/avcodec.h>
+  #include <libavformat/avformat.h>
 }
 
 #define DECLARE_NAPI_METHOD(name, func) { name, 0, func, 0, 0, 0, napi_default, 0 }
@@ -182,6 +183,8 @@ extern const beamEnum* beam_avdiscard;
 extern const beamEnum* beam_ff_sub_charenc_mode;
 extern const beamEnum* beam_avmedia_type;
 extern const beamEnum* beam_option_type;
+extern const beamEnum* beam_avoid_neg_ts;
+extern const beamEnum* beam_avfmt_duration;
 
 napi_value makeFrame(napi_env env, napi_callback_info info);
 

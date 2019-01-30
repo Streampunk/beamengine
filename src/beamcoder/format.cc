@@ -1072,6 +1072,158 @@ napi_value setFmtCtxFlags(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getFmtCtxKey(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* ctx;
+  void* resultData;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &ctx);
+  CHECK_STATUS;
+  if (ctx->keylen > 0) {
+    status = napi_create_buffer_copy(env, ctx->keylen, ctx->key,
+      &resultData, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value getFmtCtxPrograms(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element, metadata;
+  AVFormatContext* ctx;
+  AVProgram* program;
+  AVDictionaryEntry* tag = nullptr;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &ctx);
+  CHECK_STATUS;
+
+  status = napi_create_array(env, &result);
+  CHECK_STATUS;
+  for ( uint32_t x = 0 ; x < ctx->nb_programs ; x++ ) {
+    program = ctx->programs[x];
+    status = napi_create_object(env, &element);
+    CHECK_STATUS;
+    status = beam_set_string_utf8(env, element, "type", "Program");
+    CHECK_STATUS;
+    status = beam_set_int32(env, element, "id", program->id);
+    CHECK_STATUS;
+    status = beam_set_bool(env, element, "flags_running",
+      program->flags & AV_PROGRAM_RUNNING);
+    CHECK_STATUS;
+    status = beam_set_uint32(env, element, "stream_index", *program->stream_index);
+    CHECK_STATUS;
+    status = beam_set_uint32(env, element, "nb_stream_indexes", program->nb_stream_indexes);
+    CHECK_STATUS;
+    status = napi_create_object(env, &metadata);
+    CHECK_STATUS;
+    while ((tag = av_dict_get(program->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+      status = beam_set_string_utf8(env, metadata, tag->key, tag->value);
+      CHECK_STATUS;
+    }
+    status = napi_set_named_property(env, element, "metadata", metadata);
+    CHECK_STATUS;
+    status = beam_set_int32(env, element, "program_num", program->program_num);
+    CHECK_STATUS;
+    status = beam_set_int32(env, element, "pmt_pid", program->pmt_pid);
+    CHECK_STATUS;
+    status = beam_set_int32(env, element, "pcr_pid", program->pcr_pid);
+    CHECK_STATUS;
+    status = beam_set_int32(env, element, "pmt_version", program->pmt_version);
+    CHECK_STATUS;
+
+    status = napi_set_element(env, result, x, element);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+// TODO parking for now - quite complex interactions
+/* napi_value setFmtCtxPrograms(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result, element, metadata;
+  napi_valuetype type;
+  bool isArray;
+  AVFormatContext* ctx;
+  AVProgram* program;
+  AVProgram** programs;
+  AVDictionary* dict = nullptr;
+  uint32_t progCount;
+  bool present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &ctx);
+  CHECK_STATUS;
+
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the programs property.");
+    CHECK_STATUS;
+  }
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (!isArray) {
+    NAPI_THROW_ERROR("The value of the programs property requires an array of program objects.");
+  }
+  status = napi_get_array_length(env, args[0], &progCount);
+  CHECK_STATUS;
+  for ( uint32_t x = 0 ; x < progCount ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_STATUS;
+    status = napi_typeof(env, element, &type);
+    CHECK_STATUS;
+    if (type != napi_object) {
+      NAPI_THROW_ERROR("Cannot set the value of programs unless every array element is an object.");
+    }
+  }
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  programs = (AVProgram**) av_mallocz(sizeof(AVProgram*) * progCount);
+  for ( uint32_t x = 0 ; x < progCount ; x++ ) {
+    status = napi_get_element(env, args[0], x, &element);
+    CHECK_BAIL;
+    program = (AVProgram*) av_mallocz(sizeof(AVProgram));
+    status = beam_get_int32(env, element, "id", &program->id);
+    CHECK_BAIL;
+    status = napi_typeof(env, element, &type);
+    CHECK_BAIL;
+    if ()
+    status = beam_get_bool(env, element, "flags_running", &present, &flag);
+    CHECK_BAIL;
+    if (present) { program->flags = (flag) ?
+      program->flags | AV_PROGRAM_RUNNING :
+      program->flags & ~AV_PROGRAM_RUNNING; }
+    programs[x] = program;
+  }
+
+  for ( int i = ctx->nb_programs - 1; i >= 0; i--) {
+    av_dict_free(&ctx->programs[i]->metadata);
+    av_freep(&ctx->programs[i]->stream_index);
+    av_freep(&ctx->programs[i]);
+  }
+  av_freep(&ctx->programs);
+
+  ctx->programs = programs;
+  ctx->nb_programs = progCount;
+
+  return result;
+bail:
+  for ( int i = progCount - 1; i >= 0; i--) {
+    av_dict_free(&programs[i]->metadata);
+    av_freep(&programs->stream_index);
+    av_freep(&programs[i]);
+  }
+  av_freep(&ctx->programs);
+  return result;
+} */
+
 napi_value getFmtCtxProbeSize(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -1147,6 +1299,90 @@ napi_value setFmtCtxMaxAnDur(napi_env env, napi_callback_info info) {
     NAPI_THROW_ERROR("Demuxer max_analyze_duration must be set with a number.");
   }
   status = napi_get_value_int64(env, args[0], &fmtCtx->max_analyze_duration);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxIndexSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_uint32(env, fmtCtx->max_index_size, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxIndexSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_index_size must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_index_size must be set with a number.");
+  }
+  status = napi_get_value_uint32(env, args[0], &fmtCtx->max_index_size);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxPictBuf(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_uint32(env, fmtCtx->max_picture_buffer, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxPictBuf(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_picture_buffer must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_picture_buffer must be set with a number.");
+  }
+  status = napi_get_value_uint32(env, args[0], &fmtCtx->max_picture_buffer);
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
@@ -1261,6 +1497,869 @@ done:
   return result;
 }
 
+napi_value getFmtCtxFpsProbeSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->fps_probe_size, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxFpsProbeSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context fps_probe_size must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context fps_probe_size must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->fps_probe_size);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxErrRecog(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->error_recognition, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxErrRecog(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context error_recognition must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context error_recognition must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->error_recognition);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxDebug(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "TS", fmtCtx->debug & FF_FDEBUG_TS);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxDebug(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  bool isArray, present, flag;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context debug must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("Format context debug must be set with an object with Boolean-valued flags.");
+  }
+  status = beam_get_bool(env, args[0], "TS", &present, &flag);
+  CHECK_STATUS;
+  if (present) { fmtCtx->debug = (flag) ?
+    fmtCtx->debug | FF_FDEBUG_TS :
+    fmtCtx->debug & ~FF_FDEBUG_TS; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxInterleaveD(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, fmtCtx->max_interleave_delta, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxInterleaveD(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_interleave_delta must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_interleave_delta must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &fmtCtx->max_interleave_delta);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxStrictStdComp(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  status = napi_create_string_utf8(env,
+    beam_lookup_name(beam_ff_compliance->forward, fmtCtx->strict_std_compliance),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxStrictStdComp(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  char* name;
+  size_t strLen;
+  int enumValue;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the strict_std_compliance property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("A string is required to set the strict_std_compliance property.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  name = (char*) malloc(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], name, strLen + 1, &strLen);
+  CHECK_STATUS;
+  enumValue = beam_lookup_enum(beam_ff_compliance->inverse, name);
+  free(name);
+  if (enumValue != BEAM_ENUM_UNKNOWN) {
+    fmtCtx->strict_std_compliance = enumValue;
+  } else {
+    NAPI_THROW_ERROR("Unknown value for strict_std_compliance.");
+  }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxEventFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "METADATA_UPDATED",
+    fmtCtx->event_flags & AVFMT_EVENT_FLAG_METADATA_UPDATED);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxEventFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  bool isArray, present, flag;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context event_flags must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  status = napi_is_array(env, args[0], &isArray);
+  CHECK_STATUS;
+  if (isArray || (type != napi_object)) {
+    NAPI_THROW_ERROR("Format context event_flags must be set with an object with Boolean-valued flags.");
+  }
+  status = beam_get_bool(env, args[0], "METADATA_UPDATED", &present, &flag);
+  CHECK_STATUS;
+  if (present) { fmtCtx->event_flags = (flag) ?
+    fmtCtx->event_flags | AVFMT_EVENT_FLAG_METADATA_UPDATED :
+    fmtCtx->event_flags & ~AVFMT_EVENT_FLAG_METADATA_UPDATED; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxTsProbe(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->max_ts_probe, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxTsProbe(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_ts_probe must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_ts_probe must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->max_ts_probe);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+/* napi_value getFmtCtxAvoidNegTs(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    beam_lookup_name(beam_avoid_neg_ts->forward, fmtCtx->avoid_negative_ts),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxAvoidNegTs(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  char* enumName;
+  size_t strLen;
+  int enumValue;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_ts_probe must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    fmtCtx->avoid_negative_ts = AVFMT_AVOID_NEG_TS_AUTO;
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Format context avoid_negative_ts must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  enumName = (char*) malloc(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], enumName, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  enumValue = beam_lookup_enum(beam_avoid_neg_ts->inverse, enumName);
+  if (enumValue != BEAM_ENUM_UNKNOWN) {
+    fmtCtx->avoid_negative_ts = enumValue;
+  } else {
+    NAPI_THROW_ERROR("Unknown value for avoid_negative_ts. One of 'auto', 'make_non_negative' or 'make_zero'.")
+  }
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+} */
+
+napi_value getFmtCtxAudioPreload(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->audio_preload, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxAudioPreload(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context audio_preload must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context audio_preload must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->audio_preload);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxChunkDur(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->max_chunk_duration, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxChunkDur(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_chunk_duration must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_chunk_duration must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->max_chunk_duration);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxChunkSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->max_chunk_size, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxChunkSize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_chunk_size must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_chunk_size must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->max_chunk_size);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxUseWallclock(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->use_wallclock_as_timestamps, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxUseWallclock(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context use_wallclock_as_timestamps must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context use_wallclock_as_timestamps must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->use_wallclock_as_timestamps);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxAvioFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_object(env, &result);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "READ", fmtCtx->avio_flags & AVIO_FLAG_READ);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "WRITE", fmtCtx->avio_flags & AVIO_FLAG_WRITE);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "NONBLOCK", fmtCtx->avio_flags & AVIO_FLAG_NONBLOCK);
+  CHECK_STATUS;
+  status = beam_set_bool(env, result, "DIRECT", fmtCtx->avio_flags & AVIO_FLAG_DIRECT);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxAvioFlags(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  bool present, flag;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context avio_flags must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_object) {
+    NAPI_THROW_ERROR("Format context avio_flags must be set with an object of Boolean values.");
+  }
+  status = beam_get_bool(env, args[0], "READ", &present, &flag);
+  CHECK_STATUS;
+  if (present) { fmtCtx->avio_flags = (flag) ?
+    fmtCtx->avio_flags | AVIO_FLAG_READ :
+    fmtCtx->avio_flags & ~AVIO_FLAG_READ; }
+  status = beam_get_bool(env, args[0], "WRITE", &present, &flag);
+  CHECK_STATUS;
+  if (present) { fmtCtx->avio_flags = (flag) ?
+    fmtCtx->avio_flags | AVIO_FLAG_WRITE :
+    fmtCtx->avio_flags & ~AVIO_FLAG_WRITE; }
+  status = beam_get_bool(env, args[0], "NONBLOCK", &present, &flag);
+  CHECK_STATUS;
+  if (present) { fmtCtx->avio_flags = (flag) ?
+    fmtCtx->avio_flags | AVIO_FLAG_NONBLOCK :
+    fmtCtx->avio_flags & ~AVIO_FLAG_NONBLOCK; }
+  status = beam_get_bool(env, args[0], "DIRECT", &present, &flag);
+  CHECK_STATUS;
+  if (present) { fmtCtx->avio_flags = (flag) ?
+    fmtCtx->avio_flags | AVIO_FLAG_DIRECT :
+    fmtCtx->avio_flags & ~AVIO_FLAG_DIRECT; }
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+/* napi_value getFmtCtxDurEstMethod(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_string_utf8(env,
+    beam_lookup_name(beam_avfmt_duration->forward, fmtCtx->duration_estimation_method),
+    NAPI_AUTO_LENGTH, &result);
+  CHECK_STATUS;
+
+  return result;
+} */
+
+napi_value getFmtCtxSkipInitBytes(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, fmtCtx->skip_initial_bytes, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxSkipInitBytes(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context skip_initial_bytes must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context skip_initial_bytes must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &fmtCtx->skip_initial_bytes);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxCorrectTsOf(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_uint32(env, fmtCtx->correct_ts_overflow, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxCorrectTsOf(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context correct_ts_overflow must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context correct_ts_overflow must be set with a number.");
+  }
+  status = napi_get_value_uint32(env, args[0], &fmtCtx->correct_ts_overflow);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxSeek2Any(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->seek2any, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxSeek2Any(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context seek2any must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context seek2any must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->seek2any);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+/* napi_value getFmtCtxFlushPackets(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->flush_packets, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxFlushPackets(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context flush_packets must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context flush_packets must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->flush_packets);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxFmtProbesize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->format_probesize, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxFmtProbesize(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context format_probesize must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context format_probesize must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->format_probesize);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxProbeScore(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->probe_score, &result);
+  CHECK_STATUS;
+
+  return result;
+} */
+
+napi_value failSetter(napi_env env, napi_callback_info info) {
+  NAPI_THROW_ERROR("Cannot set this read-only property value.");
+}
+
 napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     napi_value* result, bool isMuxer) {
   napi_status status;
@@ -1299,8 +2398,9 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "packet_size", nullptr, nullptr, getFmtCtxPacketSize, setFmtCtxPacketSize, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    // 10
     { "max_delay", nullptr, nullptr, getFmtCtxMaxDelay, setFmtCtxMaxDelay, nullptr,
-      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },  // 10
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "flags", nullptr, nullptr, getFmtCtxFlags, setFmtCtxFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "probesize", nullptr, nullptr,
@@ -1311,35 +2411,98 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       isMuxer ? nullptr : getFmtCtxMaxAnDur,
       isMuxer ? nullptr : setFmtCtxMaxAnDur, nullptr,
       isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
-      // key?
-      // programs?
-      // max_index_size
-      // max_picture_buffer
+    { "key", nullptr, nullptr, getFmtCtxKey, failSetter, nullptr,
+      napi_enumerable, fmtCtx }, // As const uint8_t value, assume not settable
+    { "programs", nullptr, nullptr, getFmtCtxPrograms, failSetter /* setFmtCtxPrograms */, nullptr,
+      napi_enumerable, fmtCtx },
+      // video_codec_id / audio_codec_id / subtitle_codec_id
+    { "max_index_size", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxMaxIndexSize,
+      isMuxer ? failSetter : setFmtCtxMaxIndexSize, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "max_picture_buffer", nullptr, nullptr, getFmtCtxMaxPictBuf, setFmtCtxMaxPictBuf, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
       // chapters?
-      // fps_probe_size
     { "metadata", nullptr, nullptr, getFmtCtxMetadata, setFmtCtxMetadata, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "start_time_realtime", nullptr, nullptr, getFmtCtxStartTRealT, setFmtCtxStartTRealT, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
-      // error_recognition
-      // debug
-      // max_interleave_delta
-      // strict_std_compliance
-      // event_flags
-      // max_ts_probe
-      // avoid_negative_ts
-      // audio_preload
-      // max_chunk_duration
-      // max_chunk_size
-      // use_wallclock_as_timestamps
-      // avio_flags
-      // duration_estimation_method
-      // skip_initial_bytes
-      // correct_ts_overflow
-      // seek2any
-      // flush_packets
-      // probe_score
-      // format_probesize
+    // 20
+    { "fps_probe_size", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxFpsProbeSize,
+      isMuxer ? failSetter : setFmtCtxFpsProbeSize, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "error_recognition", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxErrRecog,
+      isMuxer ? failSetter : setFmtCtxErrRecog, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "debug", nullptr, nullptr, getFmtCtxDebug, setFmtCtxDebug, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "max_interleave_delta", nullptr, nullptr,
+      isMuxer ? getFmtCtxMaxInterleaveD : nullptr,
+      isMuxer ? setFmtCtxMaxInterleaveD : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    { "strict_std_compliance", nullptr, nullptr, getFmtCtxStrictStdComp, setFmtCtxStrictStdComp, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "event_flags", nullptr, nullptr, getFmtCtxEventFlags, setFmtCtxEventFlags, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "max_ts_probe", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxMaxTsProbe,
+      isMuxer ? failSetter : setFmtCtxMaxTsProbe, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    // ts_id - says it's going private
+    // { "avoid_negative_ts", nullptr, nullptr,
+    //   isMuxer ? getFmtCtxAvoidNegTs : nullptr,
+    //   isMuxer ? setFmtCtxAvoidNegTs : failSetter, nullptr,
+    //   isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    { "audio_preload", nullptr, nullptr,
+      isMuxer ? getFmtCtxAudioPreload : nullptr,
+      isMuxer ? setFmtCtxAudioPreload : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    { "max_chunk_duration", nullptr, nullptr,
+      isMuxer ? getFmtCtxMaxChunkDur : nullptr,
+      isMuxer ? setFmtCtxMaxChunkDur : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    // 30
+    { "max_chunk_size", nullptr, nullptr,
+      isMuxer ? getFmtCtxMaxChunkSize : nullptr,
+      isMuxer ? setFmtCtxMaxChunkSize : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    { "use_wallclock_as_timestamps", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxUseWallclock,
+      isMuxer ? failSetter : setFmtCtxUseWallclock, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "avio_flags", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxAvioFlags,
+      isMuxer ? failSetter : setFmtCtxAvioFlags, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    // { "duration_estimation_method", nullptr, nullptr,
+    //   isMuxer ? nullptr : getFmtCtxDurEstMethod, failSetter, nullptr,
+    //   isMuxer ? napi_default : napi_enumerable, fmtCtx },
+    { "skip_initial_bytes", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxSkipInitBytes,
+      isMuxer ? failSetter : setFmtCtxSkipInitBytes, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "correct_ts_overflow", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxCorrectTsOf,
+      isMuxer ? failSetter : setFmtCtxCorrectTsOf, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "seek2any", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxSeek2Any,
+      isMuxer ? failSetter : setFmtCtxSeek2Any, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+  /*   { "flush_packets", nullptr, nullptr,
+      isMuxer ? getFmtCtxFlushPackets : nullptr,
+      isMuxer ? setFmtCtxFlushPackets : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    { "probe_score", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxProbeScore, failSetter, nullptr,
+      isMuxer ? napi_default : napi_enumerable, fmtCtx },
+    { "format_probesize", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxFmtProbesize,
+      isMuxer ? failSetter : setFmtCtxFmtProbesize, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx }, */
+    // 40
       // codec_whitelist
       // format_whitelist
       // metaadata_header_padding
@@ -1355,7 +2518,7 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 18, desc);
+  status = napi_define_properties(env, jsFmtCtx, 37, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;

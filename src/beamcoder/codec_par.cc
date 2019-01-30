@@ -258,7 +258,7 @@ napi_value setCodecParExtraData(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if (type == napi_null) {
     if (codecPar->extradata_size > 0) { // Tidy up old buffers
-      av_freep(codecPar->extradata);
+      av_freep(&codecPar->extradata);
     }
     codecPar->extradata_size = 0;
     goto done;
@@ -272,7 +272,7 @@ napi_value setCodecParExtraData(napi_env env, napi_callback_info info) {
   status = napi_get_buffer_info(env, args[0], (void**) &data, &dataLen);
   CHECK_STATUS;
   if (codecPar->extradata_size > 0) { // Tidy up old buffers
-    av_freep(codecPar->extradata);
+    av_freep(&codecPar->extradata);
     codecPar->extradata_size = 0;
   }
   codecPar->extradata = (uint8_t*) av_mallocz(dataLen + AV_INPUT_BUFFER_PADDING_SIZE);
@@ -1662,7 +1662,7 @@ napi_status fromAVCodecParameters(napi_env env, AVCodecParameters* c, bool ownAl
 void codecParamsFinalizer(napi_env env, void* data, void* hint) {
   AVCodecParameters* c = (AVCodecParameters*) data;
   if ((c->extradata != nullptr) && (c->extradata_size > 0)) {
-    av_freep(c->extradata);
+    av_freep(&c->extradata);
     c->extradata_size = 0;
   }
   avcodec_parameters_free(&c);

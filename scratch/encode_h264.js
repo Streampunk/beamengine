@@ -41,11 +41,11 @@ async function run() {
 
   let encoder = await beamcoder.encoder(encParams);
   console.log(encoder);
-  console.log(encoder.getProperties());
+  //console.log(encoder.getProperties());
 
   let outFile = fs.createWriteStream('wibble.h264');
 
-  for ( let i = 0 ; i < 10 ; i++ ) {
+  for ( let i = 0 ; i < 200 ; i++ ) {
     let frame = beamcoder.frame({
       width: encParams.width,
       height: encParams.height,
@@ -70,12 +70,12 @@ async function run() {
     }
 
     let packets = await encoder.encode(frame);
-    console.log(i, packets.total_time);
+    console.log(i, packets.totalTime);
     packets.packets.forEach(x => outFile.write(x.data));
   }
 
   let p2 = await encoder.flush();
-  console.log(p2.packets.length, p2.total_time);
+  console.log(p2.packets.length, p2.totalTime);
   p2.packets.forEach(x => outFile.write(x.data));
   outFile.end(endcode);
 

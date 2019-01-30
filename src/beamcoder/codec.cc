@@ -979,7 +979,7 @@ napi_value setCodecCtxExtraData(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if (type == napi_null) {
     if (codec->extradata_size > 0) { // Tidy up old buffers
-      av_freep(codec->extradata);
+      av_freep(&codec->extradata);
     }
     codec->extradata_size = 0;
     goto done;
@@ -993,7 +993,7 @@ napi_value setCodecCtxExtraData(napi_env env, napi_callback_info info) {
   status = napi_get_buffer_info(env, args[0], (void**) &data, &dataLen);
   CHECK_STATUS;
   if (codec->extradata_size > 0) { // Tidy up old buffers
-    av_freep(codec->extradata);
+    av_freep(&codec->extradata);
     codec->extradata_size = 0;
   }
   codec->extradata = (uint8_t*) av_mallocz(dataLen + AV_INPUT_BUFFER_PADDING_SIZE);
@@ -4314,7 +4314,7 @@ napi_value setCodecCtxRcOverride(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if (count == 0) {
     if (codec->rc_override != nullptr) {
-      av_freep(codec->rc_override);
+      av_freep(&codec->rc_override);
     }
     codec->rc_override_count = 0;
     goto done;
@@ -4328,7 +4328,7 @@ napi_value setCodecCtxRcOverride(napi_env env, napi_callback_info info) {
     status = napi_is_array(env, element, &isArray);
     CHECK_STATUS;
     if (isArray || (type != napi_object)) {
-      av_freep(list);
+      av_freep(&list);
       NAPI_THROW_ERROR("An RcOverride value can only be set with an object.");
     }
     status = beam_get_int32(env, element, "start_frame", &list[x].start_frame);
@@ -4340,7 +4340,7 @@ napi_value setCodecCtxRcOverride(napi_env env, napi_callback_info info) {
     status = beam_get_double(env, element, "quality_factor", (double*) &list[x].quality_factor);
     CHECK_STATUS;
   }
-  av_freep(codec->rc_override);
+  av_freep(&codec->rc_override);
   codec->rc_override = list;
   codec->rc_override_count = count;
 
@@ -4653,7 +4653,7 @@ napi_value setCodecCtxStatsIn(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if ((type == napi_null) || (type == napi_undefined)) {
     if (codec->stats_in != nullptr) {
-      av_freep(codec->stats_in);
+      av_freep(&codec->stats_in);
     }
     codec->stats_in = nullptr;
     goto done;
@@ -4669,7 +4669,7 @@ napi_value setCodecCtxStatsIn(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   if (codec->stats_in != nullptr) {
-    av_freep(codec->stats_in);
+    av_freep(&codec->stats_in);
   }
   codec->stats_in = stats;
 
@@ -5989,7 +5989,7 @@ napi_value setCodecCtxSubtitleHdr(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if (type == napi_null) {
     if (codec->subtitle_header_size > 0) { // Tidy up old buffers
-      av_freep(codec->subtitle_header);
+      av_freep(&codec->subtitle_header);
     }
     codec->subtitle_header_size = 0;
     goto done;
@@ -6003,7 +6003,7 @@ napi_value setCodecCtxSubtitleHdr(napi_env env, napi_callback_info info) {
   status = napi_get_buffer_info(env, args[0], (void**) &data, &dataLen);
   CHECK_STATUS;
   if (codec->subtitle_header_size > 0) { // Tidy up old buffers
-    av_freep(codec->subtitle_header);
+    av_freep(&codec->subtitle_header);
     codec->subtitle_header_size = 0;
   }
   codec->subtitle_header = (uint8_t*) av_mallocz(dataLen + AV_INPUT_BUFFER_PADDING_SIZE);
@@ -6239,7 +6239,7 @@ napi_value setCodecCtxSubCharenc(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if ((type == napi_null) || (type == napi_undefined)) {
     if (codec->sub_charenc != nullptr) {
-      av_freep(codec->sub_charenc);
+      av_freep(&codec->sub_charenc);
     }
     codec->sub_charenc = nullptr;
     goto done;
@@ -6255,7 +6255,7 @@ napi_value setCodecCtxSubCharenc(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   if (codec->sub_charenc != nullptr) {
-    av_freep(codec->sub_charenc);
+    av_freep(&codec->sub_charenc);
   }
   codec->sub_charenc = subchar;
 
@@ -6447,7 +6447,7 @@ napi_value setCodecCtxDumpSep(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if ((type == napi_null) || (type == napi_undefined)) {
     if (codec->dump_separator != nullptr) {
-      av_freep(codec->dump_separator);
+      av_freep(&codec->dump_separator);
     }
     codec->dump_separator = nullptr;
     goto done;
@@ -6462,7 +6462,7 @@ napi_value setCodecCtxDumpSep(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   if (codec->dump_separator != nullptr) {
-    av_freep(codec->dump_separator);
+    av_freep(&codec->dump_separator);
   }
   codec->dump_separator = dumpy;
 
@@ -6511,7 +6511,7 @@ napi_value setCodecCtxWhitelist(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
   if ((type == napi_null) || (type == napi_undefined)) {
     if (codec->codec_whitelist != nullptr) {
-      av_freep(codec->codec_whitelist);
+      av_freep(&codec->codec_whitelist);
     }
     codec->codec_whitelist = nullptr;
     goto done;
@@ -6527,7 +6527,7 @@ napi_value setCodecCtxWhitelist(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   if (codec->codec_whitelist != nullptr) {
-    av_freep(codec->codec_whitelist);
+    av_freep(&codec->codec_whitelist);
   }
   codec->codec_whitelist = whity;
 
@@ -7327,28 +7327,28 @@ void codecContextFinalizer(napi_env env, void* data, void* hint) {
   AVCodecContext* codecCtx = (AVCodecContext*) data;
   bool* encodingRef = (bool*) hint;
   if ((codecCtx->extradata_size > 0) && (codecCtx->extradata != nullptr)) {
-    av_freep(codecCtx->extradata);
+    av_freep(&codecCtx->extradata);
     codecCtx->extradata_size = 0;
   }
   if (codecCtx->rc_override_count > 0) {
-    av_freep(codecCtx->rc_override);
+    av_freep(&codecCtx->rc_override);
   }
   if (codecCtx->stats_in != nullptr) {
-    av_freep(codecCtx->stats_in);
+    av_freep(&codecCtx->stats_in);
   }
   if (codecCtx->sub_charenc != nullptr) {
-    av_freep(codecCtx->sub_charenc);
+    av_freep(&codecCtx->sub_charenc);
   }
   if (codecCtx->dump_separator != nullptr) {
-    av_freep(codecCtx->dump_separator);
+    av_freep(&codecCtx->dump_separator);
   }
   if (codecCtx->codec_whitelist != nullptr) {
-    av_freep(codecCtx->codec_whitelist);
+    av_freep(&codecCtx->codec_whitelist);
   }
   // Don't delete if allocated by libavcodec when decoding
   if (*encodingRef &&(codecCtx->subtitle_header_size > 0) &&
       (codecCtx->subtitle_header != nullptr)) {
-    av_freep(codecCtx->subtitle_header);
+    av_freep(&codecCtx->subtitle_header);
     codecCtx->subtitle_header_size = 0;
   }
   avcodec_close(codecCtx);
