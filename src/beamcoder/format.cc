@@ -2364,12 +2364,12 @@ napi_value getFmtCtxCodecWhitelist(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
   CHECK_STATUS;
 
-  if (fmtCtx->codec_whitelist != null) {
-    status = napi_get_null(env, &result);
-    CHECK_STATUS;
-  } else {
+  if (fmtCtx->codec_whitelist != nullptr) {
     status = napi_create_string_utf8(env, fmtCtx->codec_whitelist,
       NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
     CHECK_STATUS;
   }
 
@@ -2397,21 +2397,21 @@ napi_value setFmtCtxCodecWhitelist(napi_env env, napi_callback_info info) {
 
   if ((type == napi_null) || (type == napi_undefined)) {
     if (fmtCtx->codec_whitelist != nullptr) {
-      av_freep(fmtCtx->codec_whitelist);
+      av_freep(&fmtCtx->codec_whitelist);
     }
-    goto done:
+    goto done;
   }
   if (type != napi_string) {
     NAPI_THROW_ERROR("Format context codec_whitelist must be set with a string.");
   }
-  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, strLen);
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
   CHECK_STATUS;
   list = (char*) av_mallocz(sizeof(char) * (strLen + 1));
-  status = napi_get_value_string_utf8(env, args[0], list, strLen + 1, strLen);
+  status = napi_get_value_string_utf8(env, args[0], list, strLen + 1, &strLen);
   CHECK_STATUS;
 
   if (fmtCtx->codec_whitelist != nullptr) {
-    av_freep(fmtCtx->codec_whitelist);
+    av_freep(&fmtCtx->codec_whitelist);
   }
   fmtCtx->codec_whitelist = list;
 
@@ -2421,6 +2421,200 @@ done:
   return result;
 }
 
+napi_value getFmtCtxFmtWhitelist(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  if (fmtCtx->format_whitelist != nullptr) {
+    status = napi_create_string_utf8(env, fmtCtx->format_whitelist,
+      NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFmtCtxFmtWhitelist(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  char* list;
+  size_t strLen;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context format_whitelist must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if ((type == napi_null) || (type == napi_undefined)) {
+    if (fmtCtx->format_whitelist != nullptr) {
+      av_freep(&fmtCtx->format_whitelist);
+    }
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Format context format_whitelist must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  list = (char*) av_mallocz(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], list, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  if (fmtCtx->format_whitelist != nullptr) {
+    av_freep(&fmtCtx->format_whitelist);
+  }
+  fmtCtx->format_whitelist = list;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxProtWhitelist(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  if (fmtCtx->protocol_whitelist != nullptr) {
+    status = napi_create_string_utf8(env, fmtCtx->protocol_whitelist,
+      NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFmtCtxProtWhitelist(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  char* list;
+  size_t strLen;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context protocol_whitelist must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if ((type == napi_null) || (type == napi_undefined)) {
+    if (fmtCtx->protocol_whitelist != nullptr) {
+      av_freep(&fmtCtx->protocol_whitelist);
+    }
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Format context protocol_whitelist must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  list = (char*) av_mallocz(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], list, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  if (fmtCtx->protocol_whitelist != nullptr) {
+    av_freep(&fmtCtx->protocol_whitelist);
+  }
+  fmtCtx->protocol_whitelist = list;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxProtBlacklist(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  if (fmtCtx->protocol_blacklist != nullptr) {
+    status = napi_create_string_utf8(env, fmtCtx->protocol_blacklist,
+      NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFmtCtxProtBlacklist(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  char* list;
+  size_t strLen;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context protocol_blacklist must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+
+  if ((type == napi_null) || (type == napi_undefined)) {
+    if (fmtCtx->protocol_blacklist != nullptr) {
+      av_freep(&fmtCtx->protocol_blacklist);
+    }
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("Format context protocol_blacklist must be set with a string.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  list = (char*) av_mallocz(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], list, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  if (fmtCtx->protocol_blacklist != nullptr) {
+    av_freep(&fmtCtx->protocol_blacklist);
+  }
+  fmtCtx->protocol_blacklist = list;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
 
 napi_value failSetter(napi_env env, napi_callback_info info) {
   NAPI_THROW_ERROR("Cannot set this read-only property value.");
@@ -2571,18 +2765,24 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     // 40
     { "codec_whitelist", nullptr, nullptr,
       isMuxer ? nullptr : getFmtCtxCodecWhitelist,
-      isMuxer ? failSetter : setFmtCtxCodecWhiteList, nullptr,
-      isMuxer ?napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+      isMuxer ? failSetter : setFmtCtxCodecWhitelist, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
     { "format_whitelist", nullptr, nullptr,
       isMuxer ? nullptr : getFmtCtxFmtWhitelist,
-      isMuxer ? failSetter : setFmtCtxFmtWhiteList, nullptr,
-      isMuxer ?napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+      isMuxer ? failSetter : setFmtCtxFmtWhitelist, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
       // io_repositioned
       // metaadata_header_padding
       // output_ts_offset
       // dump_separator
-      // protocol_whitelist
-      // protocol_blacklist
+      { "protocol_whitelist", nullptr, nullptr,
+        isMuxer ? nullptr : getFmtCtxProtWhitelist,
+        isMuxer ? failSetter : setFmtCtxProtWhitelist, nullptr,
+        isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+      { "protocol_blacklist", nullptr, nullptr,
+        isMuxer ? nullptr : getFmtCtxProtBlacklist,
+        isMuxer ? failSetter : setFmtCtxProtBlacklist, nullptr,
+        isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
       // max_streams
       // skip_estimate_duration_from_pts
     { "interleaved", nullptr, nullptr, nullptr, nullptr, truth,
@@ -2591,7 +2791,7 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 44, desc);
+  status = napi_define_properties(env, jsFmtCtx, 46, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
