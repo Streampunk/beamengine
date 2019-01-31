@@ -1250,12 +1250,12 @@ napi_value setFmtCtxProbeSize(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
   CHECK_STATUS;
   if (argc != 1) {
-    NAPI_THROW_ERROR("Demuxer probesize must be set with a value.");
+    NAPI_THROW_ERROR("Format context probesize must be set with a value.");
   }
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
   if (type != napi_number) {
-    NAPI_THROW_ERROR("Demuxer probesize must be set with a number.");
+    NAPI_THROW_ERROR("Format context probesize must be set with a number.");
   }
   status = napi_get_value_int64(env, args[0], &fmtCtx->probesize);
   CHECK_STATUS;
@@ -1291,12 +1291,12 @@ napi_value setFmtCtxMaxAnDur(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
   CHECK_STATUS;
   if (argc != 1) {
-    NAPI_THROW_ERROR("Demuxer max_analyze_duration must be set with a value.");
+    NAPI_THROW_ERROR("Format context max_analyze_duration must be set with a value.");
   }
   status = napi_typeof(env, args[0], &type);
   CHECK_STATUS;
   if (type != napi_number) {
-    NAPI_THROW_ERROR("Demuxer max_analyze_duration must be set with a number.");
+    NAPI_THROW_ERROR("Format context max_analyze_duration must be set with a number.");
   }
   status = napi_get_value_int64(env, args[0], &fmtCtx->max_analyze_duration);
   CHECK_STATUS;
@@ -2616,6 +2616,248 @@ done:
   return result;
 }
 
+napi_value getFmtCtxIORepo(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->io_repositioned, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value getFmtCtxMetadataHdrPad(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->metadata_header_padding, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMetadataHdrPad(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context metadata_header_padding must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context metadata_header_padding must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->metadata_header_padding);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxOutputTSOffset(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int64(env, fmtCtx->output_ts_offset, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxOutputTSOffset(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context output_ts_offset must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context output_ts_offset must be set with a number.");
+  }
+  status = napi_get_value_int64(env, args[0], &fmtCtx->output_ts_offset);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxDumpSep(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (fmtCtx->dump_separator != nullptr) {
+    status = napi_create_string_utf8(env, (char*) fmtCtx->dump_separator,
+      NAPI_AUTO_LENGTH, &result);
+    CHECK_STATUS;
+  } else {
+    status = napi_get_null(env, &result);
+    CHECK_STATUS;
+  }
+
+  return result;
+}
+
+napi_value setFmtCtxDumpSep(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+  uint8_t* dumpy;
+  size_t strLen;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set the dump_separator property.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if ((type == napi_null) || (type == napi_undefined)) {
+    if (fmtCtx->dump_separator != nullptr) {
+      av_freep(&fmtCtx->dump_separator);
+    }
+    fmtCtx->dump_separator = nullptr;
+    goto done;
+  }
+  if (type != napi_string) {
+    NAPI_THROW_ERROR("A string is required to set the dump_separator property.");
+  }
+  status = napi_get_value_string_utf8(env, args[0], nullptr, 0, &strLen);
+  CHECK_STATUS;
+  dumpy = (uint8_t*) av_malloc(sizeof(char) * (strLen + 1));
+  status = napi_get_value_string_utf8(env, args[0], (char*) dumpy, strLen + 1, &strLen);
+  CHECK_STATUS;
+
+  if (fmtCtx->dump_separator != nullptr) {
+    av_freep(&fmtCtx->dump_separator);
+  }
+  fmtCtx->dump_separator = dumpy;
+
+done:
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxMaxStreams(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->max_streams, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxMaxStreams(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context max_streams must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context max_streams must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->max_streams);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
+napi_value getFmtCtxSkipEstDurFromPTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVFormatContext* fmtCtx;
+
+  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+
+  status = napi_create_int32(env, fmtCtx->skip_estimate_duration_from_pts, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setFmtCtxSkipEstDurFromPTS(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  napi_valuetype type;
+  AVFormatContext* fmtCtx;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  CHECK_STATUS;
+  if (argc != 1) {
+    NAPI_THROW_ERROR("Format context skip_estimate_duration_from_pts must be set with a value.");
+  }
+  status = napi_typeof(env, args[0], &type);
+  CHECK_STATUS;
+  if (type != napi_number) {
+    NAPI_THROW_ERROR("Format context skip_estimate_duration_from_pts must be set with a number.");
+  }
+  status = napi_get_value_int32(env, args[0], &fmtCtx->skip_estimate_duration_from_pts);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_value failSetter(napi_env env, napi_callback_info info) {
   NAPI_THROW_ERROR("Cannot set this read-only property value.");
 }
@@ -2771,27 +3013,44 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       isMuxer ? nullptr : getFmtCtxFmtWhitelist,
       isMuxer ? failSetter : setFmtCtxFmtWhitelist, nullptr,
       isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
-      // io_repositioned
-      // metaadata_header_padding
-      // output_ts_offset
-      // dump_separator
-      { "protocol_whitelist", nullptr, nullptr,
-        isMuxer ? nullptr : getFmtCtxProtWhitelist,
-        isMuxer ? failSetter : setFmtCtxProtWhitelist, nullptr,
-        isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
-      { "protocol_blacklist", nullptr, nullptr,
-        isMuxer ? nullptr : getFmtCtxProtBlacklist,
-        isMuxer ? failSetter : setFmtCtxProtBlacklist, nullptr,
-        isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
-      // max_streams
-      // skip_estimate_duration_from_pts
+    { "io_repositioned", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxIORepo, failSetter, nullptr,
+      isMuxer ? napi_default : napi_enumerable, fmtCtx },
+    { "metadata_header_padding", nullptr, nullptr,
+      isMuxer ? getFmtCtxMetadataHdrPad : nullptr,
+      isMuxer ? setFmtCtxMetadataHdrPad : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+      // not exposing opaque
+    { "output_ts_offset", nullptr, nullptr,
+      isMuxer ? getFmtCtxOutputTSOffset : nullptr,
+      isMuxer ? setFmtCtxOutputTSOffset : failSetter, nullptr,
+      isMuxer ? (napi_property_attributes) (napi_writable | napi_enumerable) : napi_default, fmtCtx },
+    { "dump_separator", nullptr, nullptr, getFmtCtxDumpSep, setFmtCtxDumpSep, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "protocol_whitelist", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxProtWhitelist,
+      isMuxer ? failSetter : setFmtCtxProtWhitelist, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "protocol_blacklist", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxProtBlacklist,
+      isMuxer ? failSetter : setFmtCtxProtBlacklist, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "max_streams", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxMaxStreams,
+      isMuxer ? failSetter : setFmtCtxMaxStreams, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    { "skip_estimate_duration_from_pts", nullptr, nullptr,
+      isMuxer ? nullptr : getFmtCtxSkipEstDurFromPTS,
+      isMuxer ? failSetter : setFmtCtxSkipEstDurFromPTS, nullptr,
+      isMuxer ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), fmtCtx },
+    // 50
     { "interleaved", nullptr, nullptr, nullptr, nullptr, truth,
       (napi_property_attributes) (napi_writable | napi_enumerable), nullptr }, // format is interleaved?
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 46, desc);
+  status = napi_define_properties(env, jsFmtCtx, 52, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
@@ -2807,6 +3066,18 @@ void formatContextFinalizer(napi_env env, void* data, void* hint) {
       printf("DEBUG: For url '%s', %s", (fc->url != nullptr) ? fc->url : "unknown",
         avErrorMsg("error closing IO: ", ret));
     }
+  }
+  if (fc->codec_whitelist != nullptr) {
+    av_freep(fc->codec_whitelist);
+  }
+  if (fc->format_whitelist != nullptr) {
+    av_freep(fc->format_whitelist);
+  }
+  if (fc->protocol_whitelist != nullptr) {
+    av_freep(fc->protocol_whitelist);
+  }
+  if (fc->protocol_blacklist != nullptr) {
+    av_freep(fc->protocol_blacklist);
   }
   avformat_free_context(fc);
 }
