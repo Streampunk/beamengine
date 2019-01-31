@@ -588,6 +588,105 @@ napi_status makeAVDictionary(napi_env env, napi_value options, AVDictionary** me
   return napi_ok;
 }
 
+napi_status fromAVPacketSideDataArray(napi_env env, AVPacketSideData* data,
+    int dataSize, napi_value* result) {
+  napi_status status;
+  napi_value value, element;
+  void* resultData;
+
+  if (dataSize <= 0) {
+    status = napi_get_null(env, &value);
+    PASS_STATUS;
+    *result = value;
+    return napi_ok;
+  }
+  status = napi_create_object(env, &value);
+  PASS_STATUS;
+  status = beam_set_string_utf8(env, value, "type", "PacketSideData");
+  for ( int x = 0 ; x < dataSize ; x++ ) {
+    status = napi_create_buffer_copy(env, data[x].size, data[x].data, &resultData, &element);
+    PASS_STATUS;
+    status = napi_set_named_property(env, value,
+      beam_lookup_name(beam_packet_side_data_type->forward, data[x].type), element);
+    PASS_STATUS;
+  }
+
+  *result = value;
+  return napi_ok;
+}
+
+napi_status toAVPacketSideDataArray(napi_env env, napi_value sided,
+    AVPacketSideData** data, int* dataSize) {
+  napi_status status;
+  napi_value names, name, element;
+  napi_valuetype type;
+  bool isArray, isBuffer;
+  uint32_t sdCount;
+  AVPacketSideData* psd;
+  int psdt;
+  char* typeName;
+  size_t strLen;
+  void* rawdata;
+  size_t rawdataSize;
+
+  status = napi_typeof(env, sided, &type);
+  PASS_STATUS;
+  status = napi_is_array(env, sided, &isArray);
+  PASS_STATUS;
+  if (isArray || (type != napi_object)) {
+    av_freep(data);
+    *dataSize = 0;
+    return napi_ok;
+  }
+  status = napi_get_property_names(env, sided, &names);
+  PASS_STATUS;
+  status = napi_get_array_length(env, names, &sdCount);
+  PASS_STATUS;
+
+  psd = (AVPacketSideData*) av_mallocz(sizeof(AVPacketSideData) * sdCount);
+  for ( uint32_t x = 0 ; x < sdCount ; x++ ) {
+    status = napi_get_element(env, names, x, &name);
+    PASS_STATUS;
+    status = napi_get_property(env, sided, name, &element);
+    PASS_STATUS;
+    status = napi_is_buffer(env, element, &isBuffer);
+    PASS_STATUS;
+    if (!isBuffer) {
+      sdCount--;
+      continue;
+    }
+    status = napi_get_value_string_utf8(env, name, nullptr, 0, &strLen);
+    PASS_STATUS;
+    typeName = (char*) malloc(sizeof(char) * (strLen + 1));
+    status = napi_get_value_string_utf8(env, name, typeName, strLen + 1, &strLen);
+    PASS_STATUS;
+
+    psdt = beam_lookup_enum(beam_packet_side_data_type->inverse, typeName);
+    if (psdt == BEAM_ENUM_UNKNOWN) {
+      sdCount--;
+      continue;
+    } else {
+      status = napi_get_buffer_info(env, element, &rawdata, &rawdataSize);
+      PASS_STATUS;
+      psd[x].data = (uint8_t*) av_malloc(rawdataSize + AV_INPUT_BUFFER_PADDING_SIZE);
+      psd[x].size = rawdataSize;
+      memcpy(psd[x].data, rawdata, rawdataSize);
+    }
+  }
+
+  if ((*dataSize > 0) && (*data != nullptr)) {
+    for ( int x = 0 ; x < *dataSize ; x++ ) {
+      av_free((*data)[x].data);
+    }
+    av_freep(data);
+    *dataSize = 0;
+  }
+
+  *dataSize = sdCount;
+  *data = psd;
+  return napi_ok;
+}
+
 std::unordered_map<int, std::string> beam_field_order_fmap = {
   { AV_FIELD_PROGRESSIVE, "progressive" },
   { AV_FIELD_TT, "top coded first, top displayed first" },
@@ -745,3 +844,34 @@ std::unordered_map<int, std::string> beam_avfmt_duration2_fmap = {
   { AVFMT_DURATION_FROM_BITRATE, "from_bitrate" }
 };
 const beamEnum* beam_avfmt_duration2 = new beamEnum(beam_avfmt_duration2_fmap);
+
+std::unordered_map<int, std::string> beam_packet_side_data_type_fmap = {
+  { AV_PKT_DATA_PALETTE, "palette" },
+  { AV_PKT_DATA_NEW_EXTRADATA, "new_extradata" },
+  { AV_PKT_DATA_PARAM_CHANGE, "param_change" },
+  { AV_PKT_DATA_H263_MB_INFO, "h263_mb_info" },
+  { AV_PKT_DATA_REPLAYGAIN, "replaygain" },
+  { AV_PKT_DATA_DISPLAYMATRIX, "displaymatrix" },
+  { AV_PKT_DATA_STEREO3D, "stero3d" },
+  { AV_PKT_DATA_AUDIO_SERVICE_TYPE, "audio_service_type" },
+  { AV_PKT_DATA_QUALITY_STATS, "quality_stats" },
+  { AV_PKT_DATA_FALLBACK_TRACK, "fallback_track" },
+  { AV_PKT_DATA_CPB_PROPERTIES, "cpb_properties" },
+  { AV_PKT_DATA_SKIP_SAMPLES, "skip_samples" },
+  { AV_PKT_DATA_JP_DUALMONO, "jp_dualmono" },
+  { AV_PKT_DATA_STRINGS_METADATA, "strings_metadata" },
+  { AV_PKT_DATA_SUBTITLE_POSITION, "subtitle_position" },
+  { AV_PKT_DATA_MATROSKA_BLOCKADDITIONAL, "matroska_blockadditional" },
+  { AV_PKT_DATA_WEBVTT_IDENTIFIER, "webvtt_identifier" },
+  { AV_PKT_DATA_WEBVTT_SETTINGS, "webvtt_settings" },
+  { AV_PKT_DATA_METADATA_UPDATE, "metadata_update" },
+  { AV_PKT_DATA_MPEGTS_STREAM_ID, "mpegts_stream_id" },
+  { AV_PKT_DATA_MASTERING_DISPLAY_METADATA, "mastering_display_metadata" },
+  { AV_PKT_DATA_SPHERICAL, "spherical" },
+  { AV_PKT_DATA_CONTENT_LIGHT_LEVEL, "content_light_level" },
+  { AV_PKT_DATA_A53_CC, "a53_cc" },
+  { AV_PKT_DATA_ENCRYPTION_INIT_INFO, "encryption_init_info" },
+  { AV_PKT_DATA_ENCRYPTION_INFO, "encyption_info" },
+  { AV_PKT_DATA_AFD, "afd" }
+};
+const beamEnum* beam_packet_side_data_type = new beamEnum(beam_packet_side_data_type_fmap);
