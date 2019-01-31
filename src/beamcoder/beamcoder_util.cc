@@ -588,6 +588,15 @@ napi_status makeAVDictionary(napi_env env, napi_value options, AVDictionary** me
   return napi_ok;
 }
 
+/* Reading the methods to add and remove packet side data in FFmpeg, only one of
+   each type of stream is allowed. This has a similar semtantic to the properties
+   of a JSObject, where each property has a unique name. Therefore, an
+   AVPacketSideData* array in C maps to a JSObject of packet side data type named
+   properties with Buffer values. Data is copied to avoid lifecycle issues.
+
+   e.g. { afd: Buffer.from([7]), a53_cc: Buffer.from('subtitle bytes') }  
+*/
+
 napi_status fromAVPacketSideDataArray(napi_env env, AVPacketSideData* data,
     int dataSize, napi_value* result) {
   napi_status status;
@@ -670,6 +679,7 @@ napi_status toAVPacketSideDataArray(napi_env env, napi_value sided,
       PASS_STATUS;
       psd[x].data = (uint8_t*) av_malloc(rawdataSize + AV_INPUT_BUFFER_PADDING_SIZE);
       psd[x].size = rawdataSize;
+      psd[x].type = (AVPacketSideDataType) psdt;
       memcpy(psd[x].data, rawdata, rawdataSize);
     }
   }

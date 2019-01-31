@@ -28,7 +28,7 @@ async function run() {
   for ( let x = 0 ; x < 100 ; x++ ) {
     let packet = await demuxer.read();
     if (packet.stream_index == 0) {
-      //console.log(packet);
+      // console.log(packet);
       let frames = await decoder.decode(packet);
     //  console.log(frames);
     }

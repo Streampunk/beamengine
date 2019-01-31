@@ -6556,6 +6556,22 @@ napi_value getCodecCtxProps(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getCodecCtxCodedSideData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVCodecContext* codec;
+
+  size_t argc = 0;
+  status = napi_get_cb_info(env, info, &argc, nullptr, nullptr, (void**) &codec);
+  CHECK_STATUS;
+
+  status = fromAVPacketSideDataArray(env, codec->coded_side_data,
+    codec->nb_coded_side_data, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
 napi_value getCodecCtxSubTextFmt(napi_env env, napi_callback_info info) {
   napi_status status;
   napi_value result;
@@ -7282,7 +7298,9 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
     { "properties", nullptr, nullptr,
       encoding ? nullptr : getCodecCtxProps, failBoth, nullptr,
       encoding ? napi_default : napi_enumerable, codec},
-    // TODO AVPacketSideData
+    { "coded_side_data", nullptr, nullptr,
+      encoding ? getCodecCtxCodedSideData : nullptr, failBoth, nullptr,
+      encoding ? napi_enumerable : napi_default, codec},
     // TODO hw_frames_ctx
     { "sub_text_format", nullptr, nullptr,
       encoding ? nullptr : getCodecCtxSubTextFmt,
@@ -7290,10 +7308,10 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
       encoding ? napi_default : (napi_property_attributes) (napi_writable | napi_enumerable), codec},
     { "trailing_padding", nullptr, nullptr, getCodecCtxTrailPad, setCodecCtxTrailPad, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), codec},
+    // 130
     { "max_pixels", nullptr, nullptr, getCodecCtxMaxPixels, setCodecCtxMaxPixels, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), codec},
     // TODO hw_device_ctx
-    // 130
     { "hwaccel_flags", nullptr, nullptr,
       encoding ? nullptr : getCodecCtxHwAccelFlags,
       encoding ? failEncoding : setCodecCtxHwAccelFlags, nullptr,
@@ -7316,7 +7334,7 @@ napi_status fromAVCodecContext(napi_env env, AVCodecContext* codec,
       napi_writable, nullptr},
     { "_CodecContext", nullptr, nullptr, nullptr, nullptr, extCodec, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsCodec, 138, desc);
+  status = napi_define_properties(env, jsCodec, 139, desc);
   PASS_STATUS;
 
   *result = jsCodec;

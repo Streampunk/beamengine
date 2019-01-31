@@ -323,6 +323,41 @@ napi_value setPacketFlags(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getPacketSideData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  packetData* p;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &p);
+  CHECK_STATUS;
+
+  status = fromAVPacketSideDataArray(env, p->packet->side_data,
+    p->packet->side_data_elems, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setPacketSideData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  packetData* p;
+
+  size_t argc = 1;
+  napi_value args[1];
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &p);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set side_data property.");
+  }
+  status = toAVPacketSideDataArray(env, args[0], &p->packet->side_data,
+    &p->packet->side_data_elems);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
 
 napi_value getPacketDuration(napi_env env, napi_callback_info info) {
   napi_status status;
@@ -474,13 +509,16 @@ napi_status fromAVPacket(napi_env env, packetData* p, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "flags", nullptr, nullptr, getPacketFlags, setPacketFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
+    { "side_data", nullptr, nullptr, getPacketSideData, setPacketSideData, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "duration", nullptr, nullptr, getPacketDuration, setPacketDuration, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
+    // 10
     { "pos", nullptr, nullptr, getPacketPos, setPacketPos, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), p },
     { "_packet", nullptr, nullptr, nullptr, nullptr, extPacket, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsPacket, 10, desc);
+  status = napi_define_properties(env, jsPacket, 11, desc);
   PASS_STATUS;
 
   if (p->packet->buf != nullptr) {

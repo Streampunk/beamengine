@@ -637,11 +637,20 @@ napi_value getFmtCtxCtxFlags(napi_env env, napi_callback_info info) {
 
 napi_value getFmtCtxStreams(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, element;
+  napi_value result, element, jsStreams, jsContext;
+  bool isArray;
   AVFormatContext* fmtCtx;
 
-  status = napi_get_cb_info(env, info, nullptr, nullptr, nullptr, (void**) &fmtCtx);
+  status = napi_get_cb_info(env, info, nullptr, nullptr, &jsContext, (void**) &fmtCtx);
   CHECK_STATUS;
+
+  status = napi_get_named_property(env, jsContext, "_streams", &jsStreams);
+  CHECK_STATUS;
+  status = napi_is_array(env, jsStreams, &isArray);
+  CHECK_STATUS;
+  if (isArray) {
+    return jsStreams;
+  }
 
   status = napi_create_array(env, &result);
   CHECK_STATUS;
@@ -653,6 +662,10 @@ napi_value getFmtCtxStreams(napi_env env, napi_callback_info info) {
     status = napi_set_element(env, result, x, element);
     CHECK_STATUS;
   }
+
+  // Ensure streams have same lifecycle as owning context
+  status = napi_set_named_property(env, jsContext, "_streams", result);
+  CHECK_STATUS;
 
   return result;
 }
@@ -2865,7 +2878,7 @@ napi_value failSetter(napi_env env, napi_callback_info info) {
 napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     napi_value* result, bool isMuxer) {
   napi_status status;
-  napi_value jsFmtCtx, extFmtCtx, typeName, truth;
+  napi_value jsFmtCtx, extFmtCtx, typeName, truth, undef;
 
   status = napi_create_object(env, &jsFmtCtx);
   PASS_STATUS;
@@ -2873,6 +2886,8 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     NAPI_AUTO_LENGTH, &typeName);
   PASS_STATUS;
   status = napi_get_boolean(env, true, &truth);
+  PASS_STATUS;
+  status = napi_get_undefined(env, &undef);
   PASS_STATUS;
   status = napi_create_external(env, fmtCtx, formatContextFinalizer, nullptr, &extFmtCtx);
   PASS_STATUS;
@@ -3048,7 +3063,8 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
       (napi_property_attributes) (napi_writable | napi_enumerable), nullptr }, // format is interleaved?
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
-    { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr }
+    { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr },
+    { "_streams", nullptr, nullptr, nullptr, nullptr, undef, napi_writable, nullptr }
   };
   status = napi_define_properties(env, jsFmtCtx, 52, desc);
   PASS_STATUS;
@@ -3084,19 +3100,21 @@ void formatContextFinalizer(napi_env env, void* data, void* hint) {
 
 napi_value newStream(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, name, assign, global, jsObject;
+  napi_value result, name, assign, global, jsObject, jsContext, jsStreams;
   napi_valuetype type;
+  bool isArray;
   AVFormatContext* fmtCtx;
   AVStream* stream;
   char* codecName = nullptr;
   size_t strLen;
   AVCodec* codec = nullptr;
   const AVCodecDescriptor* codecDesc = nullptr;
+  uint32_t streamCount;
 
   size_t argc = 1;
   napi_value args[1];
 
-  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &fmtCtx);
+  status = napi_get_cb_info(env, info, &argc, args, &jsContext, (void**) &fmtCtx);
   CHECK_STATUS;
 
   if (argc >= 1) {
@@ -3164,6 +3182,17 @@ napi_value newStream(napi_env env, napi_callback_info info) {
     status = napi_call_function(env, result, assign, 2, fargs, &result);
     CHECK_STATUS;
   }
+
+  status = napi_get_named_property(env, jsContext, "_streams", &jsStreams);
+  CHECK_STATUS;
+  status = napi_is_array(env, jsStreams, &isArray);
+  CHECK_STATUS;
+  if (isArray) {
+    status = napi_get_array_length(env, jsStreams, &streamCount);
+    CHECK_STATUS;
+    status = napi_set_element(env, jsStreams, streamCount, result);
+    CHECK_STATUS;
+  } // else let the first call to get create array
   return result;
 }
 
@@ -4020,6 +4049,43 @@ napi_value getStreamAttachedPic(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value getStreamSideData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  AVStream* stream;
+
+  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  status = fromAVPacketSideDataArray(env, stream->side_data,
+    stream->nb_side_data, &result);
+  CHECK_STATUS;
+
+  return result;
+}
+
+napi_value setStreamSideData(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value result;
+  // napi_valuetype type;
+  AVStream* stream;
+
+  size_t argc = 1;
+  napi_value args[1];
+
+  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  CHECK_STATUS;
+  if (argc < 1) {
+    NAPI_THROW_ERROR("A value is required to set a stream's side_data property.");
+  }
+  status = toAVPacketSideDataArray(env, args[0], &stream->side_data,
+    &stream->nb_side_data);
+  CHECK_STATUS;
+
+  status = napi_get_undefined(env, &result);
+  CHECK_STATUS;
+  return result;
+}
+
 napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
   napi_status status;
   napi_value jsStream, extStream, typeName;
@@ -4058,7 +4124,8 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "attached_pic", nullptr, nullptr, getStreamAttachedPic, nullptr, nullptr,
        napi_enumerable, stream },
-    // side data
+    { "side_data", nullptr, nullptr, getStreamSideData, setStreamSideData, nullptr,
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "event_flags", nullptr, nullptr, getStreamEventFlags, setStreamEventFlags, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "r_frame_rate", nullptr, nullptr, getStreamRFrameRate, setStreamRFrameRate, nullptr,
@@ -4068,7 +4135,7 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
     { "name", nullptr, nullptr, nullptr, nullptr, typeName, napi_writable, nullptr },
     { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
   };
-  status = napi_define_properties(env, jsStream, 18, desc);
+  status = napi_define_properties(env, jsStream, 19, desc);
   PASS_STATUS;
 
   *result = jsStream;
