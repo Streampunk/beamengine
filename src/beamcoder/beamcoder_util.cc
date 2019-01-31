@@ -739,9 +739,9 @@ std::unordered_map<int, std::string> beam_avoid_neg_ts_fmap = {
 };
 const beamEnum* beam_avoid_neg_ts = new beamEnum(beam_avoid_neg_ts_fmap);
 
-std::unordered_map<int, std::string> beam_avfmt_duration_fmap = {
+std::unordered_map<int, std::string> beam_avfmt_duration2_fmap = {
   { AVFMT_DURATION_FROM_PTS, "from_pts" },
   { AVFMT_DURATION_FROM_STREAM, "from_stream" },
   { AVFMT_DURATION_FROM_BITRATE, "from_bitrate" }
 };
-// const beamEnum* beam_avfmt_duration = new beamEnum(beam_avfmt_duration_fmap);
+const beamEnum* beam_avfmt_duration2 = new beamEnum(beam_avfmt_duration2_fmap);
