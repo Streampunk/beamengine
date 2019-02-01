@@ -4004,7 +4004,7 @@ napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
 
 napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result, jsCodecPar, extCodecPar;
+  napi_value result, jsCodecPar, extCodecPar, jsStream;
   napi_valuetype type;
   AVStream* stream;
   bool isArray;
@@ -4012,7 +4012,7 @@ napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value args[1];
 
-  status = napi_get_cb_info(env, info, &argc, args, nullptr, (void**) &stream);
+  status = napi_get_cb_info(env, info, &argc, args, &jsStream, (void**) &stream);
   CHECK_STATUS;
   if (argc != 1) {
     NAPI_THROW_ERROR("Cannot set stream codec parameters without a value.");
@@ -4037,6 +4037,8 @@ napi_value setStreamCodecPar(napi_env env, napi_callback_info info) {
   CHECK_STATUS;
 
   status = napi_get_undefined(env, &result);
+  CHECK_STATUS; // Reset external codec par reference
+  status = napi_set_named_property(env, jsStream, "__codecPar", result);
   CHECK_STATUS;
   return result;
 }
