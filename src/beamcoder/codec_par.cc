@@ -1665,5 +1665,6 @@ void codecParamsFinalizer(napi_env env, void* data, void* hint) {
     av_freep(&c->extradata);
     c->extradata_size = 0;
   }
+  // printf("About to free %p\n", c);
   avcodec_parameters_free(&c);
 }

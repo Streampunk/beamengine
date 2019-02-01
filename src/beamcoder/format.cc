@@ -3083,7 +3083,8 @@ void formatContextFinalizer(napi_env env, void* data, void* hint) {
         avErrorMsg("error closing IO: ", ret));
     }
   }
-  if (fc->codec_whitelist != nullptr) {
+  // FIXME this is segfaulting ... why
+  /* if (fc->codec_whitelist != nullptr) {
     av_freep(fc->codec_whitelist);
   }
   if (fc->format_whitelist != nullptr) {
@@ -3094,7 +3095,7 @@ void formatContextFinalizer(napi_env env, void* data, void* hint) {
   }
   if (fc->protocol_blacklist != nullptr) {
     av_freep(fc->protocol_blacklist);
-  }
+  } */
   avformat_free_context(fc);
 }
 
@@ -3994,7 +3995,7 @@ napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
     return jsPars;
   }
 
-  status = fromAVCodecParameters(env, stream->codecpar, true, &result);
+  status = fromAVCodecParameters(env, stream->codecpar, false, &result);
   CHECK_STATUS;
   status = napi_set_named_property(env, jsStream, "__codecPar", result);
   CHECK_STATUS;
