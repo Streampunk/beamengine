@@ -129,6 +129,7 @@ napi_value getCodecCtxPrivData(napi_env env, napi_callback_info info) {
               if (option->default_val.i64 == iValue) {
                 status = beam_set_string_utf8(env, result, (char*) data, (char*) option->name);
                 CHECK_STATUS;
+                break;
               }
               prev = option;
               option = av_opt_next(codec->priv_data, option);

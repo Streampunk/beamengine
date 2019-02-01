@@ -113,7 +113,7 @@ create:
   if (encoder == nullptr) {
     NAPI_THROW_ERROR("Problem allocating encoder context.");
   }
-  printf("About to get in here %i\n", codecParams == nullptr);
+
   if (codecParams != nullptr) {
     if ((ret = avcodec_parameters_to_context(encoder, (const AVCodecParameters*) codecParams))) {
       NAPI_THROW_ERROR(avErrorMsg("Failed to set encoder paramters from provided params: ", ret));

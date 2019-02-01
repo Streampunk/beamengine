@@ -644,7 +644,7 @@ napi_value getFmtCtxStreams(napi_env env, napi_callback_info info) {
   status = napi_get_cb_info(env, info, nullptr, nullptr, &jsContext, (void**) &fmtCtx);
   CHECK_STATUS;
 
-  status = napi_get_named_property(env, jsContext, "_streams", &jsStreams);
+  status = napi_get_named_property(env, jsContext, "__streams", &jsStreams);
   CHECK_STATUS;
   status = napi_is_array(env, jsStreams, &isArray);
   CHECK_STATUS;
@@ -664,7 +664,7 @@ napi_value getFmtCtxStreams(napi_env env, napi_callback_info info) {
   }
 
   // Ensure streams have same lifecycle as owning context
-  status = napi_set_named_property(env, jsContext, "_streams", result);
+  status = napi_set_named_property(env, jsContext, "__streams", result);
   CHECK_STATUS;
 
   return result;
@@ -3064,9 +3064,9 @@ napi_status fromAVFormatContext(napi_env env, AVFormatContext* fmtCtx,
     { "newStream", nullptr, newStream, nullptr, nullptr, nullptr,
       napi_enumerable, fmtCtx },
     { "_formatContext", nullptr, nullptr, nullptr, nullptr, extFmtCtx, napi_default, nullptr },
-    { "_streams", nullptr, nullptr, nullptr, nullptr, undef, napi_writable, nullptr }
+    { "__streams", nullptr, nullptr, nullptr, nullptr, undef, napi_writable, nullptr }
   };
-  status = napi_define_properties(env, jsFmtCtx, 52, desc);
+  status = napi_define_properties(env, jsFmtCtx, 53, desc);
   PASS_STATUS;
 
   *result = jsFmtCtx;
@@ -3183,7 +3183,7 @@ napi_value newStream(napi_env env, napi_callback_info info) {
     CHECK_STATUS;
   }
 
-  status = napi_get_named_property(env, jsContext, "_streams", &jsStreams);
+  status = napi_get_named_property(env, jsContext, "__streams", &jsStreams);
   CHECK_STATUS;
   status = napi_is_array(env, jsStreams, &isArray);
   CHECK_STATUS;
@@ -3979,14 +3979,26 @@ napi_value setStreamRFrameRate(napi_env env, napi_callback_info info) {
 
 napi_value getStreamCodecPar(napi_env env, napi_callback_info info) {
   napi_status status;
-  napi_value result;
+  napi_value result, jsStream, jsPars;
+  napi_valuetype type;
   AVStream* stream;
 
-  status = napi_get_cb_info(env, info, 0, nullptr, nullptr, (void**) &stream);
+  status = napi_get_cb_info(env, info, 0, nullptr, &jsStream, (void**) &stream);
   CHECK_STATUS;
 
-  status = fromAVCodecParameters(env, stream->codecpar, false, &result);
+  status = napi_get_named_property(env, jsStream, "__codecPar", &jsPars);
   CHECK_STATUS;
+  status = napi_typeof(env, jsPars, &type);
+  CHECK_STATUS;
+  if (type == napi_object) {
+    return jsPars;
+  }
+
+  status = fromAVCodecParameters(env, stream->codecpar, true, &result);
+  CHECK_STATUS;
+  status = napi_set_named_property(env, jsStream, "__codecPar", result);
+  CHECK_STATUS;
+
   return result;
 }
 
@@ -4088,11 +4100,13 @@ napi_value setStreamSideData(napi_env env, napi_callback_info info) {
 
 napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
   napi_status status;
-  napi_value jsStream, extStream, typeName;
+  napi_value jsStream, extStream, typeName, undef;
 
   status = napi_create_object(env, &jsStream);
   PASS_STATUS;
   status = napi_create_string_utf8(env, "Stream", NAPI_AUTO_LENGTH, &typeName);
+  PASS_STATUS;
+  status = napi_get_undefined(env, &undef);
   PASS_STATUS;
   // Note - streams are cleaned by avcodec_close() and avcodec_free_context()
   status = napi_create_external(env, stream, nullptr, nullptr, &extStream);
@@ -4116,8 +4130,9 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "discard", nullptr, nullptr, getStreamDiscard, setStreamDiscard, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
+     // 10
     { "sample_aspect_ratio", nullptr, nullptr, getStreamSmpAspectRt, setStreamSmpAspectRt, nullptr,
-      (napi_property_attributes) (napi_writable | napi_enumerable), stream }, // 10
+      (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "metadata", nullptr, nullptr, getStreamMetadata, setStreamMetadata, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "avg_frame_rate", nullptr, nullptr, getStreamAvgFrameRate, setStreamAvgFrameRate, nullptr,
@@ -4133,9 +4148,11 @@ napi_status fromAVStream(napi_env env, AVStream* stream, napi_value* result) {
     { "codecpar", nullptr, nullptr, getStreamCodecPar, setStreamCodecPar, nullptr,
       (napi_property_attributes) (napi_writable | napi_enumerable), stream },
     { "name", nullptr, nullptr, nullptr, nullptr, typeName, napi_writable, nullptr },
-    { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr }
+    { "_stream", nullptr, nullptr, nullptr, nullptr, extStream, napi_default, nullptr },
+    // 20
+    { "__codecPar", nullptr, nullptr, nullptr, nullptr, undef, napi_writable, nullptr }
   };
-  status = napi_define_properties(env, jsStream, 19, desc);
+  status = napi_define_properties(env, jsStream, 20, desc);
   PASS_STATUS;
 
   *result = jsStream;
