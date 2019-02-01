@@ -1,4 +1,3 @@
-
 /*
   Aerostat Beam Engine - Redis-backed highly-scale-able and cloud-fit media beam engine.
   Copyright (C) 2019  Streampunk Media Ltd.
@@ -199,7 +198,7 @@ napi_status fromAVClass(napi_env env, const AVClass* cls, napi_value* result);
 napi_status makeAVDictionary(napi_env env, napi_value options, AVDictionary** dict);
 napi_status fromAVPacketSideDataArray(napi_env env, AVPacketSideData* data,
     int dataSize, napi_value* result);
-napi_status toAVPacketSideDataArray(napi_env env, napi_value sided, 
+napi_status toAVPacketSideDataArray(napi_env env, napi_value sided,
   AVPacketSideData** data, int* dataSize);
 
 #endif // BEAMCODER_UTIL_H
