@@ -1,8 +1,10 @@
-# Aerostat
+# Aerostat Beam Engine
 
 Redis-backed highly-scale-able and cloud-fit media beam engine.
 
 A prototype implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
+
+Work in progress. For Node.js FFmpeg native bindings, please see [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder).
 
 ## Status, support and further development
 

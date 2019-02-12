@@ -19,52 +19,12 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-const beamcoder = require('bindings')('beamcoder');
-
-// Provide useful debug on segfault-related crash
-const SegfaultHandler = require('segfault-handler');
-SegfaultHandler.registerHandler('crash.log');
-
 const splash = `Aerostat Beam Engine  Copyright (C) 2019  Streampunk Media Ltd
 GPL v3.0 or later license. This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. Conditions and warranty at:
-https://github.com/Streampunk/aerostat/blob/master/LICENSE`;
+https://github.com/Streampunk/beamengine/blob/master/LICENSE`;
 
 console.log(splash);
 
-const { Writable } = require('stream');
-
-function createBeamStream(params) {
-  const governor = new beamcoder.governor(params);
-
-  const beamStream = new Writable({
-    decodeStrings: params.decodeStrings || false,
-    highWaterMark: params.highwaterMark || 16384,
-    objectMode: false,
-    write: async (chunk, encoding, cb) => {
-      await governor.write(chunk);
-      cb();
-    },
-    final: cb => {
-      governor.finish();
-      cb();
-    }
-  });
-  beamStream.governor = governor;
-  return beamStream;
-}
-
-function createDemuxer(params) {
-  if (typeof params.pipe === 'function') {
-    const beamStream = createBeamStream({});
-    params.pipe(beamStream);
-    return beamcoder.demuxer(beamStream.governor);
-  } else
-    return beamcoder.demuxer(params);
-}
-
-module.exports = {
-  beamcoder,
-  createDemuxer
-};
+module.exports = {};
