@@ -40,7 +40,7 @@ const packetToRedis = ({ pts, dts, size, stream_index, flags,
   };
   if (side_data) {
     Object.keys(side_data).reduce((l, r) => {
-      l[`side_data_${r}`] = side_data[r];
+      if (r !== 'type') l[`side_data_${r}`] = side_data[r];
       return l;
     }, pkt);
   }
