@@ -7,7 +7,7 @@
     "node": "^8.0.0"
   },
   "scripts": {
-    "test": "npm test",
+    "test": "tape test/*Spec.js",
     "dev": "nodemon app.js",
     "lint": "eslint **/*.js",
     "lint-html": "eslint **/*.js -f html -o ./reports/lint-results.html",

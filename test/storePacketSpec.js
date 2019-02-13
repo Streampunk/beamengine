@@ -26,8 +26,8 @@ const Redis = require('ioredis');
 const packetToRedis = ({ pts, dts, size, stream_index, flags,
   duration, pos, data, side_data }) => {
   let pkt = {
-    pts: pts != null ? pts : '',
-    dts: dts != null ? dts : '',
+    pts,
+    dts,
     size,
     data,
     stream_index,
@@ -50,18 +50,18 @@ const packetToRedis = ({ pts, dts, size, stream_index, flags,
 const packetFromRedis = ({ pts, dts, stream_index, flags_KEY,
   flags_CORRUPT, flags_TRUSTED, flags_DISPOSABLE, duration, pos, data, ...sd }) => {
   let pkt = {
-    pts: pts.length !== 0 ? +pts.toString() : null,
-    dts: dts.length !== 0 ? +dts.toString() : null,
+    pts: pts.length !== 0 ? parseInt(pts.toString()) : null,
+    dts: dts.length !== 0 ? parseInt(dts.toString()) : null,
     data,
-    stream_index: +stream_index.toString(),
+    stream_index: parseInt(stream_index.toString()),
     flags: {
       KEY: flags_KEY[0] === 116, // t
       CORRUPT: flags_CORRUPT[0] === 116,
       TRUSTED: flags_TRUSTED[0] === 116,
       DISPOSABLE: flags_DISPOSABLE[0] === 116
     },
-    duration: +duration.toString(),
-    pos: +pos.toString()
+    duration: parseInt(duration.toString()),
+    pos: parseInt(pos.toString())
   };
   if (Object.keys(sd).length > 0) {
     pkt.side_data = {};
