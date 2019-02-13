@@ -24,12 +24,11 @@ const beamcoder = require('beamcoder');
 const Redis = require('ioredis');
 
 const packetToRedis = ({ pts, dts, size, stream_index, flags,
-  duration, pos, data, side_data }) => {
+  duration, pos, side_data }) => {
   let pkt = {
     pts,
     dts,
     size,
-    data,
     stream_index,
     flags_KEY: flags.KEY,
     flags_CORRUPT: flags.CORRUPT,
@@ -48,11 +47,10 @@ const packetToRedis = ({ pts, dts, size, stream_index, flags,
 };
 
 const packetFromRedis = ({ pts, dts, stream_index, flags_KEY,
-  flags_CORRUPT, flags_TRUSTED, flags_DISPOSABLE, duration, pos, data, ...sd }) => {
+  flags_CORRUPT, flags_TRUSTED, flags_DISPOSABLE, duration, pos, size, ...sd }) => {
   let pkt = {
     pts: pts.length !== 0 ? parseInt(pts.toString()) : null,
     dts: dts.length !== 0 ? parseInt(dts.toString()) : null,
-    data,
     stream_index: parseInt(stream_index.toString()),
     flags: {
       KEY: flags_KEY[0] === 116, // t
@@ -61,7 +59,8 @@ const packetFromRedis = ({ pts, dts, stream_index, flags_KEY,
       DISPOSABLE: flags_DISPOSABLE[0] === 116
     },
     duration: parseInt(duration.toString()),
-    pos: parseInt(pos.toString())
+    pos: parseInt(pos.toString()),
+    buf_size: parseInt(size)
   };
   if (Object.keys(sd).length > 0) {
     pkt.side_data = {};
@@ -98,7 +97,7 @@ test('Roundtrip a packet', async t => {
   rdp = await redis.hgetallBuffer(`beam:packet:${pkt.pts}`);
   console.log('Get took', process.hrtime(start));
   console.log(packetFromRedis(rdp));
-  t.equal(Buffer.compare(rdp.data, data), 0, 'data has roundtripped OK.');
+  // t.equal(Buffer.compare(rdp.data, data), 0, 'data has roundtripped OK.');
   let rp = beamcoder.packet(packetFromRedis(rdp));
   t.ok(rp, 'roundtrip packet is truthy.');
   console.log(rp);
