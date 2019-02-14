@@ -29,16 +29,17 @@ test('Roundtrip codec parameters', async t => {
     name: 'h264',
     width: 1920,
     height: 1080,
-    format: 'yuv422p'
+    format: 'yuv422p',
+    extradata: Buffer.from('Utter May!')
   });
-  console.log(codecParToRedis(cps));
+  console.log(codecParToRedis(cps.toJSON()));
   let redis = new Redis();
   await redis.del('beam:codecpar:test');
   let start = process.hrtime();
-  let cpr = codecParToRedis(cps);
+  let cpr = codecParToRedis(cps.toJSON());
   console.log('codecParToRedis', process.hrtime(start));
   start = process.hrtime();
-  await redis.hmset('beam:codecpar:test', cpr);
+  t.equal(await redis.hmset('beam:codecpar:test', cpr), 'OK', 'redis says set OK.');
   console.log('redis set', process.hrtime(start));
 
   start = process.hrtime();

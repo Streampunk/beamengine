@@ -25,43 +25,45 @@ const Redis = require('ioredis');
 const { codecParToRedis, codecParFromRedis } = require('../lib/mappings.js');
 
 // TODO attached pic
-const streamToRedis = ({ index, id, time_base, start_time, duration, nb_frames,
-  disposition, discard, sample_aspect_ratio, metadata, avg_frame_rate,
-  side_data, event_flags, r_frame_rate, codecpar }) => {
-  let str = {
-    index,
-    id,
-    time_base_num: time_base[0],
-    time_base_den: time_base[1],
-    start_time,
-    duration,
-    nb_frames,
-    disposition_DEFAULT: disposition.DEFAULT,
-    disposition_DUB: disposition.DUB,
-    disposition_ORIGINAL: disposition.ORIGINAL,
-    disposition_COMMENT: disposition.COMMENT,
-    disposition_LYRICS: disposition.LYRICS,
-    disposition_KARAOKE: disposition.KARAOKE,
-    disposition_FORCED: disposition.FORCED,
-    disposition_HEARING_IMPAIRED: disposition.HEARING_IMPAIRED,
-    disposition_VISUAL_IMPAIRED: disposition.VISUAL_IMPAIRED,
-    disposition_CLEAN_EFFECTS: disposition.CLEAN_EFFECTS,
-    disposition_ATTACHED_PIC: disposition.ATTACHED_PIC,
-    disposition_TIMED_THUMBNAILS: disposition.TIMED_THUMBNAILS,
-    disposition_CAPTIONS: disposition.CAPTIONS,
-    disposition_DESCRIPTIONS: disposition.DESCRIPTIONS,
-    disposition_METADATA: disposition.METADATA,
-    disposition_DEPENDENT: disposition.DEPENDENT,
-    disposition_STILL_IMAGE: disposition.STILL_IMAGE,
-    discard,
-    sample_aspect_ratio_num: sample_aspect_ratio[0],
-    sample_aspect_ratio_den: sample_aspect_ratio[1],
-    avg_frame_rate_num: avg_frame_rate[0],
-    avg_frame_rate_den: avg_frame_rate[1],
-    event_flags_METADATA_UPDATED: event_flags.METADATA_UPDATED,
-    r_frame_rate_num: r_frame_rate[0],
-    r_frame_rate_den: r_frame_rate[1]
-  };
+const streamToRedis = ({ type, time_base, disposition, sample_aspect_ratio, metadata, // eslint-disable-line no-unused-vars
+  avg_frame_rate, side_data, event_flags, r_frame_rate, codecpar, ...str }) => {
+  str.time_base_num = time_base[0];
+  str.time_base_den = time_base[1];
+  if (disposition) {
+    if (disposition.DEFAULT) str.disposition_DEFAULT = disposition.DEFAULT;
+    if (disposition.DUB) str.disposition_DUB = disposition.DUB;
+    if (disposition.ORIGINAL) str.disposition_ORIGINAL = disposition.ORIGINAL;
+    if (disposition.COMMENT) str.disposition_COMMENT = disposition.COMMENT;
+    if (disposition.LYRICS) str.disposition_LYRICS = disposition.LYRICS;
+    if (disposition.KARAOKE) str.disposition_KARAOKE = disposition.KARAOKE;
+    if (disposition.FORCED) str.disposition_FORCED = disposition.FORCED;
+    if (disposition.HEARING_IMPAIRED) str.disposition_HEARING_IMPAIRED = disposition.HEARING_IMPAIRED;
+    if (disposition.VISUAL_IMPAIRED) str.disposition_VISUAL_IMPAIRED = disposition.VISUAL_IMPAIRED;
+    if (disposition.CLEAN_EFFECTS) str.disposition_CLEAN_EFFECTS = disposition.CLEAN_EFFECTS;
+    if (disposition.ATTACHED_PIC) str.disposition_ATTACHED_PIC = disposition.ATTACHED_PIC;
+    if (disposition.TIMED_THUMBNAILS) str.disposition_TIMED_THUMBNAILS = disposition.TIMED_THUMBNAILS;
+    if (disposition.CAPTIONS) str.disposition_CAPTIONS = disposition.CAPTIONS;
+    if (disposition.DESCRIPTIONS) str.disposition_DESCRIPTIONS = disposition.DESCRIPTIONS;
+    if (disposition.METADATA) str.disposition_METADATA = disposition.METADATA;
+    if (disposition.DEPENDENT) str.disposition_DEPENDENT = disposition.DEPENDENT;
+    if (disposition.STILL_IMAGE) str.disposition_STILL_IMAGE = disposition.STILL_IMAGE;
+  }
+  if (sample_aspect_ratio) {
+    str.sample_aspect_ratio_num = sample_aspect_ratio[0];
+    str.sample_aspect_ratio_den = sample_aspect_ratio[1];
+  }
+  if (avg_frame_rate) {
+    str.avg_frame_rate_num = avg_frame_rate[0];
+    str.avg_frame_rate_den = avg_frame_rate[1];
+  }
+  if (event_flags) {
+    if (event_flags.METADATA_UPDATED)
+      str.event_flags_METADATA_UPDATED = event_flags.METADATA_UPDATED;
+  }
+  if (r_frame_rate) {
+    str.r_frame_rate_num = r_frame_rate[0];
+    str.r_frame_rate_den = r_frame_rate[1];
+  }
   let embeddedPars = codecParToRedis(codecpar);
   Object.keys(embeddedPars).reduce((l, r) => {
     l[`codecpar_${r}`] = embeddedPars[r];
@@ -95,46 +97,56 @@ const streamFromRedis = ({ index, id, time_base_num, time_base_den, start_time,
     index: parseInt(index.toString()),
     id: parseInt(id.toString()),
     time_base: [ parseInt(time_base_num.toString()),
-      parseInt(time_base_den.toString()) ],
-    start_time: start_time.length > 0 ? parseInt(start_time.toString()) : null,
-    duration: duration.length > 0 ? parseInt(duration.toString()) : null,
-    nb_frames: parseInt(nb_frames.toString()),
-    disposition: {
-      DEFAULT: disposition_DEFAULT[0] === 116,
-      DUB: disposition_DUB[0] === 116,
-      ORIGINAL: disposition_ORIGINAL[0] === 116,
-      COMMENT: disposition_COMMENT[0] === 116,
-      LYRICS: disposition_LYRICS[0] === 116,
-      KARAOKE: disposition_KARAOKE[0] === 116,
-      FORCED: disposition_FORCED[0] === 116,
-      HEARING_IMPAIRED: disposition_HEARING_IMPAIRED[0] === 116,
-      VISUAL_IMPAIRED: disposition_VISUAL_IMPAIRED[0] === 116,
-      CLEAN_EFFECTS: disposition_CLEAN_EFFECTS[0] === 116,
-      ATTACHED_PIC: disposition_ATTACHED_PIC[0] === 116,
-      TIMED_THUMBNAILS: disposition_TIMED_THUMBNAILS[0] === 116,
-      CAPTIONS: disposition_CAPTIONS[0] === 116,
-      DESCRIPTIONS: disposition_DESCRIPTIONS[0] === 116,
-      METADATA: disposition_METADATA[0] === 116,
-      DEPENDENT: disposition_DEPENDENT[0] === 116,
-      STILL_IMAGE: disposition_STILL_IMAGE[0] === 116,
-    },
-    discard: discard.length > 0 ? discard.toString() : null,
-    sample_aspect_ratio: [ parseInt(sample_aspect_ratio_num.toString()),
-      parseInt(sample_aspect_ratio_den.toString() )],
-    avg_frame_rate: [ parseInt(avg_frame_rate_num.toString()),
-      parseInt(avg_frame_rate_den.toString()) ],
-    event_flags: {
-      METADATA_UPDATED: event_flags_METADATA_UPDATED[0] === 116
-    },
-    r_frame_rate : [ parseInt(r_frame_rate_num.toString()),
-      parseInt(r_frame_rate_den.toString()) ],
-    codecpar: codecParFromRedis(Object.keys(etc)
-      .filter(x => x.startsWith('codecpar_'))
-      .reduce((l, r) => {
-        l[r.slice(9)] = etc[r];
-        return l;
-      }, {} ))
+      parseInt(time_base_den.toString()) ]
   };
+  if (start_time) str.start_time = parseInt(start_time.toString());
+  if (duration) str.duration = parseInt(duration.toString());
+  if (nb_frames) str.nb_frames = parseInt(nb_frames.toString());
+  if (disposition_DEFAULT || disposition_DUB || disposition_ORIGINAL ||
+    disposition_COMMENT || disposition_LYRICS || disposition_KARAOKE ||
+    disposition_FORCED || disposition_VISUAL_IMPAIRED || disposition_HEARING_IMPAIRED ||
+    disposition_CLEAN_EFFECTS || disposition_ATTACHED_PIC || disposition_TIMED_THUMBNAILS ||
+    disposition_CAPTIONS || disposition_DESCRIPTIONS || disposition_METADATA ||
+    disposition_DEPENDENT || disposition_STILL_IMAGE) {
+    str.disposition = {
+      DEFAULT: disposition_DEFAULT && disposition_DEFAULT[0] === 116,
+      DUB: disposition_DUB && disposition_DUB[0] === 116,
+      ORIGINAL: disposition_ORIGINAL && disposition_ORIGINAL[0] === 116,
+      COMMENT: disposition_COMMENT && disposition_COMMENT[0] === 116,
+      LYRICS: disposition_LYRICS && disposition_LYRICS[0] === 116,
+      KARAOKE: disposition_KARAOKE && disposition_KARAOKE[0] === 116,
+      FORCED: disposition_FORCED && disposition_FORCED[0] === 116,
+      HEARING_IMPAIRED: disposition_HEARING_IMPAIRED && disposition_HEARING_IMPAIRED[0] === 116,
+      VISUAL_IMPAIRED: disposition_VISUAL_IMPAIRED && disposition_VISUAL_IMPAIRED[0] === 116,
+      CLEAN_EFFECTS: disposition_CLEAN_EFFECTS && disposition_CLEAN_EFFECTS[0] === 116,
+      ATTACHED_PIC: disposition_ATTACHED_PIC && disposition_ATTACHED_PIC[0] === 116,
+      TIMED_THUMBNAILS: disposition_TIMED_THUMBNAILS && disposition_TIMED_THUMBNAILS[0] === 116,
+      CAPTIONS: disposition_CAPTIONS && disposition_CAPTIONS[0] === 116,
+      DESCRIPTIONS: disposition_DESCRIPTIONS && disposition_DESCRIPTIONS[0] === 116,
+      METADATA: disposition_METADATA && disposition_METADATA[0] === 116,
+      DEPENDENT: disposition_DEPENDENT && disposition_DEPENDENT[0] === 116,
+      STILL_IMAGE: disposition_STILL_IMAGE && disposition_STILL_IMAGE[0] === 116,
+    }; }
+  if (discard) str.discard = discard.toString();
+  if (sample_aspect_ratio_num && sample_aspect_ratio_den)
+    str.sample_aspect_ratio = [ parseInt(sample_aspect_ratio_num.toString()),
+      parseInt(sample_aspect_ratio_den.toString() )];
+  if (avg_frame_rate_num && avg_frame_rate_den)
+    str.avg_frame_rate = [ parseInt(avg_frame_rate_num.toString()),
+      parseInt(avg_frame_rate_den.toString()) ];
+  if (event_flags_METADATA_UPDATED ) {
+    str.event_flags = {
+      METADATA_UPDATED: event_flags_METADATA_UPDATED && event_flags_METADATA_UPDATED[0] === 116
+    }; }
+  if (r_frame_rate_num && r_frame_rate_den)
+    str.r_frame_rate = [ parseInt(r_frame_rate_num.toString()),
+      parseInt(r_frame_rate_den.toString()) ];
+  str.codecpar = codecParFromRedis(Object.keys(etc)
+    .filter(x => x.startsWith('codecpar_'))
+    .reduce((l, r) => {
+      l[r.slice(9)] = etc[r];
+      return l;
+    }, {} ));
   if (Object.keys(etc).length > 0) {
     if (Object.keys(etc).find(x => x.startsWith('metadata_'))) {
       str.metadata = Object.keys(etc)
@@ -166,25 +178,28 @@ test('Roundtrip a stream', async t => {
   const redis = new Redis();
   await redis.del('beam:stream:test');
 
-  let start = process.hrtime();
-  let sr = streamToRedis(s);
-  console.log('streamToRedis', process.hrtime(start));
-  start = process.hrtime();
-  t.equal(await redis.hmset('beam:stream:test', sr), 'OK', 'reports set OK.');
-  console.log('redis set', process.hrtime(start));
+  for ( let x = 0 ; x < 100 ; x++ ) {
+    let start = process.hrtime();
+    let sr = streamToRedis(s.toJSON());
+    let end = process.hrtime(start);
+    console.log('streamToRedis', end);
+    start = process.hrtime();
 
-  start = process.hrtime();
-  let srb = await redis.hgetallBuffer('beam:stream:test');
-  console.log('redis get', process.hrtime(start));
-  start = process.hrtime();
-  let rso = streamFromRedis(srb);
-  console.log('streamFromRedis', process.hrtime(start));
+    t.equal(await redis.hmset('beam:stream:test', sr), 'OK', 'reports set OK.');
+    console.log('redis set', process.hrtime(start));
 
-  start = process.hrtime();
-  let rs = fmt.newStream(rso);
-  console.log('Creatint stream', process.hrtime(start));
-  // console.log(rs);
-  t.ok(rs, 'roundtrip stream is truthy.');
+    start = process.hrtime();
+    let srb = await redis.hgetallBuffer('beam:stream:test');
+    console.log('redis get', process.hrtime(start));
+    start = process.hrtime();
+    let rso = streamFromRedis(srb);
+    console.log('streamFromRedis', process.hrtime(start));
+
+    start = process.hrtime();
+    let rs = fmt.newStream(rso);
+    console.log('Creating stream', process.hrtime(start));
+    t.ok(rs, 'roundtrip stream is truthy.');
+  }
 
   await redis.quit();
   t.end();

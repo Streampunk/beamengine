@@ -23,7 +23,7 @@ const test = require('tape');
 const beamcoder = require('beamcoder');
 const Redis = require('ioredis');
 
-const frameToRedis = ({ type, linesize, sample_aspect_ratio,
+const frameToRedis = ({ type, linesize, sample_aspect_ratio,  // eslint-disable-line no-unused-vars
   flags, decode_error_flags, side_data, metadata, buf_sizes, ...f }) => {
   f.linesize = JSON.stringify(linesize);
   if (sample_aspect_ratio) {

@@ -87,7 +87,7 @@ const Redis = require('ioredis');
   return pkt;
 }; */
 
-const packetToRedis = ({ type, flags, side_data, ...p }) => {
+const packetToRedis = ({ type, flags, side_data, ...p }) => { // eslint-disable-line no-unused-vars
   if (flags) {
     p.flags_KEY = flags.KEY;
     p.flags_CORRUPT = flags.CORRUPT;
@@ -210,23 +210,23 @@ test('Roundtrip a packet', async t => {
   await redis.del(`beam:packet:${pkt.pts}`);
   let rdpr = null;
   // for ( let x = 0 ; x < 100 ; x++ ) {
-    let start = process.hrtime();
-    let pktj = pkt.toJSON();
-    console.log('toJSON', process.hrtime(start));
-    start = process.hrtime();
-    let pktr = packetToRedis(pktj);
-    console.log('packetToRedis', process.hrtime(start));
-    console.log(pktr);
-    start = process.hrtime();
-    t.equal(await redis.hmset(`beam:packet:${pkt.pts}`, pktr), 'OK',
-      'redis says set OK.');
-    console.log('Set took', process.hrtime(start));
-    start = process.hrtime();
-    let rdp = await redis.hgetallBuffer(`beam:packet:${pkt.pts}`);
-    console.log('Get took', process.hrtime(start));
-    start = process.hrtime();
-    rdpr = packetFromRedis(rdp);
-    console.log('packetFromRedis', process.hrtime(start));
+  let start = process.hrtime();
+  let pktj = pkt.toJSON();
+  console.log('toJSON', process.hrtime(start));
+  start = process.hrtime();
+  let pktr = packetToRedis(pktj);
+  console.log('packetToRedis', process.hrtime(start));
+  console.log(pktr);
+  start = process.hrtime();
+  t.equal(await redis.hmset(`beam:packet:${pkt.pts}`, pktr), 'OK',
+    'redis says set OK.');
+  console.log('Set took', process.hrtime(start));
+  start = process.hrtime();
+  let rdp = await redis.hgetallBuffer(`beam:packet:${pkt.pts}`);
+  console.log('Get took', process.hrtime(start));
+  start = process.hrtime();
+  rdpr = packetFromRedis(rdp);
+  console.log('packetFromRedis', process.hrtime(start));
   // }
   // t.equal(Buffer.compare(rdp.data, data), 0, 'data has roundtripped OK.');
   let rp = beamcoder.packet(rdpr);
