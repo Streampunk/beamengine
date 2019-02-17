@@ -1,0 +1,9 @@
+{
+  "redis": {
+    "pool": 10,
+    "prepend": "beamengine"
+  },
+  "http" : {
+    "port": 3000
+  }
+}

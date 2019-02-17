@@ -1,6 +1,6 @@
 # Aerostat Beam Engine
 
-Redis-backed highly-scale-able and cloud-fit media beam engine.
+<img align="right" src="images/beamengine_cropped.jpg">Redis-backed highly-scale-able and cloud-fit media beam engine.
 
 A prototype implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
 
