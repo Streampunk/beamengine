@@ -61,7 +61,7 @@ test('Packet store and retrieve', async t => {
     'data TTL is set.');
   t.deepEqual(
     await redis.zrange(`${config.redis.prepend}:test_url:stream_3:index`,
-      0, -1, 'WITHSCORES'),
+      0, -1, 'WITHSCORES'), // finds all packets
     [ `${config.redis.prepend}:test_url:stream_3:packet_42`, '42' ],
     'stores expected score and key into index.');
   redisio.redisPool.recycle(redis);
