@@ -1,7 +1,10 @@
 {
   "redis": {
     "pool": 10,
-    "prepend": "beamengine"
+    "prepend": "beamengine",
+    "packetTTL": 120000,
+    "frameTTL": 10000,
+    "closeTimeout": 2000
   },
   "http" : {
     "port": 3000
