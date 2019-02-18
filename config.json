@@ -1,5 +1,9 @@
 {
   "redis": {
+    "cluster": false,
+    "host": "127.0.0.1",
+    "port": 6379,
+    "db": 0,
     "pool": 10,
     "prepend": "beamengine",
     "packetTTL": 120000,
@@ -8,5 +12,8 @@
   },
   "http" : {
     "port": 3000
+  },
+  "testing": {
+    "db": 15
   }
 }
