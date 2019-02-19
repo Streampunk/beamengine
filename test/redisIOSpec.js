@@ -21,6 +21,7 @@
 
 const test = require('tape');
 const redisio = require('../lib/redisio.js');
+const mappings = require('../lib/mappings.js');
 const beamcoder = require('beamcoder');
 const config = require('../config.json');
 
@@ -64,6 +65,19 @@ test('Packet store and retrieve', async t => {
       0, -1, 'WITHSCORES'), // finds all packets
     [ `${config.redis.prepend}:test_url:stream_3:packet_42`, '42' ],
     'stores expected score and key into index.');
+  let rpkt = await redisio.retrievePacket('test_url', 3, 42);
+  t.ok(rpkt, 'roundtrip packet is truthy.');
+  pkt.buf_size = pkt.size;
+  t.deepEqual(rpkt, pkt, 'roundtrip packet is the same.');
+  t.equal(await redis.del(`${config.redis.prepend}:test_url:stream_3:packet_42:data`),
+    1, 'deleted the data.');
+  rpkt = await redisio.retrievePacket('test_url', 3, 42);
+  t.ok(rpkt, 'roundtrip packet without data is truthy.');
+  t.equal(rpkt.size, 0, 'data size reset to zero.');
+  t.notOk(rpkt.data, 'data is now null.');
+  pkt.data = null;
+  t.deepEqual(rpkt.toJSON(), pkt.toJSON(),
+    'data-stripped packet and original have the same base.');
   redisio.redisPool.recycle(redis);
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
