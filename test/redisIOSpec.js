@@ -39,7 +39,7 @@ test.onFinish(() => {
 });
 
 test('Packet store and retrieve', async t => {
-  t.ok(beforeTest(), 'test database flushed OK.');
+  t.ok(await beforeTest(), 'test database flushed OK.');
   let pkt = beamcoder.packet({
     pts: 42,
     dts: 43,
@@ -52,7 +52,6 @@ test('Packet store and retrieve', async t => {
   });
   t.deepEqual(await redisio.storeMedia('test_url', pkt), [ 'OK', 'OK' ],
     'redis reports store of packet and data OK.');
-  t.equal(redisio.redisPool.size(), 5, 'redis pool is populated.');
   let redis = await redisio.redisPool.use();
   t.ok(await redis.exists(`${config.redis.prepend}:test_url:stream_3:packet_42`),
     'packet key created.');
@@ -65,10 +64,12 @@ test('Packet store and retrieve', async t => {
       0, -1, 'WITHSCORES'), // finds all packets
     [ `${config.redis.prepend}:test_url:stream_3:packet_42`, '42' ],
     'stores expected score and key into index.');
+
   let rpkt = await redisio.retrievePacket('test_url', 3, 42);
   t.ok(rpkt, 'roundtrip packet is truthy.');
   pkt.buf_size = pkt.size;
   t.deepEqual(rpkt, pkt, 'roundtrip packet is the same.');
+
   t.equal(await redis.del(`${config.redis.prepend}:test_url:stream_3:packet_42:data`),
     1, 'deleted the data.');
   rpkt = await redisio.retrievePacket('test_url', 3, 42);
@@ -78,7 +79,68 @@ test('Packet store and retrieve', async t => {
   pkt.data = null;
   t.deepEqual(rpkt.toJSON(), pkt.toJSON(),
     'data-stripped packet and original have the same base.');
+
   redisio.redisPool.recycle(redis);
+  await redisio.close();
+  t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
+  t.end();
+});
+
+const stripAlloc = ({ alloc, ...other }) => ({ ...other }); // eslint-disable-line no-unused-vars
+const stripBufSizes = ({ buf_sizes, ...other }) => ({ ...other });  // eslint-disable-line no-unused-vars
+
+test('Frame store and retrieve', async t => {
+  t.ok(await beforeTest(), 'test database flushed OK.');
+  let frm = beamcoder.frame({
+    pts: 42,
+    width: 1920,
+    height: 1080,
+    format: 'yuv422p'
+  }).alloc();
+  t.deepEqual(await redisio.storeMedia('test_url', frm, 2), ['OK','OK','OK','OK'],
+    'redis reports store of frame and data OK.');
+  // console.log(redisio.redisPool.pool[0].options);
+  let redis = await redisio.redisPool.use();
+  t.ok(await redis.exists(`${config.redis.prepend}:test_url:stream_2:frame_42`),
+    'frame key created.');
+  t.ok(await redis.exists(`${config.redis.prepend}:test_url:stream_2:frame_42:data_0`),
+    'data_0 key created.');
+  t.ok(await redis.exists(`${config.redis.prepend}:test_url:stream_2:frame_42:data_1`),
+    'data_1 key created.');
+  t.ok(await redis.exists(`${config.redis.prepend}:test_url:stream_2:frame_42:data_2`),
+    'data_2 key created.');
+  t.ok(await redis.ttl(`${config.redis.prepend}:test_url:stream_2:frame_42:data_0`) > 0,
+    'data_0 TTL is set.');
+  t.ok(await redis.ttl(`${config.redis.prepend}:test_url:stream_2:frame_42:data_1`) > 0,
+    'data_1 TTL is set.');
+  t.ok(await redis.ttl(`${config.redis.prepend}:test_url:stream_2:frame_42:data_2`) > 0,
+    'data_2 TTL is set.');
+  t.deepEqual(
+    await redis.zrange(`${config.redis.prepend}:test_url:stream_2:index`,
+      0, -1, 'WITHSCORES'), // finds all packets
+    [ `${config.redis.prepend}:test_url:stream_2:frame_42`, '42' ],
+    'stores expected score and key into index.');
+
+  let rfrm = await redisio.retrieveFrame('test_url', 2, 42);
+  t.ok(rfrm, 'roundtrip frame is truthy.');
+  frm.buf_sizes = frm.data.map(x => x.length);
+  t.deepEqual(stripAlloc(rfrm), stripAlloc(frm), 'roundtrip frame is the same.');
+
+  t.equal(await redis.del(`${config.redis.prepend}:test_url:stream_2:frame_42:data_0`),
+    1, 'deleted data_0.');
+  t.equal(await redis.del(`${config.redis.prepend}:test_url:stream_2:frame_42:data_1`),
+    1, 'deleted data_1.');
+  t.equal(await redis.del(`${config.redis.prepend}:test_url:stream_2:frame_42:data_2`),
+    1, 'deleted data_2.');
+  rfrm = await redisio.retrieveFrame('test_url', 2, 42);
+  t.ok(rfrm, 'roundtrip frame without data is truthy.');
+  t.ok(Array.isArray(frm.data), 'data is now an empty array ...');
+  t.equal(rfrm.data.length, 0, '... of length zero.');
+  frm.data = null;
+  t.deepEqual(stripBufSizes(rfrm.toJSON()), frm.toJSON(),
+    'data-stripped frame and original have the same base.');
+
+  await redisio.redisPool.recycle(redis);
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
   t.end();
