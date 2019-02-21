@@ -10,10 +10,11 @@
     "frameTTL": 10000,
     "closeTimeout": 2000
   },
-  "http" : {
+  "app" : {
     "port": 3000
   },
   "testing": {
-    "db": 15
+    "db": 15,
+    "port": 8765
   }
 }

@@ -29,6 +29,7 @@
   "devDependencies": {
     "eslint": "^5.9.0",
     "nodemon": "^1.18.8",
+    "supertest": "^3.4.2",
     "tap": "^12.1.0"
   },
   "bugs": {
@@ -37,6 +38,7 @@
   "homepage": "https://github.com/Streampunk/aerostat#readme",
   "dependencies": {
     "beamcoder": "^0.1.5",
+    "boom": "^7.3.0",
     "bull": "^3.5.2",
     "ioredis": "^4.3.0",
     "koa": "^2.6.2",
@@ -48,7 +50,8 @@
   "nodemonConfig": {
     "watch": [
       "views",
-      "src"
+      "lib",
+      "app.js"
     ],
     "ext": "js,html"
   }

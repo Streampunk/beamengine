@@ -21,7 +21,6 @@
 
 const test = require('tape');
 const redisio = require('../lib/redisio.js');
-const mappings = require('../lib/mappings.js');
 const beamcoder = require('beamcoder');
 const config = require('../config.json');
 
