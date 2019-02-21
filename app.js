@@ -31,17 +31,17 @@ const app = new Koa();
 const router = new Router();
 
 router
-  .get('/content', routes.contentRoute)
-  .get('/content/:fmtSpec', routes.formatRoute)
-  .get('/content/:fmtSpec/:streamSpec', routes.streamRoute)
-  .get('/content/:fmtSpec/:streamSpec/start', routes.startRedirect)
-  .get('/content/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaRoute)
-  .get('/content/:fmtSpec/:streamSpec/:mediaSpec/:dataSpec', routes.dataRoute)
-  .post('/content', routes.createContent)
-  .put('/content/:fmtSpec', routes.formatUpdate)
-  .post('/content/:fmtSpec', routes.createRelated)
-  .put('/content/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaUpdate)
-  .put('/content/:fmtSpec/:streamSpec/:mediaSpec/:dataSpec', routes.dataUpdate);
+  .get('/beams', routes.beamsRoute)
+  .get('/beams/:fmtSpec', routes.formatRoute)
+  .get('/beams/:fmtSpec/:streamSpec', routes.streamRoute)
+  .get('/beams/:fmtSpec/:streamSpec/start', routes.startRedirect)
+  .get('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaRoute)
+  .get('/beams/:fmtSpec/:streamSpec/:mediaSpec/:dataSpec', routes.dataRoute)
+  .post('/beams', routes.createBeam)
+  .put('/beams/:fmtSpec', routes.formatUpdate)
+  .post('/beams/:fmtSpec', routes.createRelated)
+  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaUpdate)
+  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec/:dataSpec', routes.dataUpdate);
 
 app
   .use(async (ctx, next) => {

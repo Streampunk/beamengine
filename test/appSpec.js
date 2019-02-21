@@ -25,6 +25,7 @@ const test = require('tape');
 const config = require('../config.json');
 const redisio = require('../lib/redisio.js');
 const request = require('supertest');
+const testUtil = require('./testUtil.js');
 
 const server = beamengine.listen(+config.testing.port);
 
@@ -57,7 +58,7 @@ test('Checking that server is listening', async t => {
 
 test('List contents', async t => {
   try {
-    let response = await request(server).get('/content')
+    let response = await request(server).get('/beams')
       .expect(200)
       .expect([]);
     t.ok(response.ok, 'empty response is OK.');
@@ -65,7 +66,7 @@ test('List contents', async t => {
 
     let fmt = beamcoder.format({ url: 'test_url' });
     t.deepEqual(await redisio.storeFormat(fmt), ['OK'], 'stored test format.');
-    response = await request(server).get('/content')
+    response = await request(server).get('/beams')
       .expect(200)
       .expect([ 'test_url' ]);
     t.ok(response.ok, 'content now has the expected item.');
@@ -76,7 +77,7 @@ test('List contents', async t => {
       fmt = beamcoder.format({ url: `test_url_${x}` });
       await redisio.storeFormat(fmt);
     }
-    response = await request(server).get('/content')
+    response = await request(server).get('/beams')
       .expect(200);
     t.ok(Array.isArray(response.body), 'response body is an array ...');
     t.equal(response.body.length, 10, '... of the default limit length of 10.');
@@ -84,7 +85,7 @@ test('List contents', async t => {
     t.equal(response.body[9], 'test_url_9', 'last element as expected.');
 
     t.comment('### Limit and offset.');
-    response = await request(server).get('/content?offset=10&limit=42')
+    response = await request(server).get('/beams?offset=10&limit=42')
       .expect(200);
     t.ok(Array.isArray(response.body), 'response body is an array ...');
     t.equal(response.body.length, 42, '... of the set limit length of 42.');
@@ -92,7 +93,7 @@ test('List contents', async t => {
     t.equal(response.body[41], 'test_url_51', 'last element as expected.');
 
     t.comment('### Overshoot limit.');
-    response = await request(server).get('/content?limit=256')
+    response = await request(server).get('/beams?limit=256')
       .expect(200);
     t.ok(Array.isArray(response.body), 'response body is an array ...');
     t.equal(response.body.length, 100, '... of the set limit length of 100.');
@@ -100,14 +101,48 @@ test('List contents', async t => {
     t.equal(response.body[99], 'test_url_99', 'last element as expected.');
 
     t.comment('### Offset based on the end of the list');
-    response = await request(server).get('/content?offset=-5')
+    response = await request(server).get('/beams?offset=-5')
       .expect(200);
     t.ok(Array.isArray(response.body), 'response body is an array ...');
     t.equal(response.body.length, 5, '... of the expected length of 5 < limit.');
     t.equal(response.body[0], 'test_url_95', 'first element as expected.');
-    t.equal(response.body[4], 'test_url_99', 'last element as expected.');    
+    t.equal(response.body[4], 'test_url_99', 'last element as expected.');
   } catch (err) {
     t.fail(err);
   }
+  t.end();
+});
+
+const stripNewStream = ({ newStream , ...other }) => ({ ...other });  // eslint-disable-line no-unused-vars
+
+test('GET a format', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Retrieve a format');
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+      'test format stored.');
+    let response = await request(server).get('/beams/test_url').expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    let fmt = beamcoder.format(response.body);
+    t.deepEqual(stripNewStream(fmt), stripNewStream(testUtil.fmt), 'roundtrip equal.');
+
+    t.comment('### Retrive something that does not exist.');
+    response = await request(server).get('/beams/wibble').expect(404);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, { statusCode: 404,
+      error: 'Not Found',
+      message: `Format with name 'wibble' was not found: Unable to retrieve a format with key 'beamengine:wibble'.` },  // eslint-disable-line
+    'error message structure as expected.');
+
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('GET a stream', async t => {
   t.end();
 });

@@ -22,6 +22,7 @@
 const test = require('tape');
 const redisio = require('../lib/redisio.js');
 const beamcoder = require('beamcoder');
+const testUtil = require('./testUtil.js');
 const config = require('../config.json');
 
 const beforeTest = async () => {
@@ -208,69 +209,10 @@ test('Retrieve media', async t => {
   t.end();
 });
 
-const stream0 = { type: 'Stream',
-  index: 0,
-  id: 301,
-  time_base: [ 1, 90000 ],
-  start_time: 7200,
-  duration: 53666250,
-  r_frame_rate: [ 24, 1 ],
-  codecpar:
-   { type: 'CodecParameters',
-     codec_type: 'video',
-     codec_id: 173,
-     name: 'hevc',
-     extradata: Buffer.from([0x00, 0x00, 0x01, 0x40, 0x01, 0x0c, 0x01, 0xff, 0xff]),
-     format: 'yuv420p',
-     profile: 0,
-     level: 0,
-     width: 1920,
-     height: 1080,
-     color_range: 'tv',
-     video_delay: 1 } };
-
-const stream1 = { type: 'Stream',
-  index: 1,
-  id: 302,
-  time_base: [ 1, 90000 ],
-  start_time: 7200,
-  duration: 53641985,
-  codecpar:
-   { type: 'CodecParameters',
-     codec_type: 'audio',
-     codec_id: 86018,
-     name: 'aac',
-     format: 'fltp',
-     bit_rate: 66494,
-     profile: 'LC',
-     channel_layout: 'stereo',
-     channels: 2,
-     sample_rate: 44100,
-     frame_size: 1024 } };
-
 test('Format store and retrieve', async t => {
   t.ok(await beforeTest(), 'test database flushed OK.');
-  let fmt = beamcoder.format({
-    iformat: 'mpegts',
-    priv_data:
-     { resync_size: 65536,
-       fix_teletext_pts: true,
-       scan_all_pmts: true,
-       skip_unknown_pmt: false,
-       merge_pmt_versions: false,
-       skip_changes: false,
-       skip_clear: false },
-    url: '../media/bbb_1080p_c.ts',
-    start_time: 80000,
-    duration: 596291667,
-    bit_rate: 2176799,
-    probe_score: 50,
-    protocol_whitelist: 'file,crypto',
-    interleaved: true });
+  let fmt = testUtil.fmt;
   t.ok(fmt, 'format is truthy.');
-  t.ok(fmt.newStream(stream0), 'stream 0 added OK.');
-  let str0 = fmt.streams[0].toJSON(); // for laster test of retrieveStream
-  t.ok(fmt.newStream(stream1), 'stream 1 added OK.');
   t.equal(fmt.streams.length, 2, 'format has two streams.');
 
   t.deepEqual(await redisio.storeFormat(fmt), ['OK','OK','OK'],
@@ -303,9 +245,22 @@ test('Format store and retrieve', async t => {
   t.comment('### checking single stream retrieve');
   let rstr = await redisio.retrieveStream(fmt.url, 0);
   t.ok(rstr, 'retrieved stream is truthy.');
-  t.deepEqual(rstr.toJSON(), str0, 'stream roundtrips as expected.');
+  t.deepEqual(rstr.toJSON(), testUtil.stream0, 'stream roundtrips as expected.');
 
   redisio.redisPool.recycle(redis);
+  await redisio.close();
+  t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
+  t.end();
+});
+
+test('Retrieve non-existant', async t => {
+  t.ok(await beforeTest(), 'test database flushed OK.');
+  try {
+    await redisio.retrieveFormat('wibble');
+    t.fail('Retrieve an unknown element did not fail.');
+  } catch (err) {
+    t.ok(err.message.indexOf('Unable') >= 0, 'retrieve throws when missing.');
+  }
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
   t.end();
