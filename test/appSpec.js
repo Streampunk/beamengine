@@ -206,12 +206,22 @@ test('GET a packet', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/json', 'response is JSON.');
     t.ok(Array.isArray(response.body), 'result is an array.');
-    console.log(response.body[0]);
     let pkt = beamcoder.packet(response.body[0]);
     t.ok(pkt, 'roundtrip packet is truthy.');
     t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
       'retrieved packet as expected.');
     t.equal(pkt.buf_size, 16383, 'has expected buf_size parameter.');
+
+    t.comment('### Packet not found');
+    response = await request(server).get('/beams/test_url/stream_3/41')
+      .expect(404);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, { statusCode: 404,
+      error: 'Not Found',
+      message: `Stream with name 'test_url:stream_42' was not found: Unable to retrieve a stream with key 'beamengine:test_url:stream_42'.` },  // eslint-disable-line
+    'error message structure as expected.');
+
 
   } catch (err) {
     t.fail(err);
