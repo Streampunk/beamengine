@@ -56,7 +56,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-test('List contents', async t => {
+/* test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -190,9 +190,11 @@ test('GET a stream', async t => {
     t.fail(err);
   }
   t.end();
-});
+}); */
 
-/* test('GET a packet', async t => {
+const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
+
+test('GET a packet', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
@@ -203,15 +205,19 @@ test('GET a stream', async t => {
       .expect(200);
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/json', 'response is JSON.');
-    console.log(response.body);
+    t.ok(Array.isArray(response.body), 'result is an array.');
+    console.log(response.body[0]);
     let pkt = beamcoder.packet(response.body[0]);
-    console.log(pkt);
+    t.ok(pkt, 'roundtrip packet is truthy.');
+    t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
+      'retrieved packet as expected.');
+    t.equal(pkt.buf_size, 16383, 'has expected buf_size parameter.');
 
   } catch (err) {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 /* test('GET a frame', async t => {
   try {
