@@ -108,6 +108,7 @@ test('List contents', async t => {
     t.equal(response.body[0], 'test_url_95', 'first element as expected.');
     t.equal(response.body[4], 'test_url_99', 'last element as expected.');
   } catch (err) {
+    console.log(err.stack);
     t.fail(err);
   }
   t.end();
@@ -128,7 +129,7 @@ test('GET a format', async t => {
     let fmt = beamcoder.format(response.body);
     t.deepEqual(stripNewStream(fmt), stripNewStream(testUtil.fmt), 'roundtrip equal.');
 
-    t.comment('### Retrive something that does not exist.');
+    t.comment('### Retrive a format that does not exist.');
     response = await request(server).get('/beams/wibble').expect(404);
     t.notOk(response.ok, 'response is not OK.');
     t.equal(response.type, 'application/json', 'response is JSON.');
@@ -144,5 +145,142 @@ test('GET a format', async t => {
 });
 
 test('GET a stream', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Retrieve a stream');
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+      'test format stored.');
+    let response = await request(server).get('/beams/test_url/stream_1').expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    let fmt = beamcoder.format();
+    let str = fmt.newStream(response.body);
+    str.__index(response.body.index);
+    t.deepEqual(str.toJSON(), testUtil.stream1, 'roundtrip equal.');
+
+    t.comment('### Retrive a stream that does not exist.');
+    response = await request(server).get('/beams/test_url/stream_42').expect(404);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, { statusCode: 404,
+      error: 'Not Found',
+      message: `Stream with name 'test_url:stream_42' was not found: Unable to retrieve a stream with key 'beamengine:test_url:stream_42'.` },  // eslint-disable-line
+    'error message structure as expected.');
+
+    t.comment('### Retrieve a stream by type - video');
+    response = await request(server).get('/beams/test_url/video').expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    fmt = beamcoder.format();
+    str = fmt.newStream(response.body);
+    str.__index(response.body.index);
+    t.deepEqual(str.toJSON(), testUtil.stream0, 'roundtrip equal.');
+
+    t.comment('### Retrieve a stream by type and index - audio_0');
+    response = await request(server).get('/beams/test_url/audio_0').expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    fmt = beamcoder.format();
+    str = fmt.newStream(response.body);
+    str.__index(response.body.index);
+    t.deepEqual(str.toJSON(), testUtil.stream1, 'roundtrip equal.');
+
+  } catch (err) {
+    t.fail(err);
+  }
   t.end();
 });
+
+/* test('GET a packet', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Retrieve a packet');
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
+      'test packet stored OK.');
+    let response = await request(server).get('/beams/test_url/stream_3/42')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    console.log(response.body);
+    let pkt = beamcoder.packet(response.body[0]);
+    console.log(pkt);
+
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+}); */
+
+/* test('GET a frame', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('GET packet data', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('GET frame data', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('POST a format', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('PUT a packet', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('PUT a frame', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('Update a format', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('Stream as live', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+}); */
