@@ -20,9 +20,8 @@
 */
 
 const test = require('tape');
-const { parseMediaSpec } = require('../lib/routes.js');
-
-const [ DEFAULT, FUZZY, INDEX, REALTIME, DURATION ] = [ 0, 1, 2, 4, 8 ];
+const { parseMediaSpec, DEFAULT, FUZZY, INDEX, REALTIME, DURATION } =
+  require('../lib/mediaSpec.js');
 
 test('Timestamp range specification', t => {
   t.deepEqual(parseMediaSpec('0'),
@@ -44,19 +43,74 @@ test('Timestamp range specification', t => {
 });
 
 test('Index range specification', t => {
+  t.deepEqual(parseMediaSpec('1st'),
+    { start: 0, end: 0, flags: INDEX }, 'first frame index numerical.');
+  t.deepEqual(parseMediaSpec('first'),
+    { start: 0, end: 0, flags: INDEX }, 'first frame index lexical.');
+  t.deepEqual(parseMediaSpec('2nd'),
+    { start: 1, end: 1, flags: INDEX }, 'second frame index numerical.');
+  t.deepEqual(parseMediaSpec('2nd-3rd'),
+    { start: 1, end: 2, flags: INDEX }, 'short range numerical.');
+  t.deepEqual(parseMediaSpec('last'),
+    { start: -1, end: -1, flags: INDEX }, 'last frame index lexical.');
+  t.deepEqual(parseMediaSpec('100th-last'),
+    { start: 99, end: -1, flags: INDEX }, '100th to last OK.');
+  t.deepEqual(parseMediaSpec('123456789th-9876543210st'),
+    { start: 123456788, end: 9876543209, flags: INDEX }, 'big number range.');
+  t.deepEqual(parseMediaSpec('9876543210st-123456789th'),
+    { start: 9876543209, end: 123456788, flags: INDEX }, 'backward range OK.');
   t.end();
 });
 
 test('Time range specification', t => {
+  t.deepEqual(parseMediaSpec('0s'),
+    { start: 0, end: 0, flags: REALTIME }, 'zero seconds single');
+  t.deepEqual(parseMediaSpec('1.0s'),
+    { start: 1, end: 1, flags: REALTIME }, 'one point zero seconds single.');
+  t.deepEqual(parseMediaSpec('1.5s'),
+    { start: 1.5, end: 1.5, flags: REALTIME }, 'one point five seconds single.');
+  t.deepEqual(parseMediaSpec('0s-1s'),
+    { start: 0, end: 1, flags: REALTIME }, 'simple range.');
+  t.deepEqual(parseMediaSpec('0s-1'),
+    { start: 0, end: 1, flags: REALTIME }, 'simple range - no 2nd s.');
+  t.deepEqual(parseMediaSpec('-42.42s'),
+    { start: -42.42, end: -42.42, flags: REALTIME }, 'negative single stamp.');
+  t.deepEqual(parseMediaSpec('-42.42s-24.24s'),
+    { start: -42.42, end: 24.24, flags: REALTIME }, 'negative-positive range.');
+  t.deepEqual(parseMediaSpec('-42.42s--24.24'),
+    { start: -42.42, end: -24.24, flags: REALTIME }, 'negative-negative range.');
   t.end();
 });
 
 test('Duration specification', t => {
+  t.deepEqual(parseMediaSpec('0+1d'),
+    { start: 0, end: 1, flags: DURATION }, 'simplest duration jump spec.');
+  t.deepEqual(parseMediaSpec('1+0d'),
+    { start: 1, end: 0, flags: DURATION }, 'no duration jump spec.');
+  t.deepEqual(parseMediaSpec('42-13d'),
+    { start: 42, end: -13, flags: DURATION }, 'backwards looking.');
+  t.deepEqual(parseMediaSpec('-42+13d'),
+    { start: -42, end: 13, flags: DURATION }, 'negative range start.');
+  t.deepEqual(parseMediaSpec('0f+1d'),
+    { start: 0, end: 1, flags: DURATION | FUZZY }, 'fuzzy simplest duration jump spec.');
+  t.deepEqual(parseMediaSpec('1f+0d'),
+    { start: 1, end: 0, flags: DURATION | FUZZY }, 'fuzzy no duration jump spec.');
+  t.deepEqual(parseMediaSpec('42f-13d'),
+    { start: 42, end: -13, flags: DURATION | FUZZY }, 'fuzzy backwards looking.');
+  t.deepEqual(parseMediaSpec('-42f+13d'),
+    { start: -42, end: 13, flags: DURATION | FUZZY }, 'fuzzy negative range start.');
   t.end();
 });
 
 test('Bad specifications', t => {
   t.notOk(parseMediaSpec('wibble'), 'unexpected string fails.');
   t.notOk(parseMediaSpec('1-2f'), 'fuzzy on end is bad.');
+  t.notOk(parseMediaSpec('0th'), 'zeroth index does not exist.');
+  t.notOk(parseMediaSpec('last-3rd'), 'cannot start with last and go backward.');
+  t.notOk(parseMediaSpec('last-last'), 'cannot range from last to last.');
+  t.notOk(parseMediaSpec('42-43s'), 'cannot put time marker on second param.');
+  t.notOk(parseMediaSpec(undefined), 'cannot parse undefined.');
+  t.notOk(parseMediaSpec(null), 'cannot parse null.');
+  t.notOk(parseMediaSpec({}), 'cannot parse an object.');
   t.end();
 });
