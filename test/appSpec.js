@@ -221,13 +221,130 @@ test('GET a packet', async t => {
       error: 'Not Found',
       message: `Media with name 'test_url:stream_3:41' was not found: Unable to find requested media elements.` },  // eslint-disable-line
     'error message structure as expected.');
+
+    t.comment('### Retrieve one packet from a range');
+    response = await request(server).get('/beams/test_url/stream_3/40-45')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.ok(Array.isArray(response.body), 'result is an array.');
+    pkt = beamcoder.packet(response.body[0]);
+    t.ok(pkt, 'roundtrip packet is truthy.');
+    t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
+      'retrieved packet as expected.');
+    t.equal(pkt.buf_size, 16383, 'has expected buf_size parameter.');
+
+    t.comment('### Store ten packets');
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    for ( let x = 0 ; x < 10 ; x++) {
+      let tpkt = testUtil.pkt;
+      tpkt.pts = (x * 10) - 40;
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+        `test packet ${tpkt.pts} stored OK.`);
+    }
+
+    t.comment('### Retrieve three by range');
+    response = await request(server).get('/beams/test_url/stream_3/-15-15')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.ok(Array.isArray(response.body), 'result is an array.');
+    t.deepEqual(response.body.map(x => x.pts), [-10, 0, 10],
+      '3 elements with expected timestamp.');
+
+    t.comment('### Fuzzy match a timestamp');
+    response = await request(server).get('/beams/test_url/stream_3/-17f')
+      .expect(200);
+    t.ok(response.ok, '-17f response claims OK.');
+    t.equal(response.body[0].pts, -20, '-17f finds closest match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-14f')
+      .expect(200);
+    t.ok(response.ok, '-14f response claims OK.');
+    t.equal(response.body[0].pts, -10, '-14f finds closest match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-15f')
+      .expect(200);
+    t.ok(response.ok, '-15f response claims OK.');
+    t.equal(response.body[0].pts, -20, '-15f finds closest match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-20f')
+      .expect(200);
+    t.ok(response.ok, '-20f response claims OK.');
+    t.equal(response.body[0].pts, -20, '-20f finds exact match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-1000f')
+      .expect(200);
+    t.ok(response.ok, '-1000f response claims OK.');
+    t.equal(response.body[0].pts, -40, '-1000f finds first packet.');
+
+    response = await request(server).get('/beams/test_url/stream_3/1000f')
+      .expect(200);
+    t.ok(response.ok, '1000f response claims OK.');
+    t.equal(response.body[0].pts, 50, '1000f finds last packet.');
+
+    t.comment('### Fuzzy match a timestamp range');
+    response = await request(server).get('/beams/test_url/stream_3/-17f-17')
+      .expect(200);
+    t.ok(response.ok, '-17f-17 response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-20, -10, 0, 10],
+      '-17f-17 range of four.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-17f-17f')
+      .expect(200);
+    t.ok(response.ok, '-17f-17d response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-20, -10, 0, 10],
+      '-17f-17f range of four.');
+
+    t.comment('### request by index');
+    response = await request(server).get('/beams/test_url/stream_3/first')
+      .expect(200);
+    t.ok(response.ok, 'first response claims OK.');
+    t.equal(response.body[0].pts, -40, 'first finds first packet.');
+
+    response = await request(server).get('/beams/test_url/stream_3/last')
+      .expect(200);
+    t.ok(response.ok, 'last response claims OK.');
+    t.equal(response.body[0].pts, 50, 'last finds last packet.');
+
+    response = await request(server).get('/beams/test_url/stream_3/2nd')
+      .expect(200);
+    t.ok(response.ok, '2nd response claims OK.');
+    t.equal(response.body[0].pts, -30, '2nd finds 2nd packet.');
+
+    response = await request(server).get('/beams/test_url/stream_3/7th-last')
+      .expect(200);
+    t.ok(response.ok, '7th-last response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [20, 30, 40, 50],
+      '7th-last finds expected packets.');
+
+    response = await request(server).get('/beams/test_url/stream_3/first-last')
+      .expect(200);
+    t.ok(response.ok, 'first-last response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [-40, -30, -20, -10, 0, 10, 20, 30, 40, 50],
+      'first-last finds all packets.');
+
+    response = await request(server).get('/beams/test_url/stream_3/first-last?limit=5')
+      .expect(200);
+    t.ok(response.ok, 'first-last with limit of 5 response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-40, -30, -20, -10, 0 ],
+      'first-last with limit of 5 finds first 5 packets.');
+
+    response = await request(server).get('/beams/test_url/stream_3/first-last?offset=5')
+      .expect(200);
+    t.ok(response.ok, 'first-last with offset of 5 response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [ 10, 20, 30, 40, 50 ],
+      'first-last with offset of 5 finds last 5 packets.');
+
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-test('GET a frame', async t => {
+/* test('GET a frame', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
@@ -259,7 +376,7 @@ test('GET a frame', async t => {
     t.fail(err);
   }
   t.end();
-});
+}); */
 
 /* test('GET packet data', async t => {
   try {
