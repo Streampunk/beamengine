@@ -99,5 +99,20 @@ module.exports = {
       duration: 44,
       pos: 45
     });
+  },
+  get frm() {
+    return beamcoder.frame({
+      width: 1920,
+      height: 1080,
+      format: 'yuv420p',
+      pts: 42,
+      interlaced_frame: true,
+      color_range: 'tv',
+      color_primaries: 'bt709',
+      color_trc: 'bt709',
+      colorspace: 'bt709',
+      chroma_location: 'left',
+      pkt_duration: 1
+    }).alloc();
   }
 };

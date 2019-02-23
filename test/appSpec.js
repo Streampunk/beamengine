@@ -207,7 +207,7 @@ test('GET a packet', async t => {
     t.equal(response.type, 'application/json', 'response is JSON.');
     t.ok(Array.isArray(response.body), 'result is an array.');
     let pkt = beamcoder.packet(response.body[0]);
-    t.ok(pkt, 'roundtrip packet is truthy.');  
+    t.ok(pkt, 'roundtrip packet is truthy.');
     t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
       'retrieved packet as expected.');
     t.equal(pkt.buf_size, 16383, 'has expected buf_size parameter.');
@@ -221,24 +221,47 @@ test('GET a packet', async t => {
       error: 'Not Found',
       message: `Media with name 'test_url:stream_3:41' was not found: Unable to find requested media elements.` },  // eslint-disable-line
     'error message structure as expected.');
-
-
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-/* test('GET a frame', async t => {
+test('GET a frame', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Retrieve a frame');
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.frm, 3),
+      ['OK','OK', 'OK', 'OK'], 'test frame stored OK.');
+    let response = await request(server).get('/beams/test_url/stream_3/42')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.ok(Array.isArray(response.body), 'result is an array.');
+    let frm = beamcoder.frame(response.body[0]);
+    t.ok(frm, 'roundtrip packet is truthy.');
+    t.deepEqual(frm.toJSON(), frm.toJSON(),
+      'retrieved packet as expected.');
+    t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
+      'has expected buf_sizes parameter.');
+
+    t.comment('### Frame not found');
+    response = await request(server).get('/beams/test_url/stream_3/41')
+      .expect(404);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, { statusCode: 404,
+      error: 'Not Found',
+      message: `Media with name 'test_url:stream_3:41' was not found: Unable to find requested media elements.` },  // eslint-disable-line
+    'error message structure as expected.');
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-test('GET packet data', async t => {
+/* test('GET packet data', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
   } catch (err) {
