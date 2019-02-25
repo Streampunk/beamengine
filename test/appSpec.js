@@ -56,7 +56,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-/* test('List contents', async t => {
+test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -190,11 +190,11 @@ test('GET a stream', async t => {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
 
-/* test('GET a packet', async t => {
+test('GET a packet', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
@@ -409,7 +409,7 @@ const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // esl
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 test('GET a frame', async t => {
   try {
