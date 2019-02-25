@@ -411,6 +411,39 @@ test('GET a packet', async t => {
   t.end();
 });
 
+test('GET a packet directly', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Retrieve a packet directly');
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
+      'test packet stored OK.');
+    let response = await request(server).get('/beams/test_url/stream_3/packet_42')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.notOk(Array.isArray(response.body), 'result is an array.');
+    let pkt = beamcoder.packet(response.body);
+    t.ok(pkt, 'roundtrip frame is truthy.');
+    t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
+      'retrieved packet as expected.');
+    t.equal(pkt.buf_size, 16383, 'has expected buf_sizes parameter.');
+
+    t.comment('### Packet not found');
+    response = await request(server).get('/beams/test_url/stream_3/packet_41')
+      .expect(404);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, { statusCode: 404,
+      error: 'Not Found',
+      message: `Packet with name 'test_url:stream_3:packet_41' was not found: Packet in stream 'stream_3' with timestamp '41' is not found.` },  // eslint-disable-line
+    'error message structure as expected.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
 test('GET a frame', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
@@ -619,7 +652,7 @@ test('GET a frame', async t => {
       'realtime range -1.0s-10 with limit has expected PTS values.');
 
     response = await request(server)
-      .get('/beams/test_url/stream_1/-1.0s-10s?offset=2&limit=3')
+      .get('/beams/test_url/stream_1/-1.0s-10s.json?offset=2&limit=3')
       .expect(200);
     t.ok(response.ok, 'realtime range -1.0s-10s with offset+limit request OK.');
     t.deepEqual(response.body.map(x => x.pts),
@@ -632,16 +665,57 @@ test('GET a frame', async t => {
   t.end();
 });
 
-/* test('GET packet data', async t => {
+test('GET a frame directly', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Retrieve a frame directly');
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.frm, 3),
+      ['OK','OK', 'OK', 'OK'], 'test frame stored OK.');
+    let response = await request(server).get('/beams/test_url/stream_3/frame_42')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.notOk(Array.isArray(response.body), 'result is an array.');
+    let frm = beamcoder.frame(response.body);
+    t.ok(frm, 'roundtrip frame is truthy.');
+    t.deepEqual(frm.toJSON(), frm.toJSON(),
+      'retrieved frame as expected.');
+    t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
+      'has expected buf_sizes parameter.');
+
+    t.comment('### Frame not found');
+    response = await request(server).get('/beams/test_url/stream_3/frame_41')
+      .expect(404);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, { statusCode: 404,
+      error: 'Not Found',
+      message: `Frame with name 'test_url:stream_3:frame_41' was not found: Frame in stream 'stream_3' with timestamp '41' is not found.` },  // eslint-disable-line
+    'error message structure as expected.');
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-test('GET frame data', async t => {
+test('GET packet data', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
+      'test packet stored OK.');
+    let response = await request(server).get('/beams/test_url/stream_3/42')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+/* test('GET frame data', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
   } catch (err) {
