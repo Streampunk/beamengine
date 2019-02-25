@@ -194,7 +194,7 @@ test('GET a stream', async t => {
 
 const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
 
-test('GET a packet', async t => {
+/* test('GET a packet', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
@@ -338,13 +338,80 @@ test('GET a packet', async t => {
     t.deepEqual(response.body.map(x => x.pts), [ 10, 20, 30, 40, 50 ],
       'first-last with offset of 5 finds last 5 packets.');
 
+    t.comment('### Realtime request fails without format');
+    response = await request(server).get('/beams/test_url/stream_3/0s')
+      .expect(404);
+    t.notOk(response.ok, 'realtime 0s request not OK.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Media with name \'test_url:stream_3:0s\' was not found: Unable to find requested media elements.'
+    }, 'has expected error message.');
+
+    t.comment('### Store ten packets with a format for time range tests');
+    t.ok(await flushdb(), 'database flushed OK.');
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+      'test format stored.');
+    for ( let x = 0 ; x < 10 ; x++) {
+      let tpkt = testUtil.pkt;
+      tpkt.pts = (x * 3600) - 14400;
+      tpkt.stream_index = 1;
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+        `test packet ${tpkt.pts} stored OK.`);
+    }
+
+    response = await request(server).get('/beams/test_url/audio/0s')
+      .expect(200);
+    t.ok(response.ok, 'realtime 0s request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [0], 'realtime 0s has expected PTS.');
+
+    response = await request(server).get('/beams/test_url/audio/-0.04s')
+      .expect(200);
+    t.ok(response.ok, 'realtime -0.04s request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-3600], 'realtime -0.04s has expected PTS.');
+
+    response = await request(server).get('/beams/test_url/audio/0.0s-0.1s')
+      .expect(200);
+    t.ok(response.ok, 'realtime range 0.0s-0.1s request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [0, 3600, 7200],
+      'realtime range 0.0s-0.1s has expected PTS values.');
+
+    response = await request(server).get('/beams/test_url/audio/0.0s-0.1')
+      .expect(200);
+    t.ok(response.ok, 'realtime range 0.0s-0.1 (no 2nd s) request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [0, 3600, 7200],
+      'realtime range 0.0s-0.1 (no 2nd s) has expected PTS values.');
+
+    response = await request(server).get('/beams/test_url/stream_1/-1.0s-10s')
+      .expect(200);
+    t.ok(response.ok, 'realtime range -1.0s-10s request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -14400, -10800, -7200, -3600, 0, 3600, 7200, 10800, 14400, 18000 ],
+      'realtime range -1.0s-10 has expected PTS values.');
+
+    response = await request(server)
+      .get('/beams/test_url/stream_1/-1.0s-10s?limit=3')
+      .expect(200);
+    t.ok(response.ok, 'realtime range -1.0s-10s with limit request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -14400, -10800, -7200 ],
+      'realtime range -1.0s-10 with limit has expected PTS values.');
+
+    response = await request(server)
+      .get('/beams/test_url/stream_1/-1.0s-10s?offset=2&limit=3')
+      .expect(200);
+    t.ok(response.ok, 'realtime range -1.0s-10s with offset+limit request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -7200, -3600, 0 ],
+      'realtime range -1.0s-10 with offset+limit has expected PTS values.');
   } catch (err) {
     t.fail(err);
   }
   t.end();
-});
+}); */
 
-/* test('GET a frame', async t => {
+test('GET a frame', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
@@ -357,9 +424,9 @@ test('GET a packet', async t => {
     t.equal(response.type, 'application/json', 'response is JSON.');
     t.ok(Array.isArray(response.body), 'result is an array.');
     let frm = beamcoder.frame(response.body[0]);
-    t.ok(frm, 'roundtrip packet is truthy.');
+    t.ok(frm, 'roundtrip frame is truthy.');
     t.deepEqual(frm.toJSON(), frm.toJSON(),
-      'retrieved packet as expected.');
+      'retrieved frame as expected.');
     t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
       'has expected buf_sizes parameter.');
 
@@ -372,11 +439,198 @@ test('GET a packet', async t => {
       error: 'Not Found',
       message: `Media with name 'test_url:stream_3:41' was not found: Unable to find requested media elements.` },  // eslint-disable-line
     'error message structure as expected.');
+
+    t.comment('### Retrieve one frame from a range');
+    response = await request(server).get('/beams/test_url/stream_3/40-45')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.ok(Array.isArray(response.body), 'result is an array.');
+    frm = beamcoder.frame(response.body[0]);
+    t.ok(frm, 'roundtrip frame is truthy.');
+    t.deepEqual(frm.toJSON(), testUtil.frm.toJSON(),
+      'retrieved frame as expected.');
+    t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
+      'has expected buf_sizes parameter.');
+
+    t.comment('### Store ten frames');
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    for ( let x = 0 ; x < 10 ; x++) {
+      let tfrm = testUtil.frm;
+      tfrm.pts = (x * 10) - 40;
+      tfrm.stream_index = 3;
+      t.deepEqual(await redisio.storeMedia('test_url', tfrm), ['OK','OK','OK','OK'],
+        `test frame ${tfrm.pts} stored OK.`);
+    }
+
+    t.comment('### Retrieve three frames by range');
+    response = await request(server).get('/beams/test_url/stream_3/-15-15')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.ok(Array.isArray(response.body), 'result is an array.');
+    t.deepEqual(response.body.map(x => x.pts), [-10, 0, 10],
+      '3 elements with expected timestamp.');
+
+    t.comment('### Fuzzy match a timestamp');
+    response = await request(server).get('/beams/test_url/stream_3/-17f')
+      .expect(200);
+    t.ok(response.ok, '-17f response claims OK.');
+    t.equal(response.body[0].pts, -20, '-17f finds closest match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-14f')
+      .expect(200);
+    t.ok(response.ok, '-14f response claims OK.');
+    t.equal(response.body[0].pts, -10, '-14f finds closest match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-15f')
+      .expect(200);
+    t.ok(response.ok, '-15f response claims OK.');
+    t.equal(response.body[0].pts, -20, '-15f finds closest match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-20f')
+      .expect(200);
+    t.ok(response.ok, '-20f response claims OK.');
+    t.equal(response.body[0].pts, -20, '-20f finds exact match.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-1000f')
+      .expect(200);
+    t.ok(response.ok, '-1000f response claims OK.');
+    t.equal(response.body[0].pts, -40, '-1000f finds first frame.');
+
+    response = await request(server).get('/beams/test_url/stream_3/1000f')
+      .expect(200);
+    t.ok(response.ok, '1000f response claims OK.');
+    t.equal(response.body[0].pts, 50, '1000f finds last frame.');
+
+    t.comment('### Fuzzy match a timestamp range');
+    response = await request(server).get('/beams/test_url/stream_3/-17f-17')
+      .expect(200);
+    t.ok(response.ok, '-17f-17 response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-20, -10, 0, 10],
+      '-17f-17 range of four.');
+
+    response = await request(server).get('/beams/test_url/stream_3/-17f-17f')
+      .expect(200);
+    t.ok(response.ok, '-17f-17d response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-20, -10, 0, 10],
+      '-17f-17f range of four.');
+
+    t.comment('### request by index');
+    response = await request(server).get('/beams/test_url/stream_3/first')
+      .expect(200);
+    t.ok(response.ok, 'first response claims OK.');
+    t.equal(response.body[0].pts, -40, 'first finds first frame.');
+
+    response = await request(server).get('/beams/test_url/stream_3/last')
+      .expect(200);
+    t.ok(response.ok, 'last response claims OK.');
+    t.equal(response.body[0].pts, 50, 'last finds last frame.');
+
+    response = await request(server).get('/beams/test_url/stream_3/2nd')
+      .expect(200);
+    t.ok(response.ok, '2nd response claims OK.');
+    t.equal(response.body[0].pts, -30, '2nd finds 2nd frame.');
+
+    response = await request(server).get('/beams/test_url/stream_3/7th-last')
+      .expect(200);
+    t.ok(response.ok, '7th-last response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [20, 30, 40, 50],
+      '7th-last finds expected frames.');
+
+    response = await request(server).get('/beams/test_url/stream_3/first-last')
+      .expect(200);
+    t.ok(response.ok, 'first-last response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [-40, -30, -20, -10, 0, 10, 20, 30, 40, 50],
+      'first-last finds all frames.');
+
+    response = await request(server).get('/beams/test_url/stream_3/first-last?limit=5')
+      .expect(200);
+    t.ok(response.ok, 'first-last with limit of 5 response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-40, -30, -20, -10, 0 ],
+      'first-last with limit of 5 finds first 5 frames.');
+
+    response = await request(server).get('/beams/test_url/stream_3/first-last?offset=5')
+      .expect(200);
+    t.ok(response.ok, 'first-last with offset of 5 response claims OK.');
+    t.deepEqual(response.body.map(x => x.pts), [ 10, 20, 30, 40, 50 ],
+      'first-last with offset of 5 finds last 5 frames.');
+
+    t.comment('### Realtime request fails without format');
+    response = await request(server).get('/beams/test_url/stream_3/0s')
+      .expect(404);
+    t.notOk(response.ok, 'realtime 0s request not OK.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Media with name \'test_url:stream_3:0s\' was not found: Unable to find requested media elements.'
+    }, 'has expected error message.');
+
+    t.comment('### Store ten frames with a format for time range tests');
+    t.ok(await flushdb(), 'database flushed OK.');
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+      'test format stored.');
+    for ( let x = 0 ; x < 10 ; x++) {
+      let tfrm = testUtil.frm;
+      tfrm.pts = (x * 3600) - 14400;
+      tfrm.stream_index = 1;
+      t.deepEqual(await redisio.storeMedia('test_url', tfrm), ['OK','OK','OK','OK'],
+        `test frame ${tfrm.pts} stored OK.`);
+    }
+
+    response = await request(server).get('/beams/test_url/audio/0s')
+      .expect(200);
+    t.ok(response.ok, 'realtime 0s request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [0], 'realtime 0s has expected PTS.');
+
+    response = await request(server).get('/beams/test_url/audio/-0.04s')
+      .expect(200);
+    t.ok(response.ok, 'realtime -0.04s request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [-3600], 'realtime -0.04s has expected PTS.');
+
+    response = await request(server).get('/beams/test_url/audio/0.0s-0.1s')
+      .expect(200);
+    t.ok(response.ok, 'realtime range 0.0s-0.1s request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [0, 3600, 7200],
+      'realtime range 0.0s-0.1s has expected PTS values.');
+
+    response = await request(server).get('/beams/test_url/audio/0.0s-0.1')
+      .expect(200);
+    t.ok(response.ok, 'realtime range 0.0s-0.1 (no 2nd s) request OK.');
+    t.deepEqual(response.body.map(x => x.pts), [0, 3600, 7200],
+      'realtime range 0.0s-0.1 (no 2nd s) has expected PTS values.');
+
+    response = await request(server).get('/beams/test_url/stream_1/-1.0s-10s')
+      .expect(200);
+    t.ok(response.ok, 'realtime range -1.0s-10s request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -14400, -10800, -7200, -3600, 0, 3600, 7200, 10800, 14400, 18000 ],
+      'realtime range -1.0s-10 has expected PTS values.');
+
+    response = await request(server)
+      .get('/beams/test_url/stream_1/-1.0s-10s?limit=3')
+      .expect(200);
+    t.ok(response.ok, 'realtime range -1.0s-10s with limit request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -14400, -10800, -7200 ],
+      'realtime range -1.0s-10 with limit has expected PTS values.');
+
+    response = await request(server)
+      .get('/beams/test_url/stream_1/-1.0s-10s?offset=2&limit=3')
+      .expect(200);
+    t.ok(response.ok, 'realtime range -1.0s-10s with offset+limit request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -7200, -3600, 0 ],
+      'realtime range -1.0s-10 with offset+limit has expected PTS values.');
+
   } catch (err) {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 /* test('GET packet data', async t => {
   try {
