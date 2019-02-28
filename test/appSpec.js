@@ -56,7 +56,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-test('List contents', async t => {
+/* test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -697,7 +697,7 @@ test('GET a frame directly', async t => {
     t.fail(err);
   }
   t.end();
-});
+}); */
 
 test('GET packet data', async t => {
   try {
@@ -705,26 +705,193 @@ test('GET packet data', async t => {
 
     t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
       'test packet stored OK.');
-    let response = await request(server).get('/beams/test_url/stream_3/42')
+
+    t.comment('### Get packet data using .raw');
+    let response = await request(server).get('/beams/test_url/stream_3/packet_42.raw')
       .expect(200);
     t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length, 16383, 'buffer has expected length.');
+    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
 
+    t.comment('### Get packet data using /data');
+    response = await request(server).get('/beams/test_url/stream_3/packet_42/data')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length, 16383, 'buffer has expected length.');
+    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+
+    t.comment('### Get packet data with .raw_0');
+    response = await request(server).get('/beams/test_url/stream_3/packet_42.raw_0')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length, 16383, 'buffer has expected length.');
+    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+
+    t.comment('### Get packet data with /data_0');
+    response = await request(server).get('/beams/test_url/stream_3/packet_42.raw_0')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length, 16383, 'buffer has expected length.');
+    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+
+    t.comment('### Packet data not found');
+    response = await request(server).get('/beams/test_url/stream_3/packet_41.raw')
+      .expect(404);
+    t.notOk(response.ok, 'data not found means response not ok.');
+    t.equal(response.type, 'application/json', 'error response type is JSON.');
+    console.log(response.body);
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Packet with name \'test_url:stream_3:packet_41\' was not found: Packet data in stream \'stream_3\' with timestamp \'41\' is not found.'
+    }, 'error message as expected.');
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-/* test('GET frame data', async t => {
+test('GET frame data', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
+
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.frm, 3),
+      ['OK','OK', 'OK', 'OK'], 'test frame stored OK.');
+
+    t.comment('### Get frame data using .raw');
+    let response = await request(server).get('/beams/test_url/stream_3/frame_42.raw')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length,  2073664+1036864+1036864,
+      'buffer has expected length.');
+    t.equal(response.headers['content-length'], `${2073664+1036864+1036864}`,
+      'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+    t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
+      [ 2073664, 1036864, 1036864 ], 'has expected buffer sizes.');
+    t.equals(response.headers['beam-data-index'], '', 'has an empty index.');
+
+    t.comment('### Get frame data using /data');
+    response = await request(server).get('/beams/test_url/stream_3/frame_42/data')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length,  2073664+1036864+1036864,
+      'buffer has expected length.');
+    t.equal(response.headers['content-length'], `${2073664+1036864+1036864}`,
+      'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+    t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
+      [ 2073664, 1036864, 1036864 ], 'has expected buffer sizes.');
+    t.equals(response.headers['beam-data-index'], '', 'has an empty index.');
+
+    t.comment('### Get frame data using .raw_0');
+    response = await request(server).get('/beams/test_url/stream_3/frame_42.raw_0')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length,  2073664,
+      'buffer has expected length.');
+    t.equal(response.headers['content-length'], `${2073664}`,
+      'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+    t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
+      [ 2073664 ], 'has expected buffer sizes.');
+    t.equals(response.headers['beam-data-index'], '0', 'has 0 index.');
+
+    t.comment('### Get frame data using /data_0');
+    response = await request(server).get('/beams/test_url/stream_3/frame_42/data_0')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length,  2073664,
+      'buffer has expected length.');
+    t.equal(response.headers['content-length'], `${2073664}`,
+      'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+    t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
+      [ 2073664 ], 'has expected buffer sizes.');
+    t.equals(response.headers['beam-data-index'], '0', 'has 0 index.');
+
+    t.comment('### Get frame data using .raw_2');
+    response = await request(server).get('/beams/test_url/stream_3/frame_42.raw_2')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length, 1036864,
+      'buffer has expected length.');
+    t.equal(response.headers['content-length'], `${1036864}`,
+      'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+    t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
+      [ 1036864 ], 'has expected buffer sizes.');
+    t.equals(response.headers['beam-data-index'], '2', 'has 2 index.');
+
+    t.comment('### Get frame data using /data_2');
+    response = await request(server).get('/beams/test_url/stream_3/frame_42/data_2')
+      .expect(200);
+    t.ok(response.ok, 'response claims OK.');
+    t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
+    t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
+    t.equal(response.body.length,  1036864,
+      'buffer has expected length.');
+    t.equal(response.headers['content-length'], `${1036864}`,
+      'header length correct.');
+    t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
+    t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
+      [ 1036864 ], 'has expected buffer sizes.');
+    t.equals(response.headers['beam-data-index'], '2', 'has 2 index.');
+
+    t.comment('### Get frame PTS not found');
+    response = await request(server).get('/beams/test_url/stream_3/frame_41.raw')
+      .expect(404);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error message is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Frame data with name \'test_url:stream_3:frame_41\' was not found: Frame data in stream \'stream_3\' with timestamp \'41\' is not found, pattern [X,X,X].'
+    }, 'has expected error message.');
+
+    t.comment('### Get frame plane not found');
+    response = await request(server).get('/beams/test_url/stream_3/frame_42.raw_3')
+      .expect(404);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error message is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Frame data with name \'test_url:stream_3:frame_42\' was not found: Frame data in stream \'stream_3\' with timestamp \'42\' and index \'3\' is not found.'
+    }, 'has expected error message.');
+
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-test('POST a format', async t => {
+/* test('POST a format', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
   } catch (err) {
