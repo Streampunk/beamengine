@@ -137,7 +137,7 @@ test('Frame store and retrieve', async t => {
   t.ok(Array.isArray(frm.data), 'data is now an empty array ...');
   t.equal(rfrm.data.length, 0, '... of length zero.');
   frm.data = null;
-  t.deepEqual(stripBufSizes(rfrm.toJSON()), frm.toJSON(),
+  t.deepEqual(rfrm.toJSON(), frm.toJSON(),
     'data-stripped frame and original have the same base.');
 
   await redisio.redisPool.recycle(redis);
@@ -199,9 +199,13 @@ test('Retrieve media', async t => {
 
 
   t.comment('### searching from 100 expecting empty');
-  mix = await redisio.retrieveMedia('test_url', 3, 100);
-  t.ok(Array.isArray(mix), 'result is an array ...');
-  t.equal(mix.length, 0, '... of length zero.');
+  try {
+    await redisio.retrieveMedia('test_url', 3, 100);
+    t.fail('retrieve media did not throw.');
+  } catch (err) {
+    console.log(err.message);
+    t.ok(err.message.indexOf('Unable to find') >= 0, 'not found throws exception.');
+  }
 
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');

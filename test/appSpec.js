@@ -56,7 +56,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-/* test('List contents', async t => {
+test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -697,7 +697,7 @@ test('GET a frame directly', async t => {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 test('GET packet data', async t => {
   try {
