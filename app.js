@@ -21,6 +21,7 @@
 
 const Koa = require('koa');
 const Router = require('koa-router');
+const bodyParser = require('koa-bodyparser');
 // const Bull = require('bull');
 // const producer = new Bull('my-first-queue');
 const config = require('./config.json');
@@ -29,6 +30,7 @@ const Boom = require('boom');
 
 const app = new Koa();
 const router = new Router();
+app.use(bodyParser());
 
 router
   .get('/beams', routes.beamsRoute)

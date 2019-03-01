@@ -998,24 +998,67 @@ test('End redirect', async t => {
     t.equal(response.headers.location,
       '/beams/test_url/stream_0/packet_50',
       'redirects to expected location.');
-
-
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-/* test('POST a format', async t => {
+test('POST a format', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Store format with existing URL');
+    let fmt = testUtil.fmt;
+    let response = await request(server)
+      .post('/beams')
+      .send(fmt.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response reports OK.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    t.deepEqual(response.body, fmt.toJSON(), 'created equals sent.');
+    t.equal(response.headers.location, '/beams/test_url',
+      'has expected location header.');
+
+    let dbfmt = await redisio.retrieveFormat('test_url');
+    t.ok(dbfmt, 'stored format is truthy.');
+    t.deepEqual(dbfmt.toJSON(), fmt.toJSON(),
+      'stored format matches sent format.');
+
+    t.comment('### Attempting to post same format');
+    response = await request(server)
+      .post('/beams')
+      .send(fmt.toJSON())
+      .expect(409);
+    t.notOk(response.ok, 'response is not OK.');
+    t.equal(response.type, 'application/json', 'error is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 409,
+      error: 'Conflict',
+      message: 'A format with key \'beamengine:test_url\' already exists.'
+    }, 'error message is as expected.');
+
+    fmt = testUtil.fmt;
+    fmt.url = '';
+    response = await request(server)
+      .post('/beams')
+      .send(fmt.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response is OK.');
+    t.ok(response.body.url && response.body.url.length > 0, 'has new URL.');
+    t.ok(response.headers.location && response.headers.location.startsWith('/beams'),
+      'location headers starts correctly.');
+    let location = response.headers.location.slice(7).replace(/%3A/g, ':');
+    t.equal(location, response.body.url, 'location derived from fmt.url.');
+
+    // TODO test more streams than the threadpool size
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-test('PUT a packet', async t => {
+/* test('PUT a packet', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
   } catch (err) {
