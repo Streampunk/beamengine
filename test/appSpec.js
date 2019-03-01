@@ -891,6 +891,121 @@ test('GET frame data', async t => {
   t.end();
 });
 
+test('Start redirect', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Start request with empty stream');
+    let response = await request(server).get('/beams/test_url/stream_0/start')
+      .expect(404);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.ok(response.type, 'application/json', 'error message is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Could not find start frame for stream \'test_url:stream_0\': Unable to find requested media elements.'
+    }, 'has expected error message.');
+
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+      'test format stored.');
+
+    for ( let x = 0 ; x < 10 ; x++) {
+      let tpkt = testUtil.pkt;
+      tpkt.stream_index = 0;
+      tpkt.pts = (x * 10) - 40;
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+        `test packet ${tpkt.pts} stored OK.`);
+    }
+
+    t.comment('### Request start via stream index');
+    response = await request(server).get('/beams/test_url/stream_0/start')
+      .expect(302);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.equal(response.headers.location,
+      '/beams/test_url/stream_0/packet_-40',
+      'redirects to expected location.');
+
+    t.comment('### Request start via stream alias');
+    response = await request(server).get('/beams/test_url/video/start')
+      .expect(302);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.equal(response.headers.location,
+      '/beams/test_url/stream_0/packet_-40',
+      'redirects to expected location.');
+
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
+test('End redirect', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### End request with empty stream');
+    let response = await request(server).get('/beams/test_url/stream_0/end')
+      .expect(404);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.ok(response.type, 'application/json', 'error message is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message:
+        'Could not find end frame for stream \'test_url:stream_0\': Unable to find requested media elements.'
+    }, 'has expected error message.');
+
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+      'test format stored.');
+
+    for ( let x = 0 ; x < 10 ; x++) {
+      let tpkt = testUtil.pkt;
+      tpkt.stream_index = 0;
+      tpkt.pts = (x * 10) - 40;
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+        `test packet ${tpkt.pts} stored OK.`);
+    }
+
+    t.comment('### Request end via stream index');
+    response = await request(server).get('/beams/test_url/stream_0/end')
+      .expect(302);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.equal(response.headers.location,
+      '/beams/test_url/stream_0/packet_50',
+      'redirects to expected location.');
+
+    t.comment('### Request end via stream alias');
+    response = await request(server).get('/beams/test_url/video/end')
+      .expect(302);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.equal(response.headers.location,
+      '/beams/test_url/stream_0/packet_50',
+      'redirects to expected location.');
+
+    t.comment('### Request latest via stream index');
+    response = await request(server).get('/beams/test_url/stream_0/latest')
+      .expect(302);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.equal(response.headers.location,
+      '/beams/test_url/stream_0/packet_50',
+      'redirects to expected location.');
+
+    t.comment('### Request latest via stream alias');
+    response = await request(server).get('/beams/test_url/video/latest')
+      .expect(302);
+    t.notOk(response.ok, 'response reports not OK.');
+    t.equal(response.headers.location,
+      '/beams/test_url/stream_0/packet_50',
+      'redirects to expected location.');
+
+
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
+
 /* test('POST a format', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');

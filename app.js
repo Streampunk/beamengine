@@ -35,6 +35,7 @@ router
   .get('/beams/:fmtSpec', routes.formatRoute)
   .get('/beams/:fmtSpec/:streamSpec', routes.streamRoute)
   .get('/beams/:fmtSpec/:streamSpec/start', routes.startRedirect)
+  .get('/beams/:fmtSpec/:streamSpec/(end|latest)', routes.endRedirect)
   .get('/beams/:fmtSpec/:streamSpec/packet_:pts(-?\\d+).raw(_0)?', routes.packetDataRoute)
   .get('/beams/:fmtSpec/:streamSpec/packet_:pts(-?\\d+)/data', routes.packetDataRoute)
   .get('/beams/:fmtSpec/:streamSpec/packet_:pts(-?\\d+)(\\.json)?', routes.packetRoute)
