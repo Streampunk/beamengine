@@ -56,7 +56,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-/* test('List contents', async t => {
+test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -190,16 +190,16 @@ test('GET a stream', async t => {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
 
-/* test('GET a packet', async t => {
+test('GET a packet', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
     t.comment('### Retrieve a packet');
-    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK-crt','OK-crt'],
       'test packet stored OK.');
     let response = await request(server).get('/beams/test_url/stream_3/42')
       .expect(200);
@@ -240,7 +240,7 @@ const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // esl
     for ( let x = 0 ; x < 10 ; x++) {
       let tpkt = testUtil.pkt;
       tpkt.pts = (x * 10) - 40;
-      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK-crt','OK-crt'],
         `test packet ${tpkt.pts} stored OK.`);
     }
 
@@ -357,7 +357,7 @@ const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // esl
       let tpkt = testUtil.pkt;
       tpkt.pts = (x * 3600) - 14400;
       tpkt.stream_index = 1;
-      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK-crt','OK-crt'],
         `test packet ${tpkt.pts} stored OK.`);
     }
 
@@ -416,7 +416,7 @@ test('GET a packet directly', async t => {
     t.ok(await flushdb(), 'database flushed OK.');
 
     t.comment('### Retrieve a packet directly');
-    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK-crt','OK-crt'],
       'test packet stored OK.');
     let response = await request(server).get('/beams/test_url/stream_3/packet_42')
       .expect(200);
@@ -450,7 +450,7 @@ test('GET a frame', async t => {
 
     t.comment('### Retrieve a frame');
     t.deepEqual(await redisio.storeMedia('test_url', testUtil.frm, 3),
-      ['OK','OK', 'OK', 'OK'], 'test frame stored OK.');
+      ['OK-crt', 'OK-crt', 'OK-crt', 'OK-crt'], 'test frame stored OK.');
     let response = await request(server).get('/beams/test_url/stream_3/42')
       .expect(200);
     t.ok(response.ok, 'response claims OK.');
@@ -493,7 +493,8 @@ test('GET a frame', async t => {
       let tfrm = testUtil.frm;
       tfrm.pts = (x * 10) - 40;
       tfrm.stream_index = 3;
-      t.deepEqual(await redisio.storeMedia('test_url', tfrm), ['OK','OK','OK','OK'],
+      t.deepEqual(await redisio.storeMedia('test_url', tfrm),
+        ['OK-crt', 'OK-crt', 'OK-crt', 'OK-crt'],
         `test frame ${tfrm.pts} stored OK.`);
     }
 
@@ -610,7 +611,8 @@ test('GET a frame', async t => {
       let tfrm = testUtil.frm;
       tfrm.pts = (x * 3600) - 14400;
       tfrm.stream_index = 1;
-      t.deepEqual(await redisio.storeMedia('test_url', tfrm), ['OK','OK','OK','OK'],
+      t.deepEqual(await redisio.storeMedia('test_url', tfrm),
+        ['OK-crt', 'OK-crt', 'OK-crt', 'OK-crt'],
         `test frame ${tfrm.pts} stored OK.`);
     }
 
@@ -671,7 +673,7 @@ test('GET a frame directly', async t => {
 
     t.comment('### Retrieve a frame directly');
     t.deepEqual(await redisio.storeMedia('test_url', testUtil.frm, 3),
-      ['OK','OK', 'OK', 'OK'], 'test frame stored OK.');
+      ['OK-crt', 'OK-crt', 'OK-crt', 'OK-crt'], 'test frame stored OK.');
     let response = await request(server).get('/beams/test_url/stream_3/frame_42')
       .expect(200);
     t.ok(response.ok, 'response claims OK.');
@@ -703,7 +705,7 @@ test('GET packet data', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
 
-    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK','OK'],
+    t.deepEqual(await redisio.storeMedia('test_url', testUtil.pkt), ['OK-crt','OK-crt'],
       'test packet stored OK.');
 
     t.comment('### Get packet data using .raw');
@@ -769,7 +771,7 @@ test('GET frame data', async t => {
     t.ok(await flushdb(), 'database flushed OK.');
 
     t.deepEqual(await redisio.storeMedia('test_url', testUtil.frm, 3),
-      ['OK','OK', 'OK', 'OK'], 'test frame stored OK.');
+      ['OK-crt', 'OK-crt', 'OK-crt', 'OK-crt'], 'test frame stored OK.');
 
     t.comment('### Get frame data using .raw');
     let response = await request(server).get('/beams/test_url/stream_3/frame_42.raw')
@@ -907,14 +909,14 @@ test('Start redirect', async t => {
         'Could not find start frame for stream \'test_url:stream_0\': Unable to find requested media elements.'
     }, 'has expected error message.');
 
-    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK', 'OK', 'OK'],
       'test format stored.');
 
     for ( let x = 0 ; x < 10 ; x++) {
       let tpkt = testUtil.pkt;
       tpkt.stream_index = 0;
       tpkt.pts = (x * 10) - 40;
-      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK-crt','OK-crt'],
         `test packet ${tpkt.pts} stored OK.`);
     }
 
@@ -956,14 +958,14 @@ test('End redirect', async t => {
         'Could not find end frame for stream \'test_url:stream_0\': Unable to find requested media elements.'
     }, 'has expected error message.');
 
-    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK','OK','OK'],
+    t.deepEqual(await redisio.storeFormat(testUtil.fmt), ['OK', 'OK', 'OK'],
       'test format stored.');
 
     for ( let x = 0 ; x < 10 ; x++) {
       let tpkt = testUtil.pkt;
       tpkt.stream_index = 0;
       tpkt.pts = (x * 10) - 40;
-      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK','OK'],
+      t.deepEqual(await redisio.storeMedia('test_url', tpkt), ['OK-crt','OK-crt'],
         `test packet ${tpkt.pts} stored OK.`);
     }
 
@@ -1056,7 +1058,7 @@ test('POST a format', async t => {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 test('PUT a packet', async t => {
   try {
@@ -1070,7 +1072,7 @@ test('PUT a packet', async t => {
       .expect(201);
     t.ok(response.ok, 'response reports OK.');
 
-    t.comment('Put in a packet for the format with "stream_0"');
+    t.comment('### Put in a packet for the format with "stream_0"');
     let pkt = testUtil.pkt;
     pkt.stream_index = 0;
     response = await request(server)
@@ -1084,9 +1086,10 @@ test('PUT a packet', async t => {
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
 
-    t.comment('Put in a packet for the format with "0"');
+    t.comment('### Put in a packet for the format with "0"');
     pkt = testUtil.pkt;
     pkt.stream_index = 0;
+    pkt.duration = 143;
     response = await request(server)
       .put('/beams/test_url/0/packet_42')
       .send(pkt.toJSON())
@@ -1098,9 +1101,10 @@ test('PUT a packet', async t => {
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
 
-    t.comment('Put in a packet for the format with "video"');
+    t.comment('### Put in a packet for the format with "video"');
     pkt = testUtil.pkt;
     pkt.stream_index = 0;
+    pkt.duration = 144;
     response = await request(server)
       .put('/beams/test_url/video/packet_42')
       .send(pkt.toJSON())
@@ -1112,9 +1116,10 @@ test('PUT a packet', async t => {
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
 
-    t.comment('Put in a packet that does not identify');
+    t.comment('### Put in a packet that does not identify');
     pkt = testUtil.pkt;
     pkt.stream_index = 0;
+    pkt.duration = 145;
     response = await request(server)
       .put('/beams/test_url/stream_0/42')
       .send(pkt.toJSON())
@@ -1126,7 +1131,7 @@ test('PUT a packet', async t => {
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
 
-    t.comment('Packet stream mismatch error');
+    t.comment('### Packet stream mismatch error');
     pkt = testUtil.pkt;
     pkt.stream_index = 0;
     response = await request(server)
@@ -1141,7 +1146,7 @@ test('PUT a packet', async t => {
       message: 'Packet stream index \'0\' does not match URL stream index \'1\'.'
     }, 'error message as expected.');
 
-    t.comment('Frame for packet error');
+    t.comment('### Frame for packet error');
     pkt = testUtil.frm;
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42')
@@ -1155,7 +1160,7 @@ test('PUT a packet', async t => {
       message: 'Media element type \'Frame\' does not match URL parameter \'packet_42\'.'
     }, 'error message as expected.');
 
-    t.comment('Post something that is not a packet by type name');
+    t.comment('### Post something that is not a packet by type name');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42')
       .send({ type: 'Wibble' })
@@ -1168,7 +1173,7 @@ test('PUT a packet', async t => {
       message: 'Media element type \'Wibble\' does not match URL parameter \'packet_42\'.'
     }, 'error message as expected.');
 
-    t.comment('Post something that is not a packet by media type');
+    t.comment('### Post something that is not a packet by media type');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42')
       .send(Buffer.from('Wibbly'))
@@ -1181,22 +1186,155 @@ test('PUT a packet', async t => {
       message: 'Media element must be described with JSON.'
     }, 'error message as expected.');
 
+    t.comment('### Packet PTS and path must match');
+    pkt = testUtil.pkt;
+    pkt.stream_index = 0;
+    response = await request(server)
+      .put('/beams/test_url/stream_0/packet_43')
+      .send(pkt.toJSON())
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'URL PTS of \'43\' does not match media element PTS of \'42\'.'
+    }, 'error message as expected.');
+
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-/* test('PUT a frame', async t => {
+test('PUT a frame', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Store format with existing URL');
+    let fmt = testUtil.fmt;
+    let response = await request(server)
+      .post('/beams')
+      .send(fmt.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response reports OK.');
+
+    t.comment('Put in a frame for the format with "stream_0"');
+    let frm = testUtil.frm;
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42')
+      .send(frm.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response is truthy.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    let rfrm = beamcoder.frame(response.body);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'returned frame as expected.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'stored frame as expected.');
+
+    t.comment('Put in a frame for the format with "0"');
+    frm = testUtil.frm;
+    frm.pkt_duration = 143;
+    response = await request(server)
+      .put('/beams/test_url/0/frame_42')
+      .send(frm.toJSON())
+      .expect(200);
+    t.ok(response.ok, 'response is truthy.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    rfrm = beamcoder.frame(response.body);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'returned frame as expected.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'stored frame as expected.');
+
+    t.comment('Put in a frame for the format with "video"');
+    frm = testUtil.frm;
+    frm.pkt_duration = 144;
+    response = await request(server)
+      .put('/beams/test_url/video/frame_42')
+      .send(frm.toJSON())
+      .expect(200);
+    t.ok(response.ok, 'response is truthy.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    rfrm = beamcoder.frame(response.body);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'returned frame as expected.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'stored frame as expected.');
+
+    t.comment('### Put a frame that does not identify');
+    frm = testUtil.frm;
+    frm.pkt_duration = 145;
+    response = await request(server)
+      .put('/beams/test_url/stream_0/42')
+      .send(frm.toJSON())
+      .expect(200);
+    t.ok(response.ok, 'response is truthy.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    rfrm = beamcoder.frame(response.body);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'returned frame as expected.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'stored frame as expected.');
+
+    t.comment('### Packet for frame error');
+    frm = testUtil.pkt;
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42')
+      .send(frm.toJSON())
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Media element type \'Packet\' does not match URL parameter \'frame_42\'.'
+    }, 'error response as expected.');
+
+    t.comment('### Post something that is not a frame by name');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42')
+      .send({ type: 'Wobble' })
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Media element type \'Wobble\' does not match URL parameter \'frame_42\'.'
+    }, 'error response as expected.');
+
+    t.comment('### Post something that is not a frame by media type');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42')
+      .send('Jelly on a plate.')
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Media element must be described with JSON.'
+    }, 'error response as expected.');
+
+    t.comment('### Frame PTS and path must match');
+    frm = testUtil.frm;
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_43')
+      .send(frm.toJSON())
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'URL PTS of \'43\' does not match media element PTS of \'42\'.'
+    }, 'error response as expected.');
+
   } catch (err) {
     t.fail(err);
   }
   t.end();
 });
 
-test('Update a format', async t => {
+/* test('Update a format', async t => {
   try {
     t.ok(await flushdb(), 'database flushed OK.');
   } catch (err) {

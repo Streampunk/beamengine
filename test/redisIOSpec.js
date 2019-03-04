@@ -50,7 +50,7 @@ test('Packet store and retrieve', async t => {
     duration: 44,
     pos: 45
   });
-  t.deepEqual(await redisio.storeMedia('test_url', pkt), [ 'OK', 'OK' ],
+  t.deepEqual(await redisio.storeMedia('test_url', pkt), [ 'OK-crt', 'OK-crt' ],
     'redis reports store of packet and data OK.');
   let redis = await redisio.redisPool.use();
   t.ok(await redis.exists(`${config.redis.prepend}:test_url:stream_3:packet_42`),
@@ -97,7 +97,8 @@ test('Frame store and retrieve', async t => {
     height: 1080,
     format: 'yuv422p'
   }).alloc();
-  t.deepEqual(await redisio.storeMedia('test_url', frm, 2), ['OK','OK','OK','OK'],
+  t.deepEqual(await redisio.storeMedia('test_url', frm, 2),
+    [ 'OK-crt', 'OK-crt', 'OK-crt', 'OK-crt' ],
     'redis reports store of frame and data OK.');
   // console.log(redisio.redisPool.pool[0].options);
   let redis = await redisio.redisPool.use();
@@ -164,9 +165,10 @@ test('Retrieve media', async t => {
     height: 1080,
     format: 'yuv422p'
   }).alloc();
-  t.deepEqual(await redisio.storeMedia('test_url', pkt), [ 'OK', 'OK' ],
+  t.deepEqual(await redisio.storeMedia('test_url', pkt), [ 'OK-crt', 'OK-crt' ],
     'redis reports store of packet and data OK.');
-  t.deepEqual(await redisio.storeMedia('test_url', frm, 3), ['OK','OK','OK','OK'],
+  t.deepEqual(await redisio.storeMedia('test_url', frm, 3),
+    [ 'OK-crt', 'OK-crt', 'OK-crt', 'OK-crt' ],
     'redis reports store of frame and data OK.');
 
   t.comment('### searching from 42 upwards');
