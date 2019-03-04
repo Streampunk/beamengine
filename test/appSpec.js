@@ -43,6 +43,8 @@ const flushdb = async () => {
   return result === 'OK';
 };
 
+const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
+
 test('Checking that server is listening', async t => {
   redisio.redisPool.testing = true;
   t.ok(await flushdb(), 'test database flushed OK.');
@@ -56,7 +58,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-test('List contents', async t => {
+/* test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -191,8 +193,6 @@ test('GET a stream', async t => {
   }
   t.end();
 });
-
-const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
 
 test('GET a packet', async t => {
   try {
@@ -1327,6 +1327,53 @@ test('PUT a frame', async t => {
       error: 'Bad Request',
       message: 'URL PTS of \'43\' does not match media element PTS of \'42\'.'
     }, 'error response as expected.');
+
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+}); */
+
+test('PUT packet data', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
+
+    t.comment('### Store format with existing URL');
+    let fmt = testUtil.fmt;
+    let response = await request(server)
+      .post('/beams')
+      .send(fmt.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response reports OK.');
+
+    t.comment('### Put in a packet for the format with "stream_0"');
+    let pkt = testUtil.pkt;
+    pkt.stream_index = 0;
+    response = await request(server)
+      .put('/beams/test_url/stream_0/packet_42')
+      .send(pkt.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response is truthy.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    let rpkt = beamcoder.packet(response.body);
+    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'returned packet as expected.');
+    rpkt = await redisio.retrievePacket('test_url', 0, 42);
+    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
+
+    t.comment('### Put packet data');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/packet_42/data')
+      .type('application/octet-stream')
+      .send(Buffer.alloc(pkt.size))
+      .expect(204);
+    t.ok(response.ok, 'data response is OK.');
+    t.ok(response.size, 0, 'empty body.');
+    rpkt = await redisio.retrievePacket('test_url', 0, 42);
+    t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
+    t.equal(rpkt.data.length, 16383, 'stored data has expected length.');
+    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is correct.');
+
+
 
   } catch (err) {
     t.fail(err);

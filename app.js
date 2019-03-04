@@ -46,18 +46,19 @@ router
   .get('/beams/:fmtSpec/:streamSpec/frame_:pts(-?\\d+)/data(_?):idx(\\d?)', routes.frameDataRoute)
   .get('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaRoute)
   .post('/beams', routes.createBeam)
-  .put('/beams/:fmtSpec', routes.formatUpdate)
-  .post('/beams/:fmtSpec', routes.createRelated)
+  .put('/beams/:fmtSpec', routes.formatUpdate) // TODO
+  .post('/beams/:fmtSpec', routes.createRelated) // TODO
   .put('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaUpdate)
-  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec/:dataSpec', routes.dataUpdate);
+  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec/data', routes.dataUpdate);
 
 app
   .use(async (ctx, next) => {
     try {
       await next();
-      if (ctx.status === 404) {
+      if ((ctx.status === 404) || (ctx.body === undefined)) {
         ctx.body = { statusCode: 404, error: 'Not Found',
           message: 'Resource not found.' };
+        ctx.status = 404;
       }
     } catch (err) {
       if (Boom.isBoom(err)) {
