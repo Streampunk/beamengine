@@ -58,7 +58,7 @@ test('Checking that server is listening', async t => {
   });
 });
 
-/* test('List contents', async t => {
+test('List contents', async t => {
   try {
     let response = await request(server).get('/beams')
       .expect(200)
@@ -1332,7 +1332,7 @@ test('PUT a frame', async t => {
     t.fail(err);
   }
   t.end();
-}); */
+});
 
 test('PUT packet data', async t => {
   try {
@@ -1477,7 +1477,7 @@ test('PUT packet data', async t => {
       message: 'Packet buffer size \'16384\' exceeds data length of \'16383\'.'
     }, 'has expected error message.');
 
-    t.comment('### Put packet data with "/data"');
+    t.comment('### Put short packet data with "/data"');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42/data')
       .type('application/octet-stream')
@@ -1491,8 +1491,187 @@ test('PUT packet data', async t => {
     t.equal(rpkt.data.length, 16283, 'stored data has expected length.');
     t.equal(rpkt.size, rpkt.data.length, 'rpkt size is incorrect.');
     t.ok(Buffer.compare(rpkt.data, pkt.data.slice(0, -100)) === 0, 'stored buffer is a subset.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});
 
+test('PUT frame data', async t => {
+  try {
+    t.ok(await flushdb(), 'database flushed OK.');
 
+    t.comment('### Store format with existing URL');
+    let fmt = testUtil.fmt;
+    let response = await request(server)
+      .post('/beams')
+      .send(fmt.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response reports OK.');
+
+    t.comment('### Put in a frame for the format with "stream_0"');
+    let frm = testUtil.frm;
+    for ( let y = 0 ; y < frm.data.length ; y++ ) {
+      for ( let x = 0 ; x < 1000 ; x++ ) {
+        frm.data[y][x] = (y * 16) + (x % 10);
+      }
+    }
+
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42')
+      .send(frm.toJSON())
+      .expect(201);
+    t.ok(response.ok, 'response is truthy.');
+    t.equal(response.type, 'application/json', 'response is JSON.');
+    let rfrm = beamcoder.frame(response.body);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'returned frame as expected.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.deepEqual(rfrm.toJSON(), frm.toJSON(), 'stored frame as expected.');
+
+    t.comment('### Put frame data with "/data"');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42/data')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify(frm.data.map(x => x.length)))
+      .send(Buffer.concat(frm.data))
+      .expect(201);
+    t.ok(response.ok, 'response is OK.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.ok(rfrm, 'roundtripped frame is truthy.');
+    t.ok(Array.isArray(rfrm.data), 'roundtripped data is array.');
+    t.equal(rfrm.data.length, 3, 'roundtripped array has expected length.');
+    t.deepEqual(rfrm.data.map(x => x.length), frm.data.map(x => x.length),
+      'element lengths as expected.');
+    t.ok(Buffer.compare(rfrm.data[0], frm.data[0]) === 0, 'first plane OK.');
+    t.ok(Buffer.compare(rfrm.data[1], frm.data[1]) === 0, 'second plane OK.');
+    t.ok(Buffer.compare(rfrm.data[2], frm.data[2]) === 0, 'third plane OK.');
+
+    t.comment('### Put sepaate planes of data with "/data_0/1/2"');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42/data_0')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify([ frm.data[0].length ]))
+      .send(frm.data[0])
+      .expect(200);
+    t.ok(response.ok, 'response for plane 0 is OK.');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42/data_1')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify([ frm.data[1].length ]))
+      .send(frm.data[1])
+      .expect(200);
+    t.ok(response.ok, 'response for plane 1 is OK.');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42/data_2')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify([ frm.data[2].length ]))
+      .send(frm.data[2])
+      .expect(200);
+    t.ok(response.ok, 'response for plane 2 is OK.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.ok(rfrm, 'roundtripped frame is truthy.');
+    t.ok(Array.isArray(rfrm.data), 'roundtripped data is array.');
+    t.equal(rfrm.data.length, 3, 'roundtripped array has expected length.');
+    t.deepEqual(rfrm.data.map(x => x.length), frm.data.map(x => x.length),
+      'element lengths as expected.');
+    t.ok(Buffer.compare(rfrm.data[0], frm.data[0]) === 0, 'first plane OK.');
+    t.ok(Buffer.compare(rfrm.data[1], frm.data[1]) === 0, 'second plane OK.');
+    t.ok(Buffer.compare(rfrm.data[2], frm.data[2]) === 0, 'third plane OK.');
+
+    t.comment('### Put frame data with ".raw"');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42.raw')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify(frm.data.map(x => x.length)))
+      .send(Buffer.concat(frm.data))
+      .expect(200);
+    t.ok(response.ok, 'response is OK.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.ok(rfrm, 'roundtripped frame is truthy.');
+    t.ok(Array.isArray(rfrm.data), 'roundtripped data is array.');
+    t.equal(rfrm.data.length, 3, 'roundtripped array has expected length.');
+    t.deepEqual(rfrm.data.map(x => x.length), frm.data.map(x => x.length),
+      'element lengths as expected.');
+    t.ok(Buffer.compare(rfrm.data[0], frm.data[0]) === 0, 'first plane OK.');
+    t.ok(Buffer.compare(rfrm.data[1], frm.data[1]) === 0, 'second plane OK.');
+    t.ok(Buffer.compare(rfrm.data[2], frm.data[2]) === 0, 'third plane OK.');
+
+    t.comment('### Put sepaate planes of data with ".raw_0/1/2"');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42.raw_0')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify([ frm.data[0].length ]))
+      .send(frm.data[0])
+      .expect(200);
+    t.ok(response.ok, 'response for plane 0 is OK.');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42.raw_1')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify([ frm.data[1].length ]))
+      .send(frm.data[1])
+      .expect(200);
+    t.ok(response.ok, 'response for plane 1 is OK.');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42.raw_2')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify([ frm.data[2].length ]))
+      .send(frm.data[2])
+      .expect(200);
+    t.ok(response.ok, 'response for plane 2 is OK.');
+    rfrm = await redisio.retrieveFrame('test_url', 0, 42);
+    t.ok(rfrm, 'roundtripped frame is truthy.');
+    t.ok(Array.isArray(rfrm.data), 'roundtripped data is array.');
+    t.equal(rfrm.data.length, 3, 'roundtripped array has expected length.');
+    t.deepEqual(rfrm.data.map(x => x.length), frm.data.map(x => x.length),
+      'element lengths as expected.');
+    t.ok(Buffer.compare(rfrm.data[0], frm.data[0]) === 0, 'first plane OK.');
+    t.ok(Buffer.compare(rfrm.data[1], frm.data[1]) === 0, 'second plane OK.');
+    t.ok(Buffer.compare(rfrm.data[2], frm.data[2]) === 0, 'third plane OK.');
+
+    t.comment('### Put frame data pts not found with "/data"');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_43/data')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify(frm.data.map(x => x.length)))
+      .send(Buffer.concat(frm.data))
+      .expect(404);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 404,
+      error: 'Not Found',
+      message: 'Media element metadata not found: Frame metadata for key \'beamengine:test_url:stream_0:frame_43\' does not exist.'
+    }, 'error message as expected.');
+
+    t.comment('### Put frame data index and buf sizes');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42/data_0')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify(frm.data.map(x => x.length)))
+      .send(Buffer.concat(frm.data))
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Cannot specifiy an index and provide multiple buffer sizes.'
+    }, 'error message as expected.');
+
+    t.comment('### Put frame data with not enough data');
+    response = await request(server)
+      .put('/beams/test_url/stream_0/frame_42/data_0')
+      .type('application/octet-stream')
+      .set('Beam-Buf-Sizes', JSON.stringify(frm.data.map(x => x.length + 1)))
+      .send(Buffer.concat(frm.data))
+      .expect(400);
+    t.notOk(response.ok, 'error response is not OK.');
+    t.equal(response.type, 'application/json', 'error response is JSON.');
+    t.deepEqual(response.body, {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Frame buffer\'s size total \'4147395\' exceeds data length of \'4147392\'.'
+    }, 'error message as expected.');
   } catch (err) {
     t.fail(err);
   }
