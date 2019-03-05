@@ -48,8 +48,8 @@ router
   .post('/beams', routes.createBeam)
   .put('/beams/:fmtSpec', routes.formatUpdate) // TODO
   .post('/beams/:fmtSpec', routes.createRelated) // TODO
-  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaUpdate)
-  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec/data', routes.dataUpdate);
+  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaUpdate) // .json and .raw(_0) supported
+  .put('/beams/:fmtSpec/:streamSpec/:mediaSpec/data(_?):idx(\\d?)', routes.dataUpdate);
 
 app
   .use(async (ctx, next) => {
