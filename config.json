@@ -16,5 +16,30 @@
   "testing": {
     "db": 15,
     "port": 8765
+  },
+  "jobs": {
+    "jpeg": {
+      "method": "GET",
+      "pathPattern": "^.*\\.(jpg|jpeg)$",
+      "queue": "media_workers",
+      "function": "makeJPEG",
+      "post": false
+    },
+    "fileStore": {
+      "method": ["PUT", "POST"],
+      "pathPattern": "^/beams.*",
+      "statusCode": [200, 201],
+      "queue": "file_workers",
+      "function": "storeCopy",
+      "post": true
+    },
+    "dataMissing": {
+      "method": "GET",
+      "pathPattern": "^.*(packet|frame)_.*$",
+      "statusCode": 404,
+      "queue": "file_workers",
+      "function": "retrieveCopy",
+      "post": true
+    }
   }
 }

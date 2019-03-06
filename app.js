@@ -26,6 +26,7 @@ const bodyParser = require('koa-bodyparser');
 // const producer = new Bull('my-first-queue');
 const config = require('./config.json');
 const routes = require('./lib/routes.js');
+const jobCatcher = require('./lib/jobCatcher.js');
 const Boom = require('boom');
 
 const app = new Koa();
@@ -73,6 +74,7 @@ app
       console.error(err.stack);
     }
   })
+  .use(jobCatcher)
   .use(router.routes())
   .use(router.allowedMethods());
 
