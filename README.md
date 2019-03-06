@@ -1,10 +1,30 @@
 # Aerostat Beam Engine
 
-<img align="right" src="images/beamengine_third.jpg">Redis-backed highly-scale-able and cloud-fit media beam engine.
+<img align="right" src="images/beamengine_third.jpg">Redis-backed highly-scale-able and cloud-fit media beam engine. Aerostat Beam Engine provides the following:
 
-A prototype implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
+* A resilient media-aware cache of media data structured ready for processing by FFmpeg libraries that can be backed by file or object stores;
+* Stateless clients providing access to the cache through the _Content Beam API_, an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed;
+* Job queues allowing multiple worker clients to carry out media transformations just-in-time, on local systems or via serverless compute like AWS Lambda.
+
+The engine comes in the form of a web server application that provides access to read and write data stored in the underlying Redis cache, which may be a single Redia instance or a cluster of master/slave Redis instances. Also included are some extendible worker clients, supporting clients and the ability to trigger work based on some simple rules.
+
+This is an implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
 
 Work in progress. For Node.js FFmpeg native bindings, please see [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder).
+
+## Installation
+
+## Configuration
+
+## Content Beam API
+
+## Workers
+
+### Setting up a rule
+
+### Pre-built workers
+
+### Writing a worker
 
 ## Status, support and further development
 
