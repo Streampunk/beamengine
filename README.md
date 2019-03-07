@@ -4,7 +4,7 @@
 
 * A resilient media-aware cache of media data structured ready for processing by FFmpeg libraries that can be backed by file or object stores;
 * Stateless clients providing access to the cache through the _Content Beam API_, an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed;
-* Job queues allowing multiple worker clients to carry out media transformations just-in-time, on local systems or via serverless compute like AWS Lambda.
+* Job queues allowing multiple worker clients to carry out media transformations just-in-time, on the local systems, distributed across other nodes or via serverless compute like AWS Lambda.
 
 The engine comes in the form of a web server application that provides access to read and write data stored in the underlying Redis cache, which may be a single Redia instance or a cluster of master/slave Redis instances. Also included are some extendible worker clients, supporting clients and the ability to trigger work based on some simple rules.
 
@@ -16,7 +16,27 @@ Work in progress. For Node.js FFmpeg native bindings, please see [Aerostat Beam 
 
 ## Configuration
 
+Configuration of an Aerostat Beam Engine is achieved by editing the `config.json` file.
+
 ## Content Beam API
+
+The _content beam API_ allows FFmpeg-style media data structures to be transported over HTTP and HTTPS protocols. This allows streams of related media - a _virtual format_ or _logical cable_ - to be moved for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with little delay - recorded and played back - with a mechanism to start streaming at the latest frame. Endpoints can host the content they represent as _content beams_ through a pull-based mechanism or push media to other endpoints.
+
+All content beam API requests start with `/beams/`. The content beam API for HTTP breaks down as:
+
+`/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
+
+* _content_name_: a reference to the source of the content and is set be default to the `url` property of the underlying format context (encoded to safe representation for use in the path part of a URL). This is a unique name for the content that can be beamed from this endpoint.
+* _stream_name_: .
+* _media_ref_: .
+* _data_ref_: .
+
+### Listing available content
+
+
+
+### Format - the logical cable
+
 
 ## Workers
 
