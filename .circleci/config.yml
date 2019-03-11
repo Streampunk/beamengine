@@ -32,6 +32,7 @@ jobs:
     - run: mkdir -p $CIRCLE_TEST_REPORTS/eslint
     - run: mkdir -p $CIRCLE_TEST_REPORTS/xunit
     - run: eslint '**/*.js' -f junit -o /tmp/circleci-test-results/eslint/eslint.xml
+    - run: dockerize -wait tcp://localhost:6379 -timeout 1m
     - run: set -eo pipefail && npm test | tap-xunit > /tmp/circleci-test-results/xunit/results.xml
       
     - store_test_results:
