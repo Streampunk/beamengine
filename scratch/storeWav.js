@@ -31,7 +31,7 @@ async function run() {
   let wavFmt = await beamcoder.demuxer(location);
   let locPathPart = convertToPathPart(location);
   try {
-    let response = await got.post('http://localhost:3000/beams', {
+    let response = await got.post('http://localhost:3000/beams', { // eslint-disable-line no-unused-vars
       body: wavFmt.toJSON(),
       json: true,
       headers : { 'Content-Type': 'application/json' }

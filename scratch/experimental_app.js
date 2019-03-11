@@ -54,7 +54,7 @@ app.use(async (ctx, next) => {
   });
 }); */
 
-const timer = t => new Promise(f => {
+const timer = t => new Promise(f => { // eslint-disable-line no-unused-vars
   setTimeout(f, t);
 });
 
