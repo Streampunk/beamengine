@@ -1,6 +1,6 @@
 {
   "name": "beamengine",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
   "main": "index.js",
   "engines": {
@@ -27,26 +27,26 @@
   "author": "Streampunk Media Ltd",
   "license": "GPL-3.0",
   "devDependencies": {
-    "eslint": "^5.9.0",
-    "nodemon": "^1.18.8",
-    "supertest": "^3.4.2",
-    "tap": "^12.1.0"
+    "eslint": "^5.15.1",
+    "nodemon": "^1.18.10",
+    "supertest": "^3.4.2"
   },
   "bugs": {
     "url": "https://github.com/Streampunk/aerostat/issues"
   },
   "homepage": "https://github.com/Streampunk/aerostat#readme",
   "dependencies": {
+    "beamcoder": "^0.1.13",
     "boom": "^7.3.0",
-    "bull": "^3.5.2",
+    "bull": "^3.7.0",
     "got": "^9.6.0",
-    "ioredis": "^4.3.0",
-    "koa": "^2.6.2",
+    "ioredis": "^4.6.2",
+    "koa": "^2.7.0",
     "koa-bodyparser": "^4.2.1",
-    "koa-ejs": "^4.1.2",
+    "koa-ejs": "^4.2.0",
     "koa-router": "^7.4.0",
     "path-to-regexp": "^3.0.0",
-    "tape": "^4.9.2",
+    "tape": "^4.10.1",
     "uuid": "^3.3.2"
   },
   "nodemonConfig": {
