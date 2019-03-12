@@ -32,7 +32,8 @@ const server = beamengine.listen(+config.testing.port);
 test.onFinish(() => {
   console.log('Closing test server and clearing redis connection pool.');
   redisio.redisPool.testing = false;
-  redisio.close();
+  let wibble = redisio.close();
+  wibble.then(() => console.log('Closed redis pool connections.'));
   server.close();
 });
 
@@ -48,6 +49,12 @@ const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // esl
 test('Checking that server is listening', async t => {
   redisio.redisPool.testing = true;
   t.ok(await flushdb(), 'test database flushed OK.');
+  server.on('close', () => {
+    beamengine.closeQueues().then(() => {
+      console.log('Closed bull queues.');
+    }, console.error);
+  });
+  server.on('error', console.error);
   if (server.listening) {
     t.pass('Server is already listening.');
     return t.end();

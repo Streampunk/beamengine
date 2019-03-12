@@ -26,7 +26,7 @@ const bodyParser = require('koa-bodyparser');
 // const producer = new Bull('my-first-queue');
 const config = require('./config.json');
 const routes = require('./lib/routes.js');
-const jobCatcher = require('./lib/jobCatcher.js');
+const { jobCatcher, closeQueues } = require('./lib/jobCatcher.js');
 const Boom = require('boom');
 
 const app = new Koa();
@@ -78,12 +78,33 @@ app
   .use(router.routes())
   .use(router.allowedMethods());
 
+let server = null;
+app.closeQueues = closeQueues;
+
 if (!module.parent) {
-  app.listen(config.app.port);
+  server = app.listen(config.app.port);
 }
 
 app.on('error', (err) => {
   console.log(err.stack);
 });
+
+if (server) {
+  server.on('close', () => {
+    console.log('Closing bull queues.');
+    closeQueues().then(console.log('Bull queues close.'));
+  });
+}
+
+function end() {
+  if (server) {
+    server.close();
+  }
+}
+
+process.on('SIGINT', end);
+process.on('SIGHUP', end);
+process.on('SIGTERM', end);
+process.on('SIGUSR2', end);
 
 module.exports = app;

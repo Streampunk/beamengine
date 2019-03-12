@@ -24,7 +24,7 @@ The _content beam API_ allows FFmpeg-style media data structures to be transport
 
 All content beam API requests start with `/beams/`. The content beam API for HTTP breaks down as:
 
-`/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
+`/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
 
 * _content_name_: a reference to the source of the content and is set be default to the `url` property of the underlying format context (encoded to safe representation for use in the path part of a URL). This is a unique name for the content that can be beamed from this endpoint.
 * _stream_name_: .
