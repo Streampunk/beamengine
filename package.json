@@ -1,6 +1,6 @@
 {
   "name": "beamengine",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
   "main": "index.js",
   "engines": {
