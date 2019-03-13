@@ -1,7 +1,7 @@
 {
   "name": "beamengine",
-  "version": "0.0.5",
-  "description": "Redis-backed highly-scale-able and cloud-fit media beam engine.",
+  "version": "0.0.6",
+  "description": "Redis-backed highly-scale-able and cloud-fit distributed media processing engine..",
   "main": "index.js",
   "engines": {
     "node": "^8.0.0"
@@ -22,7 +22,14 @@
     "Beam API",
     "Agile Media Blueprint",
     "Beam Engine",
-    "AMB"
+    "AMB",
+    "FFmpeg",
+    "video",
+    "audio",
+    "transcoding",
+    "encoding",
+    "decoding",
+    "Redis"
   ],
   "author": "Streampunk Media Ltd",
   "license": "GPL-3.0",
@@ -53,7 +60,8 @@
     "watch": [
       "views",
       "lib",
-      "app.js"
+      "app.js",
+      "config.json"
     ],
     "ext": "js,html"
   }

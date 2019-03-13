@@ -1,12 +1,12 @@
 # Aerostat Beam Engine
 
-<img align="right" src="images/beamengine_third.jpg">Redis-backed highly-scale-able and cloud-fit media beam engine. Aerostat Beam Engine provides the following:
+<img align="right" src="images/beamengine_third.jpg">[Redis](https://redis.io/)-backed highly-scale-able and cloud-fit distributed media processing engine. A [Node.js](https://nodejs.org/en/) web application and library, _Aerostat Beam Engine_ provides the following:
 
-* A resilient media-aware cache of media data structured ready for processing by FFmpeg libraries that can be backed by file or object stores;
-* Stateless clients providing access to the cache through the _Content Beam API_, an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed;
-* Job queues allowing multiple worker clients to carry out media transformations just-in-time, on the local systems, distributed across other nodes or via serverless compute like AWS Lambda.
+* A resilient, media-aware cache of media data structured ready for processing by [FFmpeg](http://ffmpeg.org/) libraries, which can be backed by file or object stores;
+* Connection to stateless clients that provide access to the media-aware cache through the _Content Beam API_, an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed;
+* Job queues allowing multiple worker clients to carry out media transformations _just-in-time_ or _just-in-case_, executing on either the local system, distributed across many systems, GPU accelerated or via serverless compute services like [AWS Lambda](https://aws.amazon.com/lambda/).
 
-The engine comes in the form of a web server application that provides access to read and write data stored in the underlying Redis cache, which may be a single Redia instance or a cluster of master/slave Redis instances. Also included are some extendible worker clients, supporting clients and the ability to trigger work based on some simple rules.
+The engine is a web server application that provides access to read and write data stored in the underlying Redis cache, which may be a single Redis instance or a cluster of master/slave Redis instances. Also included are some example workers, a library to build customised workders and the ability to trigger work based on rules.
 
 This is an implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
 
@@ -14,15 +14,79 @@ Work in progress. For Node.js FFmpeg native bindings, please see [Aerostat Beam 
 
 ## Installation
 
+Before installation can take place, it is necessary to identify some connected networked resources, to include:
+
+* system(s)/container(s)/VM(s) to run the [Node.js](https://nodejs.org/en/) Beam Engine web apps, possibly behind a load balancer such as [NGINX](https://www.nginx.com/) or [AWS Elastic Load Balancing](https://aws.amazon.com/elasticloadbalancing/).
+* system(s)/container(s)/VM(s) to run [Redis](https://redis.io/), either a single instance, replicated or as a cluster. Alternatively, use a Redis-backed cache service such as [AWS Elasticache](https://aws.amazon.com/elasticache/) or [Azure Cache for Redis](https://azure.microsoft.com/en-gb/services/cache/).
+* system(s)/container(s)/VM(s) to run workers written in Node.js, some of which may need access to a shared file system to persist cached data.
+* access to serverless processing capability such as [AWS Lambda](https://aws.amazon.com/lambda/) or [Azure Functions](https://azure.microsoft.com/en-gb/services/functions/) (optional).
+* systems with GPUs for workers that can do accelerated GPU processing (optional).
+
+It is recommended that for the distributed processing of uncompressed HD video data, all network interconnects run at speeds at or over 10Gbs.
+
+For development purposes, it is possible to run Redis, Beam Engine and workers all on the same system.
+
+### Node.js prerequisites
+
+On x86_64 Windows, Mac or Linux platforms, Beam Engine uses the latest Long Term Support version of Node.js which is currently the most recent v10. Download or install Node.js from [here](https://nodejs.org/en/) or use a [system package manager](https://nodejs.org/en/download/package-manager/).
+
+The Aerostat Beam Engine web app and workers depend on [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder), a module that is a native addon that requires compilation as part of its installation process. The Node.js native addon build tool is called `node-gyp`. Follow the [node-gyp installation instructions](https://github.com/nodejs/node-gyp#installation) to ensure that each Node.js system is ready to build native extensions.
+
+Note: For MacOSX Mojave, install the following package after `xcode-select --install`:
+
+    /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg
+
+The Beam Coder installer downloads suitable FFmpeg `.dll`s on Windows and uses _homebrew_ to install FFmpeg `.dylib` libraries on Mac. For Linux, install FFmpeg development packages suitable for your Linux version, ensuring that the packages include the shared library `.so` files.   
+
+### Redis
+
+For local working, install Redis on a system or systems with a substantial amount of memory. Follow the instructions from Redis themselves. For testing and low criticality systems, a single Redis instance or replicating instance may be sufficient.
+
+For mission critical applications, consider establishing a cluster. Beam Engine uses [ioredis], a package with support for single connections as well as self-healing connections to members of a Redis cluster.
+
+For cloud environments, consider using Redis backed cache service, creating a connection to a virtual private network where the beam engines and workers are located. Such services include:
+
+* aws
+* MS
+* Google
+
+For development and testing on Windows, consider installing Redis using the [Windows Subsystem for Linux](). Note that for some operations, this approach is one or two orders of magnitude slower than installing Redis on a Linux build directly and, as such, should only be used for feature testing and not performance testing.
+
+### Development
+
+To run a Beam Engine in development mode, clone the module from github. In the modules root folder, edit the `config.json` file to match local settings. Then run `npm install` followed by `npm run dev`. This will install dependencies and start the development web server that runs using the automated restart module [nodemon](). To restart, type `rs`.
+
+To see debug information from Redis connections (ioredis), the web framework (Koa 2) and from the job queues (Bull), set the debug flag as follows.
+
+From bash:
+```
+$ DEBUG="*,-not_this"; npm run dev
+```
+
+From Windows Powershell:
+```
+PS > $env:DEBUG="*,-not_this"; npm run dev
+```
+
+To create workers, install Beam Engine in your project.
+
+    npm install beamengine
+
+### Production
+
+__TODO__ - to follow.
+
 ## Configuration
 
-Configuration of an Aerostat Beam Engine is achieved by editing the `config.json` file.
+Configuration of an Aerostat Beam Engine is achieved by editing the `config.json` file. This can also be passed in on the command line as follows:
+
+__TODO__ config on the command line
 
 ## Content Beam API
 
-The _content beam API_ allows FFmpeg-like media data structures to be transported over HTTP and HTTPS protocols. This allows streams of related media - a _virtual format_ or _logical cable_ - to be moved for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with little delay - recorded and played back - with a mechanism to start streaming at the latest frame. Endpoints can host the content they represent as _content beams_ through a pull-based mechanism or push media to other endpoints.
+The _content beam API_ allows FFmpeg-like media data structures to be transported over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows streams of related media - a _virtual format_ or _logical cable_ - to be moved around for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a mechanism to start streaming at the latest frame. As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
 
-All content beam API requests start with `/beams/`. The content beam API for HTTP breaks down as:
+All content beam API requests start with `/beams/`. The content beam API for HTTP/S breaks down as:
 
 `/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
 
@@ -61,7 +125,7 @@ The first retrieves the metadata and the second retrieves the associated payload
 
 The second _data_ URL retrieves a payload of type `application/octet-stream` with content length `16383`.
 
-The packet metadata contains no details as to the relative timing of the media element wrt other elements of the stream, the type of data or encoding used. To be able to decode that packet, it is necessary to find out the details of the associated stream. This can be retrieved from a GET request to one of following URLs:
+The packet metadata contains no details as to the relative timing of the media element wrt other elements of the stream, the type of data payload or the encoding used. To be able to decode that packet, it is necessary to find out the details of the associated stream. This can be retrieved from a GET request to one of following URLs:
 
     https://production.news.zbc.tv/beams/newswatch_20190312/video
     https://production.news.zbc.tv/beams/newswatch_20190312/stream_0
@@ -91,7 +155,7 @@ The URLs are equivalent and produce the following response:
 }
 ```
 
-Time can be specified by timestamp, index count, in real time and relatively by offset, including to the _first_ and _latest_ - or _last_ - media element. Metadata can be retrieved using time ranges. Timestamp specification can be _fuzzy_ for the case where errors in timestamp digitisation, fractional framerates or stream jitter mean that timestamps do not increment by an exact, constant value. Here are some examples:
+Time can be specified by timestamp, index count, in real time and relatively by offset, including to the _first_ and _latest_ - or _last_ - media elements. Metadata can be retrieved using time ranges. Timestamp specification can be _fuzzy_ for the case where errors in timestamp digitisation, fractional framerates or stream jitter mean that timestamps do not increment by an exact, constant value. Here are some examples:
 
 * Single data packet: `/beams/newswatch_20190312/video/packet_108000`
 * Uncompressed frame: `/beams/newswatch_live/video/frame_108000`
@@ -113,10 +177,15 @@ Another example is creating a partial MP4 file for a specified frame range for a
 
 ### Listing available content
 
+The names of all the items of content items stored at an endpoint can be retrieved by a GET request to `/beams/`. This may be a long list and so the request supports query parameters `start` offset and `limit` to enable paging of the values. The value returned is a JSON ay
 
+__TODO__ - example
+
+It is assumed that an external search service, such as [Elasticsearch](), will be used to provide a better searchable index of available streams.
 
 ### Format - the logical cable
 
+Content items have a _format_ that provides the context for reproducing that content. This consists of overall description, the streams that make up the content and the technical parameters to configure decoders. When used to access files, the beam API format is a representation of labels of the storage compartments of that container. When used to access a live stream, the _format_ can be considered as if the description of a multi-core _cable_, where each strand contains the latest content for a particular stream.
 
 ### Streams
 
