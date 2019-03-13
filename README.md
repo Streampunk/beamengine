@@ -118,7 +118,105 @@ Another example is creating a partial MP4 file for a specified frame range for a
 ### Format - the logical cable
 
 
+### Streams
+
+### Media elements
+
+### Data
+
+## Relationships
+
+Items of content may be related to other items because they are:
+
+* byte-for-byte _equivalent_, stored in different locations but otherwise with exactly the same encoding, format and other metadata;
+* visually equivalent _renditions_, such as some source material and all of the encodings made from it, generally with the same resolution;
+* _transformations_ that create a new item of content by applying a filter such as scaling or mixing, possibly with one or more inputs.
+
+These kinds of relationships can be stored in the beamengine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
+
+### Equivalent
+
+Beam Engine uses Redis as a RAM cache for media data but this cannot be a permanent, medium or long term storage medium. The time-to-live from creation to cache expiry for media data payloads can be set in the config file. When data payloads expire, they are no longer available unless they have also been stored in an external equivalent content item. An equivalent content item is a byte-for-byte copy of the source data. Typically, an equivalent content item will have content name that represents a resolvable storage reference, such as a local file path of AWS S3 bucket identifier, where a version of the cached content was persisted by a worker.
+
+Equivalent content representations are one-to-one relationships. Although there will often be a content source, any equivalent content item should be able to be substituted by another.
+
+Here is an example workflow for a content item being recorded via the Beam Content API.
+
+1. A new content item is created. A file backup worker with access to a shred storage drive responds to all content creation requests by creating an equivalent content items with the same format and streams. An equivalent content relationship is stored in the Beam Engine.
+
+2. Each packet that is stored into the Beam Engine creates a post-response job that stores the packet's metadata and payload onto the shared storage.
+
+3. Requests for the packet's payload that take place prior to the expiry of the packet in the cache are services from the cache.
+
+4. Requests for the packet's payload that occur after the cache expiry cause a `404` error that is intercepted and creates a job. A worker checks to see if any equivalent off-line items of content exists. If so, the packet is retrieved from that storage. By policy, the packet's payload can be re-created in Redis if further requests are expected within the TTL.
+
+As an optimisation, it may be possible to predict that if a particular packet is requested then the next few packets in sequence may be required, so pre-emptive read-ahead jobs can be used to pre-populate the cache for anticipated requests.
+
+__TODO__ - description of asserting a equivalent relationship
+
+### Rendition
+
+As experienced by the viewer, a rendition content item is a visually- and/or audibly-equivalent representation of an item of content. Typically, a rendition has the same resolution its source but may have different parameters such as format or codec, meaning that it is not an exact byte-for-byte copy. Renditions relationships between content items are one-to-one and directional, with a source and a target. A rendition without a source is not a rendition as such and is considered to be the _original_ version.
+
+A rendition has a many-to-many stream mapping within two related content items. For example, a source professional format video file - such as `.mxf` or `.mov` - may have a video stream and sixteen separate mono audio streams. A target rendition has a video stream and a stereo audio stream. The rendition relationship must include which of the source audio streams, say the 3rd and 4th, are used to make the left and right tracks for the target.
+
+One-to-one transformations of a stream that are experientially equivalent may be represented as a rendition, even if the result is a different resolution, number or samples or number of packets. For example:
+
+* scaling a video stream for presentation on a lower resolution device, as this is a form of compression;
+* similarly, reducing the sample rate of high-definition audio;
+* compressing audio and adding a short amount of additional silence at the beginning or end to facilitate better lip sync.
+
+Decode rendition relationships have source media elements that are packets and target media elements that are frames, whereas encode rendition relationships start with frames and end up with packets. A rendition target may be a lossless rendition of its source, such as a different packing of samples into a transport. For example, an interleaved V210 packing of an uncompressed 10-bit-per-sample video packet that is otherwise represented as 16-bits-per-sample as separate planes as a frame.
+
+In a workflow, a rendition relationship can be used as follows:
+
+1. Create a new item of content and a rendition relationship to its source. The format of the content items declares details of the target transformation from the source. The relationship includes any stream mappings from source to target and may suggest how the data payloads are to be made.
+
+2. The media element metadata and payloads of a rendition can be made in one of three ways:
+   * _provided_: the payloads are sent in over the Content Beam API in the usual way.
+   * _just-in-case_: payloads are made be a worker or workers from the source material as soon as possible.
+   * _just-in-time_: payloads are made as requested and, where appropriate, cached for subsequent requests.
+
+3. If a request is made for rendition media element metadata payload that does not exist, a worker can be assigned to determine whether to respond with `404 - Not Found` or to assign another worker to make the response _just-in-time_.
+
+__TODO__ - description of asserting a rendition relationship
+
+### Transformation
+
+A content item that is made by applying a filter to one or more other content items such as what a viewer experiences is different from the source is a form of transformation. Transformations include cropping, scaling, mixing, graphics, shaping, retiming (e.g. slow motion), filtering (e.g. remove noise) etc.. A transformation relationship is a means of specifying the correspondence between items of source material that are transformed to make items of target material.
+
+Transformation relationships may be time bounded and only exist for part of the target's timeline. This is a bit like a combination of the timeline in an editor and a live vision mixer:
+
+* For timelines, recipes can be specified in advance.
+* For live streams, parameters such as mix level or graphics position can be updated on-the-fly.
+* Or you can have a mix of the two, with recipes triggered by live events and/or recipes configuring potential live interaction.
+
+At a content-item level, transformations are typically one-to-many, a target with one or more sources. However, in some cases, a transformation may create more than one target, for example making separate key and fill versions of video with graphics overlay. At a stream level, relationships may be many-to-many and exists between media elements that are frames rather than packets.
+
+As with rendition relationships, transformation relationships can be externally _provided_, made _just-in-case_ or made _just-in-time_.
+
+__TODO__ - description of asserting a transformation relationship
+
 ## Workers
+
+Workers run jobs, either just-in-time to create a response to an HTTP request or triggered to do some just-in-vase background work - e.g. housekeeping - as the result of a request. For example:
+
+* create an image from a frame of video _on-the-fly_;
+* change the sample rate of some audio as it is being played without storing the result, e.g. 44,100Hz to 48,000Hz;
+* store an equivalent representation of some media into an object store or onto a filing system.
+
+<img src="images/workers.png">
+
+Workers can run in the same application and on the same system as a Beam Engine. However, the design idea behind the beam engine is that work is distributed across many systems and processors, with the front end is scaled by having multiple instances of Beam Engines with a common data source. Redis is the data source glue in the middle, ensuring that jobs are queued and executed to order using [Bull](https://www.npmjs.com/package/bull).
+
+A Beam Engine is configured with _rules_ that determine what jobs are scheduled and when depending on beam engine requests, classifying the work to different queues. Workers service queues, executing jobs using the shared Redis as both the job manager and primary access point for data payloads. A worker is taken from a catalogue of microservices, may service one or more queues and can be implemented as:
+
+* A single-threaded Node.js process that can execute one job at a time;
+* A [Node.js cluster](https://nodejs.org/docs/latest-v10.x/api/cluster.html) that can execute a number of concurrent _workers_;
+* GPU-accelerated processing, facilitated by a library such as [NodenCL](https://github.com/Streampunk/nodencl);
+* An invocation of an external processing function, such as an [AWS Lambda](https://aws.amazon.com/lambda/) function - see also [Aerostat Beam Lambda](https://www.npmjs.com/package/beamlambda).
+
+
 
 ### Setting up a rule
 
