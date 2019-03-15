@@ -253,14 +253,77 @@ Streams are the sub-components of a format, the virtual strands of a logical cab
 
 `/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;
 
+The primary _stream_name_ is based on the stream index, made by appending the index to `stream_`, e.g. `stream_0`, `stream_42`. This can be shortened to just the index number, e.g. `0`, `42`.
+
+Streams define a `time_base` for the unit of measurement for any of the media elements of the stream. Any two streams in the same format may have a different time bases but any timestamp measured to have the same time value relative to the time base should be presented at the same moment to the viewer. For example, for a video and audio time element:
+
+* Video stream time base is `[1, 90000]` and the frame's presentation timestamp is `90000` then the video frame must be presented at 1s.
+* Audio stream time base is `[1, 48000]` and the audio frame's presentation timestamp is `48000` then the audio samples must be played at 1s, co-timed with the video frame.
+
+Streams have codec parameters defining the way data is encoded (or not) and the dimensions of each media element, including pixel format, sample format, resolution, colorspace etc.. The codec has a name and a type, with the type describing whether the stream consists of _video_, _audio_, _subtitles_ (_captions_), _data_ or an _attachment_. The difference between a _data_ stream and an _attachment_ stream is that a data stream contains elements of timed data associated with the video, such as interactive event triggers, whereas an _attachment_ is a single item of data for the entire stream, such as a thumbnail image.
+
+To make it easier to make reference a stream, the codec type can be used as the name of a stream in the URL. If more than one stream of a particular type exists, a type-scoped index can be added, with e.g. `audio` and `audio_0` referencing the first audio stream, `audio_2` the second and so on. This is an alias ... the primary _stream_name_ is always based on the stream index.
+
+A final alias, `default`, is a reference to the stream that FFmpeg nominates as the default for a format. This is normally the main video track and provides a time base for making reference to all the streams of a format.
+
+Details about a stream can be retrieved in the form of a JSON document with a GET request. The following four requests are equivalent (`.json` extension is optional):
+
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_0
+    https://production.news.zbc.tv/beams/newswatch_2019031/video.json
+    https://production.news.zbc.tv/beams/newswatch_2019031/viddo_0
+    https://production.news.zbc.tv/beams/newswatch_2019031/default
+
+The result is the same as the stream returned as part of the parent format:
+
+```json
+{
+  "type": "Stream",
+  "index": 0,
+  "time_base": [ 1, 90000 ],
+  "codecpar": {
+    "type": "CodecParameters",
+    "codec_type": "video",
+    "name": "hevc",
+    "format": "yuv420p",
+    "width": 1920,
+    "height": 1080
+  }
+}
+```
+
 __TODO__ - add a stream to a format.
 __TODO__ - updating details of a stream.
 
-### Media elements
+### Media elements - metadata
+
+The sub-components of a stream of media are its _media elements_, a generic term referring to either a _packet_ of encoded data or an uncompressed _frame_ of media. A frame is either a single video frame or a sequential grouping of audio samples, where the size of the group is related to either the video frame timing (e.g. 1920 samples for every video frame at 25fps) or by the _blocksize_ for a given audio codec (e.g. AAC uses a blocksize of either 960 or 1024 samples). Media elements are located in time within a stream at a given _presentation timestamp_ (PTS) and the PTS is the primary identifier for a media element.
+
+A beam engine stores data about every media element, its _metadata_, and may also store the payload of the media element. For packets, this is a sparse amount of data including the presentation timestamp, decode timestamp (e.g. for streams of H.264 video where the stored decode order and presentation order differ), duration and position in the source stream. For frames, additional details of the format, resolution, sample rate etc. are included.
+
+Media element metadata can be read and queried with GET requests and written with PUT requests. The URL is the same as for a stream, including name aliasing, with a media reference specifying the specific media element or elements.
+
+`/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;`/`&lrangle;_media_ref_&rangle;
+
+GET requests can be for either a single media element or an inclusive range of media elements whereas PUT requests are for a single element only. The body of requests and responses are `application/json`. Five kinds of request can be made with a _media_ref_:
+
+* _direct by timestamp_: GET and PUT. Retrieve, create or update metadata about a specific packet or frame, using a direct media reference of the form `packet_`&langle;pts&rangle; or `frame_`&langle;pts&rangle;. Direct requests bypass index lookup but require that the PTS value in the path is exact.
+* _presentation timestamp_: GET only. Request contains a presentations timestamp or range of presentation timestamps, e.g. `7200` or `7200-43200`. Add an `f` for fuzzy match, useful when sampling errors, jitter or sampling conversion may cause timestamps to be non exact, e.g. `7200f` will match the closest media element to 7200, either before or after.
+* _index_: GET only. Request contains a media element that is a given count into the stream in its current state, from the `first` to the `last` element. For example, `first` or `1st`, `2nd`, `3rd`, ... up to e.g. `41st`, `42nd` or `last`. Ranges can be used, such as `first-last` for all media elements or `345th-723rd`. Index values are 1-based.
+* _real timestamps_: GET only. Request contains a real time value or range measured in seconds, with the beam engine converting presentation timestamps to real time based on the stream time base. For example, `1.4s` resolves to frame `35` in a stream with a time base of 25fps and `1.2s-2.2s` refers to frames `30-55`.
+* _relative timestamp_: GET only. Retrieve a media element at a given offset before or after the specified presentation timestamp. If following a live stream, this allows a request to be made for the next frame. For scrubbing, this allows jumping backwards and or forwards from a given point. The format is the PTS `+`/`-` offset signified with `d`, e.g. `7200+1d` references the frame after one with timestamp `7200`, say `10800`, and `7200-1d` is the frame before, say `3600`.
+
+The query can have query parameters `offset` and `limit` to control how many values are returned and the pagination of values. GET requests return JSON arrays, even for a single value, or `404 - Not Found` if no results are found. All requests can have `.json` as an optional file extension.
 
 
 
-### Data
+Streams of type _attachment_ have a single media element _packet_ with a presentation timestamp of zero.
+
+__TODO__ - check updating of media element data
+__TODO__ - delete media elements - is this necessary or only when deleting owning format?
+
+### Payload data
+
+
 
 ## Relationships
 
@@ -270,7 +333,7 @@ Items of content may be related to other items because they are:
 * visually equivalent _renditions_, such as some source material and all of the encodings made from it, generally with the same resolution;
 * _transformations_ that create a new item of content by applying a filter such as scaling or mixing, possibly with one or more inputs.
 
-<img  align="center" src="images/rels.png" width="50%"/>
+<img align="center" src="images/rels.png" width="50%"/>
 
 These kinds of relationships can be stored in the beamengine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
 
@@ -345,7 +408,7 @@ Workers run jobs, either just-in-time to create a response to an HTTP request or
 * change the sample rate of some audio as it is being played without storing the result, e.g. 44,100Hz to 48,000Hz;
 * store an equivalent representation of some media into an object store or onto a filing system.
 
-<img src="images/workers.png">
+<img src="images/workers.png" width="75%"/>
 
 Workers can run in the same application and on the same system as a Beam Engine. However, the design idea behind the beam engine is that work is distributed across many systems and processors, with the front end is scaled by having multiple instances of Beam Engines with a common data source. Redis is the data source glue in the middle, ensuring that jobs are queued and executed to order using [Bull](https://www.npmjs.com/package/bull).
 
