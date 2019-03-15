@@ -1,6 +1,6 @@
 # Aerostat Beam Engine
 
-<img align="right" src="images/beamengine_third.jpg">[Redis](https://redis.io/)-backed highly-scale-able and cloud-fit distributed media processing engine. A [Node.js](https://nodejs.org/en/) web application and library, _Aerostat Beam Engine_ provides the following:
+<img align="right" src="images/beamengine_third.jpg"/>[Redis](https://redis.io/)-backed highly-scale-able and cloud-fit distributed media processing engine. A [Node.js](https://nodejs.org/en/) web application and library, _Aerostat Beam Engine_ provides the following:
 
 * A resilient, media-aware cache of media data structured ready for processing by [FFmpeg](http://ffmpeg.org/) libraries, which can be backed by file or object stores;
 * Connection to stateless clients that provide access to the media-aware cache through the _Content Beam API_, an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed;
@@ -270,7 +270,7 @@ Items of content may be related to other items because they are:
 * visually equivalent _renditions_, such as some source material and all of the encodings made from it, generally with the same resolution;
 * _transformations_ that create a new item of content by applying a filter such as scaling or mixing, possibly with one or more inputs.
 
-<img src="images/rels.png">
+<img src="images/rels.png" style="width:75%,align:center"/>
 
 These kinds of relationships can be stored in the beamengine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
 
