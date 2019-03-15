@@ -185,11 +185,80 @@ It is assumed that an external search service, such as [Elasticsearch](), will b
 
 ### Format - the logical cable
 
-Content items have a _format_ that provides the context for reproducing that content. This consists of overall description, the streams that make up the content and the technical parameters to configure decoders. When used to access files, the beam API format is a representation of labels of the storage compartments of that container. When used to access a live stream, the _format_ can be considered as if the description of a multi-core _cable_, where each strand contains the latest content for a particular stream.
+Content items have a _format_ that provides the context for reproducing that content. This consists of overall description, the streams that make up the content and the technical parameters to configure decoders. When used to access files, the beam API format is a representation of labels of the storage compartments of that container. When used to access a live stream, the _format_ can be considered as if the description of a multi-core _cable_, where each strand of that cable contains the latest content for a particular stream. As media elements in beams are only tied together by URL, beams of the beam API represent _virtual formats_ and _logical cables_.
+
+Each content item has a format that is used to create, query, update or delete that content from a beam engine. All requests take the form `/beams/`&langle;_content_name_&rangle;.
+
+To get the details of a format associated with a content item, a JSON document, send a GET request including the content name. For example, one of:
+
+    https://production.news.zbc.tv/beams/newswatch_20190312
+    https://production.news.zbc.tv/beams/newswatch_20190312.json
+
+This will produce a result of the form:
+
+```json
+{
+  "type": "format",
+  "streams": [
+    {
+      "type": "Stream",
+      "index": 0,
+      "time_base": [ 1, 90000 ],
+      "codecpar": {
+        "type": "CodecParameters",
+        "codec_type": "video",
+        "name": "hevc",
+        "format": "yuv420p",
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "type": "Stream",
+      "index": 1,
+      "time_base": [ 1, 90000 ],
+      "codecpar": {
+        "type": "CodecParameters",
+        "codec_type": "audio",
+        "name": "aac",
+        "format": "fltp",
+        "bit_rate": 66494,
+        "channel_layout": "stereo",
+        "channels": 2,
+        "sample_rate": 44100,
+        "frame_size": 1024
+      }
+    }
+  ],
+  "url": "newswatch_20190312",
+  "duration": 596291667,
+  "bit_rate": 2176799,
+  "metadata": {
+    "title": "ZBC News Watch - evening news 12th March 2019",
+    "author": "ZBC News Production"
+  }
+}
+```
+
+Note that the name of the content item is stored in the `url` property. Consider using ECMAScript function [`encodeURIComponent`]() when using the name in a path. Also note that if the `format` has in input format set (`iformat` property), the result will have type `demuxer`. Similarly, if the format has an output format set (`oformat` property) it will have type `muxer`.
+
+To create a content item, POST a JSON format description to `/beams/`. The content item's name will be set using the `url` property if present, otherwise a [version 4 UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) will be generated. If the content item already exists, a `409 - Conflict` error response will be generated. If the content item is successfully created, a `201 - Created` response is returned with the `Location` header set to the path for the new item.
+
+__TODO__ - updating a format - not yet supported
+__TODO__ - deleting a format - not yet supported
 
 ### Streams
 
+Streams are the sub-components of a format, the virtual strands of a logical cable. The details of streams are provided as part of the format but can also be accessed stream-by-stream using index or stream type. Streams are located within their content item at a sub-path:
+
+`/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;
+
+__TODO__ - add a stream to a format.
+__TODO__ - updating details of a stream.
+
 ### Media elements
+
+
 
 ### Data
 
@@ -200,6 +269,8 @@ Items of content may be related to other items because they are:
 * byte-for-byte _equivalent_, stored in different locations but otherwise with exactly the same encoding, format and other metadata;
 * visually equivalent _renditions_, such as some source material and all of the encodings made from it, generally with the same resolution;
 * _transformations_ that create a new item of content by applying a filter such as scaling or mixing, possibly with one or more inputs.
+
+<img src="images/rels.png">
 
 These kinds of relationships can be stored in the beamengine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
 

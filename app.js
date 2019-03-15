@@ -35,7 +35,7 @@ app.use(bodyParser());
 
 router
   .get('/beams', routes.beamsRoute)
-  .get('/beams/:fmtSpec', routes.formatRoute)
+  .get('/beams/:fmtSpec', routes.formatRoute) // .json supported 
   .get('/beams/:fmtSpec/:streamSpec', routes.streamRoute)
   .get('/beams/:fmtSpec/:streamSpec/start', routes.startRedirect)
   .get('/beams/:fmtSpec/:streamSpec/(end|latest)', routes.endRedirect)
