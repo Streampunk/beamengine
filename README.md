@@ -270,7 +270,7 @@ Items of content may be related to other items because they are:
 * visually equivalent _renditions_, such as some source material and all of the encodings made from it, generally with the same resolution;
 * _transformations_ that create a new item of content by applying a filter such as scaling or mixing, possibly with one or more inputs.
 
-<img src="images/rels.png" style="width:75%,align:center"/>
+<img  align="center" src="images/rels.png" width="50%"/>
 
 These kinds of relationships can be stored in the beamengine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
 
