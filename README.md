@@ -244,6 +244,25 @@ Note that the name of the content item is stored in the `url` property. Consider
 
 To create a content item, POST a JSON format description to `/beams/`. The content item's name will be set using the `url` property if present, otherwise a [version 4 UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) will be generated. If the content item already exists, a `409 - Conflict` error response will be generated. If the content item is successfully created, a `201 - Created` response is returned with the `Location` header set to the path for the new item.
 
+The following code shows how to create a content items from an Aerostat Beam Coder format using the [got](https://www.npmjs.com/package/got) promise-friendly HTTP request module:
+
+```javascript
+let response = await got.post(
+    'https://production.news.zbc.tv/beams/', 
+  {
+    body: wavFmt.toJSON(),
+    json: true,
+    headers : { 'Content-Type': 'application/json' }
+  }
+).catch(err => {
+  if (err.statusCode === 409) {
+    console.log('Got conflict: assuming OK.');
+  } else {
+    throw err;
+  }
+});
+```
+
 __TODO__ - updating a format - not yet supported
 __TODO__ - deleting a format - not yet supported
 
@@ -314,9 +333,41 @@ GET requests can be for either a single media element or an inclusive range of m
 
 The query can have query parameters `offset` and `limit` to control how many values are returned and the pagination of values. GET requests return JSON arrays, even for a single value, or `404 - Not Found` if no results are found. All requests can have `.json` as an optional file extension.
 
+Here is an example of a relative timestamp request.
 
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/3600+1d
+
+```json
+[ { "type": "Packet",
+    "pts": 7200,
+    "dts": 7200,
+    "stream_index": 1,
+    "flags": {
+      "KEY": true,
+      "CORRUPT": false,
+      "DISCARD": false,
+      "TRUSTED": true,
+      "DISPOSABLE": false
+    },
+    "duration": 3600,
+    "pos": 81912,
+    "buf_size": 16383
+  } ]
+```
 
 Streams of type _attachment_ have a single media element _packet_ with a presentation timestamp of zero.
+
+When creating or updating packets created by Aerostat Beam Coder, use the `toJSON` method. Assuming a packet called `pkt` is in the local scope, the following example shows how to create a packet using the [got](https://www.npmjs.com/package/got) promise-friendly HTTP request module:
+
+```javascript
+await got.put(
+    `https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/packet_${pkt.pts}`,
+  {
+    body: pkt.toJSON(),
+    json: true
+  }
+);
+```
 
 __TODO__ - check updating of media element data
 __TODO__ - delete media elements - is this necessary or only when deleting owning format?

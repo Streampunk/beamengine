@@ -412,6 +412,15 @@ test('GET a packet', async t => {
     t.deepEqual(response.body.map(x => x.pts),
       [ -7200, -3600, 0 ],
       'realtime range -1.0s-10 with offset+limit has expected PTS values.');
+
+    response = await request(server)
+      .get('/beams/test_url/stream_1/-7200+1d')
+      .expect(200);
+    t.ok(response.ok, 'offset request OK.');
+    t.deepEqual(response.body.map(x => x.pts),
+      [ -3600 ],
+      'offset request has expected PTS value.');
+    // console.log(JSON.stringify(response.body, null, 2));
   } catch (err) {
     t.fail(err);
   }
