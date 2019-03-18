@@ -248,7 +248,7 @@ The following code shows how to create a content items from an Aerostat Beam Cod
 
 ```javascript
 let response = await got.post(
-    'https://production.news.zbc.tv/beams/', 
+    'https://production.news.zbc.tv/beams/',
   {
     body: wavFmt.toJSON(),
     json: true,
@@ -374,7 +374,34 @@ __TODO__ - delete media elements - is this necessary or only when deleting ownin
 
 ### Payload data
 
+Payload data for a media element is stored separately from the metadata that describes it and may have a different lifetime in the cache. It is possible to be able to retrieve the metadata but not get access to the payload because it has expired. See details on creating relationships and workers that can mitigate against the issue.
 
+Payload data has the same basic path as the associated media element's _direct by timestamp_ path with an extension of `.raw` or sub-path part `.../data`. The additional part is the _data_ref_. It is only possible to reference one media element, frame or packet, at a time:
+
+* For packets, this is a reference to the single _blob_ of data contained in a packet.
+* For frames that often contain more than one _blob_, e.g. three planes of data with one for each colour component, an unqualified data reference refers to all the _blobs_ concatenated together. Reference can be made to each separate plane by adding an zero-based index, e.g. `.raw_0` or `/data_0` for the first plane, `.raw_1` or `/data_1` for the second, and so on.
+
+In the following example of retrieving the data payload for a specific frame, the data for each plane for a format of `yuv422p` is retrieved separately, possibly concurrently:
+
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data_0
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data_1
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data_2
+
+Alternatively, the data for all the planes can be retrieved as follows:
+
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data
+
+The value returned contains a header `Beam-Buf-Sizes`, a JSON array with the size of each separate data plane. For example:
+
+    Beam-Buf-Sizes: [ 2073664, 1036864, 1036864 ]
+
+Note that due to the way FFmpeg code reads buffers, the size of each data plane buffer is generally slightly larger than the minimum required to represent a plane of data.
+
+An equivalent request using the `.raw` extension:
+
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200.raw
+
+All payload data has content type `application/octet-stream` even if the payload may have another valid MIME type, such as the payloads produced by the `png` codec could have MIME type `image/png`. 
 
 ## Relationships
 
