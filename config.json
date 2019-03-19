@@ -20,10 +20,10 @@
   "jobs": {
     "jpeg": {
       "method": "GET",
-      "pathPattern": "^.*\\.(jpg|jpeg)$",
+      "pathPattern": "^/beams/.*\\.(jpg|jpeg)$",
       "queue": "media_workers",
       "function": "makeJPEG",
-      "post": false
+      "postRoute": false
     },
     "fileStore": {
       "method": ["PUT", "POST"],
@@ -31,15 +31,15 @@
       "statusCode": [200, 201],
       "queue": "file_workers",
       "function": "storeCopy",
-      "post": true
+      "postRoute": true
     },
     "dataMissing": {
       "method": "GET",
-      "pathPattern": "^.*(packet|frame)_.*$",
+      "pathPattern": "^.*(packet|frame)_(\d+)(.raw.*|/data.*)$",
       "statusCode": 404,
       "queue": "file_workers",
       "function": "retrieveCopy",
-      "post": true
+      "postRoute": true
     }
   }
 }

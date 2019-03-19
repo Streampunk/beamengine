@@ -98,7 +98,7 @@ The configuration has the following properties:
 | `app.port`                | int     | Local port on which to run the app server      |
 | `testing.db`              | int     | Redis database to use for testing              |
 | `testing.port`            | int     | Port to run test app server on                 |
-| `jobs...`                 | Object  | See [workers]() section                        |
+| `jobs...`                 | Object  | See [workers](#workers) section                |
 
 ## Content Beam API
 
@@ -419,7 +419,38 @@ An equivalent request using the `.raw` extension:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200.raw
 
-All payload data has content type `application/octet-stream` even if the payload may have another valid MIME type, such as the payloads produced by the `png` codec could have MIME type `image/png`.
+All payload data has content type `application/octet-stream` even if the payload may have another valid MIME type, such as the payloads produced by the `png` codec could have MIME type `image/png`. Data payloads can be retrieved with GET and created or updated with PUT.
+
+If the payload data is not available for whatever reason, a `404 - Not Found` status response is created. This is case even if the payload was once cached and has now longer available from the cache where, arguably, a `410 - Gone` might have been more appropriate. This is because it is possible that the payload for a given element might be cached again in the future - it has not been permanently removed - so requesting the element again is not unreasonable behaviour for a client.
+
+The following is an example of a [got](https://www.npmjs.com/package/got) request to retrieve payload data:
+
+```javascript
+let payloadResponse = await got(
+  `https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data`,
+  { responseType: 'buffer', encoding: null }
+);
+let payload = response.body;
+```
+
+### Streaming as live
+
+A beam can chase the progress of a growing live stream and give the impression of playing live or with only a small latency of one or two frames. To do this and with knowledge of the stream's time base:
+
+1. A client requests the _latest_ frame in a stream, noting the time (_t_) of the request using `latest` (or `end`) as the media reference (_media_ref_).
+2. A response with status `302 - Found` is returned with the `Location` header containing a _direct by timestamp_ link to the frame with the highest timestamp.
+3. The client retrieves the metadata about the packet or frame, noting the presentation time stamp (`pts`) and duration (`duration` or `pkt_duration`).
+4. Based on the metadata and media element type, the client retrieves the data payload.
+5. At time _t_ plus `duration`, request metadata and/or payload data for the next frame with timestamp `pts` plus `duration`. A _relative timestamp_ could be used. Note that a `404` response might indicate a difference in clocks between client and server, so the client should retry a few times.
+6. A beam has no defined end point, so the client should assume that stream has ended when repeated requests for the next element, i.e. ten repeated requests, all generate a `404` response.
+
+The following is a request for the latest frame in the example stream:
+
+    https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/latest
+
+An HTTP/S client set to follow redirects will retrieve media element metadata from this request, subject to at least one media element being available.
+
+It is also possible to stream from the start using `start` as the media reference, allowing for a scenario such as the catch-up watching of an event that has already started. In this case, the redirect response is to the first media element known for the stream.
 
 ## Relationships
 
@@ -515,13 +546,130 @@ A Beam Engine is configured with _rules_ that determine what jobs are scheduled 
 * GPU-accelerated processing, facilitated by a library such as [NodenCL](https://github.com/Streampunk/nodencl);
 * An invocation of an external processing function, such as an [AWS Lambda](https://aws.amazon.com/lambda/) function - see also [Aerostat Beam Lambda](https://www.npmjs.com/package/beamlambda).
 
-
-
 ### Setting up a rule
+
+Jobs are configured in the configuration file `config.json`. This allows the content beam API routes to be overridden or supplemented by some additional work. This work can be:
+
+* _pre_route job_: jobs executed before content beam API requests, either starting a background process or providing the response to the method;
+* _post_route job_: jobs executed after the content beam API request has created a response, either starting a background process or modifying the response.
+
+The rules that trigger jobs are listed in the `jobs` object of the configuration file, with each rule being a separate property. The value of the property is an object that describes the rule and how it is to be executed. The rule object has the following properties:
+
+| property       | type    | description                                              |
+| -------------- | ------- | -------------------------------------------------------- |
+| `method`       | string or array of string | Match only HTTP methods of this type   |
+| `pathPattern`  | string  | Regular expression to match against the HTTP path        |
+| `statusCode`   | int or array of int | Match only responses with these status codes |
+| `queue`        | string  | Name of the queue to which jobs should be added          |
+| `function`     | string  | Name of the function to execute.                         |
+| `postRoute`    | Boolean | Set for a _post_route job_, defaults to _pre_route job_  |
+
+For example, here is a rule that matches all requests that end in `.jpg` or `.jpeg`:
+
+```json
+{
+  "jobs": {
+    "jpeg": {
+      "method": "GET",
+      "pathPattern": "^/beams/.*\\.(jpg|jpeg)$",
+      "queue": "media_workers",
+      "function": "makeJPEG",
+      "postRoute": false
+    }
+  }
+}
+```
+
+This rule catches any GET request starting `beams` and ending `.jpg` or `.jpeg` and sends the details to a job queue called `media_workers`. As `postRoute` is set to `false`, this match happens before processing relating to the content beam API. The reason for naming a queue is that different kinds workers may have access to different kinds of resources. Some contrived examples:
+
+* _media workers_: Workers that execute encoding or decoding operations that require significant amounts of CPU, possibly multi-core, and sufficiently large RAM.
+* _file workers_: Workers that have access to a shared file system that is keeping a copy of some of the content items.
+* _lambda workers_: Workers that execute functions using serverless compute resource.
+* _accelerated workers_: Workers that execute part of a job on a GPU or another form of hardware-accelerated device.
+
+The function name is used by a worker to select a function to execute from the library of functions it has available locally.
+
+Rules for _post_route jobs_ include a status code or codes that must be matched in addition to the path pattern and method type. Here is an example of a rule that catches all data payload cache misses and attempts to retrieve the data from another source:
+
+```json
+{
+  "jobs": {
+    "dataMissing" {
+      "method": "GET",
+      "pathPattern": "^/beams/.*(packet|frame)_(\\d+)(\\.raw.*|/data.*)$",
+      "statusCode": 404,
+      "queue": "file_workers",
+      "function": "retrieveCopy",
+      "postRoute": true
+    }
+  }
+}
+```
+
+When a _pre_route job_ has been executed by a worker, the job signals whether it has created a response to be returned directly without further processing. This could be success or an error. However, if a worker indicates that further work may be required, the request continues through the content beam API router and onto the _post_route jobs_. This means that it is possible to run more than one job per HTTP request.
+
+Changing a rule requires a modification to the configuration file and a restart of the associated app server. If a number of application servers are running behind a load balancer, changing the configuration file requires restarting each server.
 
 ### Pre-built workers
 
+__TODO__ - implement and document some pre-built workers
+
 ### Writing a worker
+
+Workers are Node.js programs that execute on systems with access to the same Redis store as the beam engines that provide them with job to do. Workers are consumers of jobs from Bull queues. Workers use the information they are provided with to select a function to execute.
+
+Functions are expected to communicate directly with Redis about content items, streams and media elements, either via the content beam API or by requiring the `redisio` capability provided by the beam engine. Data payloads are not intended for transport over jobs requests and responses, which go via fairly basic serialization into Redis.
+
+Workers are composable, in other words it is possible for one worker to put jobs onto other queues to be serviced by another worker. Care must be taken that this does not result in a circular activity!
+
+A worker is provided with details of the rule defined in the configuration (`rule`), the request path (`path`), request headers (`headers`) and HTTP request method (`method`). It is then expected to carry out some work, often asynchronously, creating either a successful or errored response. The response consists of a `status`, `body` and `type` (the `Content-Type` header) to be used as the Koa context properties of the same name. For data _blobs_ with type `application/octet-stream`, the body is assumed to be a Redis key for a value to be retrieved from Redis as the body of the associated response.
+
+Here is an example of a simple worker for a request to get a simple textual description of a stream of the form `/beams/some_content/video.txt`.
+
+```javascript
+const Queue = require('bull'); // Set Redis parameters
+const consumer = new Queue('media_workers');
+const { redisio } = require('beamengine');
+const Boom = require('boom');
+
+async function extractMetadata (job) {
+  try {
+    // Assumes path pattern "^/beams/\S+/\S+\\.txt$" has been matched
+    let stream = await redisio.retrieveStream(job.data.path.slice(0, -4));
+    job.data.response = true;
+    switch (stream.codecpar.codec_type) {
+    case 'video':
+      job.data.body = `Video stream with height ${stream.codecpar.height} and width ${stream.codecpar.width}.`;
+      break;
+    case 'audio':
+      job.data.body = `Audio stream with sample rate ${stream.codecpar.sample_rate}Hz and ${stream.codecpar.channels} channels.`;
+      break;
+    default:
+      job.data.body = `Stream of type ${stream.codecpar.codec_type}.`;
+      break;
+    }
+    job.data.type = 'text/plain';
+    job.data.respond = true;
+  } catch (err) {
+    if (err.message.startsWith('Unable to retrieve')) {
+      throw Boom.notFound(`Could not retrieve stream at path '${job.data.path}': ${err.message}`);
+    }
+    throw Boom.badImplementation(`Internal error: ${err.message}`);
+  }
+  return job.data;
+}
+
+consumer.process(async job => {
+  if (job.data.rule.function === 'extractMetadata') return extractMetadata(job);
+  throw new Error(`Unknown worker ${job.job.function} on queue "media_workers".`);
+});
+```
+
+Exceptions thrown from within redisio calls are [Javascript Errors](https://nodejs.org/api/errors.html#errors_class_error). The code above translates appropriate errors to [Boom](https://www.npmjs.com/package/boom) so as to provide an informative response with an appropriate status code.
+
+__TODO__ - consider how a response could set headers
+__TODO__ - test throwing and carrying Boom errors from worker to response
+__TODO__ - returning Redis keys for octet-stream values
 
 ## Status, support and further development
 
