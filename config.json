@@ -35,7 +35,7 @@
     },
     "dataMissing": {
       "method": "GET",
-      "pathPattern": "^.*(packet|frame)_(\d+)(.raw.*|/data.*)$",
+      "pathPattern": "^.*(packet|frame)_(\\d+)(.raw.*|/data.*)$",
       "statusCode": 404,
       "queue": "file_workers",
       "function": "retrieveCopy",
