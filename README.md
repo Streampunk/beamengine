@@ -102,18 +102,18 @@ The configuration has the following properties:
 
 ## Content Beam API
 
-The _content beam API_ allows FFmpeg-like media data structures to be transported over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows streams of related media - a _virtual format_ or _logical cable_ - to be moved around for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a mechanism to start streaming at the latest frame. As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
+The _content beam API_ allows FFmpeg-like media data structures to be transported over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows _content items_ in the form of streams of related media - a _virtual format_ or _logical cable_ - to be moved around for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a [mechanism to start streaming at the latest frame](#stream_as_live). As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
 
-All content beam API requests start with `/beams/`. The content beam API for HTTP/S breaks down as:
+All content beam API requests start with `/beams/`. The content beam API for HTTP/S (HTTP or HTTPS) breaks down as:
 
 `/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
 
-* _content_name_: a reference to the source of the content and is set be default to the `url` property of the underlying format context (encoded to safe representation for use in the path part of a URL). This is a unique name for the content that can be beamed from this endpoint.
+* _content_name_: a reference to the source of the content, set by default to the `url` property of the underlying format context (encoded to safe representation for use in the path part of a URL). This is a unique name for the content that can be beamed to or from this endpoint.
 * _stream_name_: Content is subdivided into streams of _video_, _audio_, _captions_/_subtitles_ and _data_. Streams can be referenced by their index and/or type, e.g. `stream_0`, `stream_1`, ... or aliases `video`, `audio`, `subtitle`, `data` or `attachment` ... or aliases for the first audio stream `audio_0`, the second `audio_1` ... or alias `default` for the stream that FFmpeg considers to be the default stream.
-* _media_ref_: The _presentation timestamp_ that uniquely represents a specific media element - _frame_ or _packet_ - or range of media elements in a stream. Most streams have a _time base_ that the presentation time stamps of each element, frame or packet, are measured. Without a _data_ref_, this refers to metadata only.
+* _media_ref_: The _presentation timestamp_ that uniquely represents a specific media element - a _frame_ or a _packet_ - or range of media elements in a stream. Most streams have a _time base_ that the presentation time stamps of each element are measured. When ommitting the _data_ref_, such a URL refers to JSON metadata only.
 * _data_ref_: Access to data payloads associated with a single media element, usually simply `data`. For planar data used in some frame formats, `data` refers to the planes concatenated and `data_0`, `data_1` ... refer to each plane.
 
-Content can be created, pulled and pushed, streamed, written, read and deleted using this API. A few examples follow and then the rest of this section breaks down the API in further detail.
+Content can be created, pulled and pushed, streamed, read, written and deleted using this API. A few introductory examples follow and then the rest of this section breaks down the API in further detail.
 
 To read a single video frame from a compressed stream at timestamp `108000` in content called `newswatch_20190312` for a stream with a time base of 90,000Hz, two GET requests are required:
 
@@ -141,7 +141,7 @@ The first retrieves the metadata and the second retrieves the associated payload
 }
 ```
 
-The second _data_ URL retrieves a payload of type `application/octet-stream` with content length `16383`.
+The second _data_ URL retrieves a payload of type `application/octet-stream` with content length `16383`. To create the packet, PUT the metadata and payload to the same URLs.
 
 The packet metadata contains no details as to the relative timing of the media element wrt other elements of the stream, the type of data payload or the encoding used. To be able to decode that packet, it is necessary to find out the details of the associated stream. This can be retrieved from a GET request to one of following URLs:
 
@@ -185,25 +185,25 @@ Time can be specified by timestamp, index count, in real time and relatively by 
 * First frame: `/beams/newswatch_live/video/first`
 * Latest frame: `/beams/newswatch_live/video/latest` - redirect to most recent
 
-Finally, these URLs may be decorated by job specifications, such as converting any referenced video frame to a JPEG:
+Finally, these URLs may be decorated by job specifications to be carried out just-in-time by [workers](#workers), such as converting any referenced video frame to a JPEG:
 
      /beams/newswatch_live/video/frame_108000.jpeg
 
-Another example is creating a partial MP4 file for a specified frame range for all streams:
+Another example of a job is creating a partial MP4 file for a specified frame range for all streams:
 
     /beams/newswatch_live/all/30s-45s.mp4
 
 ### Listing available content
 
-The names of all the items of content items stored at an endpoint can be retrieved by a GET request to `/beams/`. This may be a long list and so the request supports query parameters `start` offset and `limit` to enable paging of the values. The value returned is a JSON ay
+The names of all the items of content items stored at an endpoint can be retrieved by a GET request to `/beams/`. This may be a long list and so the request supports query parameters `start` offset and `limit` to enable paging of the values. The value returned is a JSON array:
 
-__TODO__ - example
+    [ 'newswatch_live', 'newswatch_20190312', 'newswatch_20190311' ]
 
-It is assumed that an external search service, such as [Elasticsearch](), will be used to provide a better searchable index of available streams.
+It is assumed that an external search service, such as [Elasticsearch](https://www.elastic.co/), will be used in tandem with beam engine to provide a competent index of available streams.
 
 ### Format - the logical cable
 
-Content items have a _format_ that provides the context for reproducing that content. This consists of overall description, the streams that make up the content and the technical parameters to configure decoders. When used to access files, the beam API format is a representation of labels of the storage compartments of that container. When used to access a live stream, the _format_ can be considered as if the description of a multi-core _cable_, where each strand of that cable contains the latest content for a particular stream. As media elements in beams are only tied together by URL, beams of the beam API represent _virtual formats_ and _logical cables_.
+Content items have a _format_ that provides the recipe for reproducing that content. This consists of overall format description, the streams that make up the content and the technical parameters required to configure decoders. When used to access files, the streams of the beam API format label the virtual storage compartments of a virtual container. When used to access a live stream, the _format_ can be considered as if the description of a multicore _cable_, where each core wire of that cable carries the latest media elements for a particular stream. As media elements in beams are associated by URL path structure only, beams of the beam API represent _virtual formats_ and _logical cables_.
 
 Each content item has a format that is used to create, query, update or delete that content from a beam engine. All requests take the form `/beams/`&langle;_content_name_&rangle;.
 
@@ -258,7 +258,7 @@ This will produce a result of the form:
 }
 ```
 
-Note that the name of the content item is stored in the `url` property. Consider using ECMAScript function [`encodeURIComponent`]() when using the name in a path. Also note that if the `format` has in input format set (`iformat` property), the result will have type `demuxer`. Similarly, if the format has an output format set (`oformat` property) it will have type `muxer`.
+Note that the name of the content item as it appears in the URL is also stored in the `url` property. Consider using ECMAScript function [`encodeURIComponent`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent) to safely use a structured name in a path. Also note that if the `format` has in input format set (`iformat` property - not shown), the result will have type `demuxer`. Similarly, if the format has an output format set (`oformat` property - not shown) it will have type `muxer`.
 
 To create a content item, POST a JSON format description to `/beams/`. The content item's name will be set using the `url` property if present, otherwise a [version 4 UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) will be generated. If the content item already exists, a `409 - Conflict` error response will be generated. If the content item is successfully created, a `201 - Created` response is returned with the `Location` header set to the path for the new item.
 
@@ -282,32 +282,33 @@ let response = await got.post(
 ```
 
 __TODO__ - updating a format - not yet supported
+
 __TODO__ - deleting a format - not yet supported
 
-### Streams
+### Streams - logical cable cores
 
-Streams are the sub-components of a format, the virtual strands of a logical cable. The details of streams are provided as part of the format but can also be accessed stream-by-stream using index or stream type. Streams are located within their content item at a sub-path:
+Streams are the sub-components of a format, the virtual core wires of a multicore logical cable. The details of streams are provided as part of the format but can also be accessed stream-by-stream using index or stream type. Streams are located within their content item at a sub-path:
 
-`/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;
+`/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;
 
 The primary _stream_name_ is based on the stream index, made by appending the index to `stream_`, e.g. `stream_0`, `stream_42`. This can be shortened to just the index number, e.g. `0`, `42`.
 
-Streams define a `time_base` for the unit of measurement for any of the media elements of the stream. Any two streams in the same format may have a different time bases but any timestamp measured to have the same time value relative to the time base should be presented at the same moment to the viewer. For example, for a video and audio time element:
+Streams define a `time_base` for the unit of measurement for any of the media elements of the stream. Any two streams in the same format may have a different time bases. Any timestamp measured to have the same time value relative to the time base within the foramt should be presented at the same moment to the viewer. For example, for a video and audio time element:
 
-* Video stream time base is `[1, 90000]` and the frame's presentation timestamp is `90000` then the video frame must be presented at 1s.
-* Audio stream time base is `[1, 48000]` and the audio frame's presentation timestamp is `48000` then the audio samples must be played at 1s, co-timed with the video frame.
+* Video stream time base is `[1, 90000]` and the frame's presentation timestamp is `90000` then the video frame must be presented at content item time of 1s.
+* Audio stream time base is `[1, 48000]` and the audio frame's presentation timestamp is `48000` then the audio samples must be played at content item time 1s, co-timed with the video frame.
 
-Streams have codec parameters defining the way data is encoded (or not) and the dimensions of each media element, including pixel format, sample format, resolution, colorspace etc.. The codec has a name and a type, with the type describing whether the stream consists of _video_, _audio_, _subtitles_ (_captions_), _data_ or an _attachment_. The difference between a _data_ stream and an _attachment_ stream is that a data stream contains elements of timed data associated with the video, such as interactive event triggers, whereas an _attachment_ is a single item of data for the entire stream, such as a thumbnail image.
+Streams have codec parameters describing how data is encoded (or not), reprsented and the dimensions of each media element. This includes pixel format, sample format, resolution, colorspace etc.. The codec has a name and a type, with the type describing whether the stream consists of _video_, _audio_, _subtitles_ (_captions_), _data_ or an _attachment_. The difference between a _data_ stream and an _attachment_ stream is that a data stream contains elements of timed data associated with the video, such as interactive event triggers, whereas an _attachment_ is a single item of data for the entire stream, such as a thumbnail image.
 
-To make it easier to make reference a stream, the codec type can be used as the name of a stream in the URL. If more than one stream of a particular type exists, a type-scoped index can be added, with e.g. `audio` and `audio_0` referencing the first audio stream, `audio_2` the second and so on. This is an alias ... the primary _stream_name_ is always based on the stream index.
+To make it easier to make reference a stream, the codec type can be used as the name of a stream in the URL. If more than one stream of a particular type exists, a type-scoped index can be added, with for example `audio` and `audio_0` referencing the first audio stream, `audio_1` the second and so on. This is an alias ... the primary _stream_name_ is always based on the stream index.
 
-A final alias, `default`, is a reference to the stream that FFmpeg nominates as the default for a format. This is normally the main video track and provides a time base for making reference to all the streams of a format.
+A final alias, `default`, is a reference to the stream that FFmpeg nominates as the default for a format. This is normally the main video track. The dafault track provides a time base for making reference to all the streams of a format.
 
 Details about a stream can be retrieved in the form of a JSON document with a GET request. The following four requests are equivalent (`.json` extension is optional):
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_0
     https://production.news.zbc.tv/beams/newswatch_2019031/video.json
-    https://production.news.zbc.tv/beams/newswatch_2019031/viddo_0
+    https://production.news.zbc.tv/beams/newswatch_2019031/video_0
     https://production.news.zbc.tv/beams/newswatch_2019031/default
 
 The result is the same as the stream returned as part of the parent format:
@@ -329,6 +330,7 @@ The result is the same as the stream returned as part of the parent format:
 ```
 
 __TODO__ - add a stream to a format.
+
 __TODO__ - updating details of a stream.
 
 ### Media elements - metadata
@@ -339,17 +341,17 @@ A beam engine stores data about every media element, its _metadata_, and may als
 
 Media element metadata can be read and queried with GET requests and written with PUT requests. The URL is the same as for a stream, including name aliasing, with a media reference specifying the specific media element or elements.
 
-`/beams/`&lrangle;_content_name_&rangle;`/`&lrangle;_stream_name_&rangle;`/`&lrangle;_media_ref_&rangle;
+`/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;
 
-GET requests can be for either a single media element or an inclusive range of media elements whereas PUT requests are for a single element only. The body of requests and responses are `application/json`. Five kinds of request can be made with a _media_ref_:
+GET requests can be for either a single media element or an inclusive range of media elements. Whereas PUT requests are for a single media element only. The body of requests and responses have type `application/json`. Five kinds of request can be made with a _media_ref_:
 
 * _direct by timestamp_: GET and PUT. Retrieve, create or update metadata about a specific packet or frame, using a direct media reference of the form `packet_`&langle;pts&rangle; or `frame_`&langle;pts&rangle;. Direct requests bypass index lookup but require that the PTS value in the path is exact.
-* _presentation timestamp_: GET only. Request contains a presentations timestamp or range of presentation timestamps, e.g. `7200` or `7200-43200`. Add an `f` for fuzzy match, useful when sampling errors, jitter or sampling conversion may cause timestamps to be non exact, e.g. `7200f` will match the closest media element to 7200, either before or after.
-* _index_: GET only. Request contains a media element that is a given count into the stream in its current state, from the `first` to the `last` element. For example, `first` or `1st`, `2nd`, `3rd`, ... up to e.g. `41st`, `42nd` or `last`. Ranges can be used, such as `first-last` for all media elements or `345th-723rd`. Index values are 1-based.
-* _real timestamps_: GET only. Request contains a real time value or range measured in seconds, with the beam engine converting presentation timestamps to real time based on the stream time base. For example, `1.4s` resolves to frame `35` in a stream with a time base of 25fps and `1.2s-2.2s` refers to frames `30-55`.
-* _relative timestamp_: GET only. Retrieve a media element at a given offset before or after the specified presentation timestamp. If following a live stream, this allows a request to be made for the next frame. For scrubbing, this allows jumping backwards and or forwards from a given point. The format is the PTS `+`/`-` offset signified with `d`, e.g. `7200+1d` references the frame after one with timestamp `7200`, say `10800`, and `7200-1d` is the frame before, say `3600`.
+* _presentation timestamp_: GET only. Request contains a presentations timestamp or range of presentation timestamps, e.g. `7200` or `7200-43200`. Useful when clock sampling errors, jitter or sampling conversion cause timestamps to be non exact, fuzzy match is enabled by adding an `f` to the timestamp, e.g. `7200f` will match the closest media element to `7200`, either before or after.
+* _index_: GET only. Request contains a media element that is a given count into the stream in its current state, from the `first` to the `last` element. For example, `first` or `1st`, `2nd`, `3rd`, ... up to e.g. `41st`, `42nd` or `last`. Ranges can be used, such as `first-last` for all media elements or `345th-723rd`. Media element index values are 1-based.
+* _real timestamps_: GET only. Request contains a real time value or range that is measured in seconds, with the beam engine converting presentation timestamps to real time based on the stream time base. For example, in a stream with a time base of 25fps, real timestamp `1.4s` resolves to frame `35`  and real timestamp range `1.2s-2.2s` refers to frames `30-55`.
+* _relative timestamp_: GET only. Retrieve a media element at a given offset before or after the specified presentation timestamp. If following a live stream, this allows a request to be made for the next frame based on the current frames timestamp. For scrubbing, this allows jumping backwards and or forwards from a given point. The format is the PTS, follows by `+`/`-`, follows by an offset value signified with `d`, e.g. `7200+1d` references the frame after one with timestamp `7200`, say `10800`, and `7200-1d` is the frame before, say `3600`.
 
-The query can have query parameters `offset` and `limit` to control how many values are returned and the pagination of values. GET requests return JSON arrays, even for a single value, or `404 - Not Found` if no results are found. All requests can have `.json` as an optional file extension.
+As with listing content items, requests can the query parameters `offset` and `limit` to control how many values are returned and the pagination of values. GET requests return JSON arrays, even for a single value, or `404 - Not Found` if no results are found. All requests can have `.json` as an optional file extension.
 
 Here is an example of a relative timestamp request.
 
@@ -373,7 +375,7 @@ Here is an example of a relative timestamp request.
   } ]
 ```
 
-Streams of type _attachment_ have a single media element _packet_ with a presentation timestamp of zero.
+Streams with codec type _attachment_ have a single media element _packet_ with a presentation timestamp of zero.
 
 When creating or updating packets created by Aerostat Beam Coder, use the `toJSON` method. Assuming a packet called `pkt` is in the local scope, the following example shows how to create a packet using the [got](https://www.npmjs.com/package/got) promise-friendly HTTP request module:
 
@@ -388,16 +390,17 @@ await got.put(
 ```
 
 __TODO__ - check updating of media element data
-__TODO__ - delete media elements - is this necessary or only when deleting owning format?
+
+__TODO__ - delete media elements - is this necessary or only when deleting the parent format?
 
 ### Payload data
 
-Payload data for a media element is stored separately from the metadata that describes it and may have a different lifetime in the cache. It is possible to be able to retrieve the metadata but not get access to the payload because it has expired. See details on creating relationships and workers that can mitigate against the issue.
+The payload data for a media element is stored separately from the metadata that describes it and may have a different lifetime in the underlying cache. It is possible to be able to retrieve the metadata but not get access to the payload because it has expired. See details on creating relationships and workers that can mitigate against the issue.
 
-Payload data has the same basic path as the associated media element's _direct by timestamp_ path with an extension of `.raw` or sub-path part `.../data`. The additional part is the _data_ref_. It is only possible to reference one media element, frame or packet, at a time:
+Payload data has the same base path as the associated media element's _direct by timestamp_, then add an extension `.raw` or sub-path part `.../data`. This additional part is the _data_ref_. It is only possible to reference one media element, frame or packet, at a time:
 
-* For packets, this is a reference to the single _blob_ of data contained in a packet.
-* For frames that often contain more than one _blob_, e.g. three planes of data with one for each colour component, an unqualified data reference refers to all the _blobs_ concatenated together. Reference can be made to each separate plane by adding an zero-based index, e.g. `.raw_0` or `/data_0` for the first plane, `.raw_1` or `/data_1` for the second, and so on.
+* For packets, the path URL refers to the single [_blob_](https://en.wikipedia.org/wiki/Binary_large_object) of data contained in a packet.
+* For frames that often contain more than one _blob_, e.g. a frame with three separate planes of data - one for each colour component, an unqualified data reference of `/data` or `.raw` refers to all of the _blobs_ concatenated together. Reference can be made to each separate plane by adding an zero-based index, e.g. `.raw_0` or `/data_0` for the first plane, `.raw_1` or `/data_1` for the second, and so on.
 
 In the following example of retrieving the data payload for a specific frame, the data for each plane for a format of `yuv422p` is retrieved separately, possibly concurrently:
 
@@ -419,7 +422,7 @@ An equivalent request using the `.raw` extension:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200.raw
 
-All payload data has content type `application/octet-stream` even if the payload may have another valid MIME type, such as the payloads produced by the `png` codec could have MIME type `image/png`. Data payloads can be retrieved with GET and created or updated with PUT.
+Data payloads can be retrieved with GET and created or updated with PUT. Even if a payload has a specific MIME type, all payload data sent to or from a beam engine has content type `application/octet-stream`. For example, the payloads produced by the `png` codec could have MIME type `image/png` but beam engine uses the general type.
 
 If the payload data is not available for whatever reason, a `404 - Not Found` status response is created. This is case even if the payload was once cached and has now longer available from the cache where, arguably, a `410 - Gone` might have been more appropriate. This is because it is possible that the payload for a given element might be cached again in the future - it has not been permanently removed - so requesting the element again is not unreasonable behaviour for a client.
 
@@ -435,20 +438,22 @@ let payload = response.body;
 
 ### Streaming as live
 
-A beam can chase the progress of a growing live stream and give the impression of playing live or with only a small latency of one or two frames. To do this and with knowledge of the stream's time base:
+A beam can chase the progress of a growing live stream and give the impression of playing the stream live, with only a small latency of one or two frames for uncompressed data. To do this and with knowledge of the stream's time base:
 
-1. A client requests the _latest_ frame in a stream, noting the time (_t_) of the request using `latest` (or `end`) as the media reference (_media_ref_).
-2. A response with status `302 - Found` is returned with the `Location` header containing a _direct by timestamp_ link to the frame with the highest timestamp.
+1. A client requests the _latest_ frame in a stream, noting the real time (_t_) of the request, using sub-path `/latest` (or `/end`) as the media reference (_media_ref_).
+2. A response with status `302 - Found` is returned with the `Location` header containing a _direct by timestamp_ link to the frame with the highest timestamp in the stream.
 3. The client retrieves the metadata about the packet or frame, noting the presentation time stamp (`pts`) and duration (`duration` or `pkt_duration`).
-4. Based on the metadata and media element type, the client retrieves the data payload.
-5. At time _t_ plus `duration`, request metadata and/or payload data for the next frame with timestamp `pts` plus `duration`. A _relative timestamp_ could be used. Note that a `404` response might indicate a difference in clocks between client and server, so the client should retry a few times.
-6. A beam has no defined end point, so the client should assume that stream has ended when repeated requests for the next element, i.e. ten repeated requests, all generate a `404` response.
+4. Based on the metadata and media element type, the client retrieves the data payload, e.g. `/packet_10800`.
+5. At time _t_ plus `duration`, request metadata and/or payload data for the next frame with timestamp `pts`&nbsp;+&nbsp;`duration`, e.g. `packet_14400`. A _relative timestamp_ could be used, e.g. `10800+1d`. Note that a `404` response might indicate a difference in clocks between client, server and media source, so the client should be prepared to retry a few times.
+6. A beam has no defined end point, so the client should assume that stream has ended when repeated requests for the next element, i.e. ten repeated requests, all generate a `404` response. A further `/latest` request can be used to check that the latest frame is not longer incrementing or to resync with the stream.
 
 The following is a request for the latest frame in the example stream:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/latest
 
 An HTTP/S client set to follow redirects will retrieve media element metadata from this request, subject to at least one media element being available.
+
+With a suitably high-bandwidth network of 10Gbps or higher, uncompressed formats can be transported as if SDI or SMPTE ST 2110 streams, with slightly increased latency but no need to establish accurate clocks that synchronize source and destination.
 
 It is also possible to stream from the start using `start` as the media reference, allowing for a scenario such as the catch-up watching of an event that has already started. In this case, the redirect response is to the first media element known for the stream.
 
@@ -614,7 +619,7 @@ Changing a rule requires a modification to the configuration file and a restart 
 
 __TODO__ - implement and document some pre-built workers
 
-### Writing a worker
+### Building a worker
 
 Workers are Node.js programs that execute on systems with access to the same Redis store as the beam engines that provide them with job to do. Workers are consumers of jobs from Bull queues. Workers use the information they are provided with to select a function to execute.
 
