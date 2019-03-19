@@ -10,7 +10,7 @@ The engine is a web server application that provides access to read and write da
 
 This is an implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
 
-Work in progress. For Node.js FFmpeg native bindings, please see [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder).
+Work in progress. This README describes the _to be_ state of Beam Engine and the current implementation falls short of what is described. See the __TODO__ notes for details of implementation still to be done. For Node.js FFmpeg native bindings, please see [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder).
 
 ## Installation
 
@@ -80,7 +80,25 @@ __TODO__ - to follow.
 
 Configuration of an Aerostat Beam Engine is achieved by editing the `config.json` file. This can also be passed in on the command line as follows:
 
-__TODO__ config on the command line
+__TODO__ config on the command line following best practices
+
+The configuration has the following properties:
+
+| property name             | type    | description                                    |
+| ------------------------- | ------- | ---------------------------------------------- |
+| `redis.cluster`           | Boolean | True if connecting to a redis cluster          |
+| `redis.host`              | string  | IP address of primary redis host               |
+| `redis.port`              | int     | Port number of primary redis host connection   |
+| `redis.db`                | int     | Redis database to be used for main cache       |
+| `redis.pool`              | int     | Maximum pool size for Redis connection pool    |
+| `redis.prepend`           | string  | Value to prepend to beamengine database keys   |
+| `redis.packetTTL`         | int     | Time (ms) before expiry of packet data         |
+| `redis.frameTTL`          | int     | Time (ms) before expiry of frame data          |
+| `redis.closeTimeout`      | int     | Time (ms) before error when closing Redis pool |
+| `app.port`                | int     | Local port on which to run the app server      |
+| `testing.db`              | int     | Redis database to use for testing              |
+| `testing.port`            | int     | Port to run test app server on                 |
+| `jobs...`                 | Object  | See [workers]() section                        |
 
 ## Content Beam API
 
@@ -401,7 +419,7 @@ An equivalent request using the `.raw` extension:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200.raw
 
-All payload data has content type `application/octet-stream` even if the payload may have another valid MIME type, such as the payloads produced by the `png` codec could have MIME type `image/png`. 
+All payload data has content type `application/octet-stream` even if the payload may have another valid MIME type, such as the payloads produced by the `png` codec could have MIME type `image/png`.
 
 ## Relationships
 
