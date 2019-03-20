@@ -19,7 +19,7 @@
   14 Ormiscaig, Aultbea, Achnasheen, IV22 2JJ  U.K.
 */
 
-const redisio = require('lib/redisio.js');
+const redisio = require('./lib/redisio.js');
 
 const splash = `Aerostat Beam Engine  Copyright (C) 2019  Streampunk Media Ltd
 GPL v3.0 or later license. This program comes with ABSOLUTELY NO WARRANTY.

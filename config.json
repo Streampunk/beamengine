@@ -8,6 +8,7 @@
     "prepend": "beamengine",
     "packetTTL": 120000,
     "frameTTL": 10000,
+    "ephemeralTTL": 10000,
     "closeTimeout": 2000
   },
   "app" : {

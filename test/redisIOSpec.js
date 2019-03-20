@@ -271,3 +271,20 @@ test('Retrieve non-existant', async t => {
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
   t.end();
 });
+
+test('Store and retrieve blob', async t => {
+  t.ok(await beforeTest(), 'test database flushed OK.');
+  try {
+    let testBuffer = Buffer.from('wibble wobble jelly');
+    let key = await redisio.storeBlob(testBuffer);
+    t.ok(key.startsWith('beamengine:blob:'), 'key starts as expected.');
+    console.log(key, key.slice(16));
+    t.ok(!isNaN(parseInt(key.slice(16))), 'key includes random number.');
+    let result = await redisio.retrieveBlob(key);
+    t.ok(Buffer.isBuffer(result), 'result is a buffer.');
+    t.equal(Buffer.compare(result, testBuffer), 0, 'roundtrip buffer as expected.');
+  } catch (err) {
+    t.fail(err);
+  }
+  t.end();
+});

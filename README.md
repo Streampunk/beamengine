@@ -94,6 +94,7 @@ The configuration has the following properties:
 | `redis.prepend`           | string  | Value to prepend to beamengine database keys   |
 | `redis.packetTTL`         | int     | Time (ms) before expiry of packet data         |
 | `redis.frameTTL`          | int     | Time (ms) before expiry of frame data          |
+| `redis.ephemeralTTL`      | int     | Time (ms) before expiry of ephemeral data blob |
 | `redis.closeTimeout`      | int     | Time (ms) before error when closing Redis pool |
 | `app.port`                | int     | Local port on which to run the app server      |
 | `testing.db`              | int     | Redis database to use for testing              |
