@@ -278,7 +278,6 @@ test('Store and retrieve blob', async t => {
     let testBuffer = Buffer.from('wibble wobble jelly');
     let key = await redisio.storeBlob(testBuffer);
     t.ok(key.startsWith('beamengine:blob:'), 'key starts as expected.');
-    console.log(key, key.slice(16));
     t.ok(!isNaN(parseInt(key.slice(16))), 'key includes random number.');
     let result = await redisio.retrieveBlob(key);
     t.ok(Buffer.isBuffer(result), 'result is a buffer.');

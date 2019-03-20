@@ -103,13 +103,13 @@ The configuration has the following properties:
 
 ## Content Beam API
 
-The _content beam API_ allows FFmpeg-like media data structures to be transported over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows _content items_ in the form of streams of related media - a _virtual format_ or _logical cable_ - to be moved around for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a [mechanism to start streaming at the latest frame](#stream_as_live). As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
+The _content beam API_ transports FFmpeg-like media data structures over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows _content items_ in the form of streams of related media - a _virtual format_ or _logical cable_ - to be accessed for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a [mechanism to start streaming at the latest frame](#stream_as_live). As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
 
 All content beam API requests start with `/beams/`. The content beam API for HTTP/S (HTTP or HTTPS) breaks down as:
 
 `/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
 
-* _content_name_: a reference to the source of the content, set by default to the `url` property of the underlying format context (encoded to safe representation for use in the path part of a URL). This is a unique name for the content that can be beamed to or from this endpoint.
+* _content_name_: a reference to the source of the content, set by default to the `url` property of the underlying format context (encoded to safe representation for use in a component of a URL). This is a unique name for the content that can be beamed to or from this endpoint.
 * _stream_name_: Content is subdivided into streams of _video_, _audio_, _captions_/_subtitles_ and _data_. Streams can be referenced by their index and/or type, e.g. `stream_0`, `stream_1`, ... or aliases `video`, `audio`, `subtitle`, `data` or `attachment` ... or aliases for the first audio stream `audio_0`, the second `audio_1` ... or alias `default` for the stream that FFmpeg considers to be the default stream.
 * _media_ref_: The _presentation timestamp_ that uniquely represents a specific media element - a _frame_ or a _packet_ - or range of media elements in a stream. Most streams have a _time base_ that the presentation time stamps of each element are measured. When ommitting the _data_ref_, such a URL refers to JSON metadata only.
 * _data_ref_: Access to data payloads associated with a single media element, usually simply `data`. For planar data used in some frame formats, `data` refers to the planes concatenated and `data_0`, `data_1` ... refer to each plane.
@@ -630,6 +630,13 @@ Workers are composable, in other words it is possible for one worker to put jobs
 
 A worker is provided with details of the rule defined in the configuration (`rule`), the request path (`path`), request headers (`headers`) and HTTP request method (`method`). It is then expected to carry out some work, often asynchronously, creating either a successful or errored response. The response consists of a `status`, `body` and `type` (the `Content-Type` header) to be used as the Koa context properties of the same name. For data _blobs_ with type `application/octet-stream`, the body is assumed to be a Redis key for a value to be retrieved from Redis as the body of the associated response.
 
+Beam engine workers can access their source data or store generated results in four different ways:
+
+1. Using the methods of the [redisio API](doc/redisio.md).
+2. Using HTTP or HTTPS [content beam API](#content_beam_api) requests.
+3. Directly communicating with Redis (not recommended).
+4. Via URLs and a third-party store (not ideal).
+
 Here is an example of a simple worker for a request to get a simple textual description of a stream of the form `/beams/some_content/video.txt`.
 
 ```javascript
@@ -674,8 +681,12 @@ consumer.process(async job => {
 Exceptions thrown from within redisio calls are [Javascript Errors](https://nodejs.org/api/errors.html#errors_class_error). The code above translates appropriate errors to [Boom](https://www.npmjs.com/package/boom) so as to provide an informative response with an appropriate status code.
 
 __TODO__ - consider how a response could set headers
+
 __TODO__ - test throwing and carrying Boom errors from worker to response
+
 __TODO__ - returning Redis keys for octet-stream values
+
+__TODO__ - returning results stored at URLs
 
 ## Status, support and further development
 
