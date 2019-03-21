@@ -69,11 +69,59 @@ Search for and retrieve media elements matching a given query, with or without m
 
 The response is an array of media elements, either packets or frames. For large responses, the array can be _paged_ by starting at the optional `offset` (defaults to `0`) and limited to `limit` values (defaults to `10`). Set the  `metadataOnly` flag to true to return media elements without payloads included, otherwise set to `false` to include payloads (default `false`). If no media elements are found or an error occurs, an exception is thrown.
 
+### retrievePacket(nameOrKey, [stream_id], [pts])
+
+Retrieve metadata and payload data for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided. [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
+
+If the packet is found and retrieval was a success, the result is a beam coder _packet_ with its data payload included. Otherwise, an exception is thrown.
+
+### retrievePacketMetadata(nameOrKey, [stream_id], [pts])
+
+Retrieve metadata for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
+
+If the packet is found and retrieval was a success, the result is a beam coder _packet_ without its data payload included. Otherwise, an exception is thrown.
+
+Property `.buf_size` is set to the size of the related data payload.
+
+### retrievePacketData(nameOrKey, [stream_id], [pts])
+
+Retrieve payload data for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
+
+If the packet is found and retrieval was a success, the result is a [Node.js `Buffer`](https://nodejs.org/api/buffer.html) containing the data payload of the packet. Otherwise, an exception is thrown.
+
+### retrieveFrame(nameOrKey, [stream_id], [pts])
+
+Retrieve metadata and payload data for a specific single frame, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
+
+If the frame is found and retrieval was a success, the result is a beam coder _frame_ with all of its data payloads included. Otherwise, an exception is thrown.
+
+### retrieveFrameMetadata(nameOrKey, [stream_id], [pts])
+
+Retrieve metadata for a specific single frame, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
+
+If the frame is found and retrieval was a success, the result is a beam coder _frame_ witout any of its data payloads included.  Otherwise, an exception is thrown.
+
+Array-valued property `.buf-sizes` contains the sizes of the related data payloads.
+
+### retrieveFrameData(nameOrKey, [stream_id], [pts], [data_index])
+
+Retrieve payload data for a specific single frame, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`. Where provided, the `data_index` requests data for a specific data plane by zero-based numerical index, otherwise the data for all planes is retrieved and concatenated.
+
+If requesting data for a single plane, the result is a [Node.js `Buffer`](https://nodejs.org/api/buffer.html) containing the data payload of the single data plane in the frame. Otherwise, an exception is thrown.
+
+If requesting data for all the planes, the result is an array containing the `data` with [Node.js `Buffer`](https://nodejs.org/api/buffer.html) elements with the data for each plane. For example:
+
+    [ Buffer <0a 1c 7c ... >, Buffer <9f 32 00 ... >, ... ]
+
+If the frame does not exist or one of more of the data planes requested is not available, an exception is thrown.
+
 ### storeMedia(name, element, [stream_index])
 
 Store a single element of media including both its metadata and payload. The media `element` will be either created or replaced for format with the given `name`.
 
 If the media element is a beam coder _packet_, the stream will be identified from its `.stream_index` property. For beam coder _frames_, either the frame has an additional `.stream_index` property or the `stream_index` must be provided as an argument. In all cases, this must be a numerical stream index, not a name or a `default`.
+
+__TODO__ - consider allowing the use of media kind stream identifiers?
 
 Whether a _packet_ or _frame_, the presentation timestamp of the media element will be taken from the `pts` property.
 
@@ -97,11 +145,11 @@ For frames, the number of elements in the array is the number of data planes plu
 
 ### storePacket(name, packet)
 
-As [`storeMedia`](#storeMediaformat-element-stream_index) except that the `element` is a `packet` and must be a beam coder _packet_.
+As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `packet` and must be a beam coder _packet_.
 
 ### storeFrame(name, frame, [stream_index])
 
-As [`storeMedia`](#storeMediaformat-element-stream_index) except that the `element` is a `frame` and must be a beam coder _frame_.
+As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `frame` and must be a beam coder _frame_.
 
 ## API - ephemeral data blobs
 
