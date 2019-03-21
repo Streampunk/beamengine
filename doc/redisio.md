@@ -57,7 +57,7 @@ Returns a beam coder stream-type object if the stream is found. Otherwise, throw
 
 Access to media elements, which are either [_packets_](https://github.com/Streampunk/beamcoder#creating-packets) or [_frames_](https://github.com/Streampunk/beamcoder#creating-frames). Some methods work with both media element metadata and payload, some just the metadata and others just the payload. Some methods a generic wrappers around both frames and packets and others a specific to type.
 
-### retrieveMedia(name, stream_id, start, [end], [offset], [limit], [flags], [metadataOnly])
+### redisio.retrieveMedia(name, stream_id, start, [end], [offset], [limit], [flags], [metadataOnly])
 
 Search for and retrieve media elements matching a given query, with or without metadata payload. The search for media elements is carried out in the format with the given `name` within the stream identified by `stream_id`. [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`. The search starts at the given inclusive numerical `start` point, continues to the optional numerical `end` point (defaults to [maximum safe integer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER)), with the type of query configured by the `flags`:
 
@@ -69,13 +69,13 @@ Search for and retrieve media elements matching a given query, with or without m
 
 The response is an array of media elements, either packets or frames. For large responses, the array can be _paged_ by starting at the optional `offset` (defaults to `0`) and limited to `limit` values (defaults to `10`). Set the  `metadataOnly` flag to true to return media elements without payloads included, otherwise set to `false` to include payloads (default `false`). If no media elements are found or an error occurs, an exception is thrown.
 
-### retrievePacket(nameOrKey, [stream_id], [pts])
+### redisio.retrievePacket(nameOrKey, [stream_id], [pts])
 
 Retrieve metadata and payload data for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided. [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
 If the packet is found and retrieval was a success, the result is a beam coder _packet_ with its data payload included. Otherwise, an exception is thrown.
 
-### retrievePacketMetadata(nameOrKey, [stream_id], [pts])
+### redisio.retrievePacketMetadata(nameOrKey, [stream_id], [pts])
 
 Retrieve metadata for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
@@ -83,19 +83,19 @@ If the packet is found and retrieval was a success, the result is a beam coder _
 
 Property `.buf_size` is set to the size of the related data payload.
 
-### retrievePacketData(nameOrKey, [stream_id], [pts])
+### redisio.retrievePacketData(nameOrKey, [stream_id], [pts])
 
 Retrieve payload data for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
 If the packet is found and retrieval was a success, the result is a [Node.js `Buffer`](https://nodejs.org/api/buffer.html) containing the data payload of the packet. Otherwise, an exception is thrown.
 
-### retrieveFrame(nameOrKey, [stream_id], [pts])
+### redisio.retrieveFrame(nameOrKey, [stream_id], [pts])
 
 Retrieve metadata and payload data for a specific single frame, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
 If the frame is found and retrieval was a success, the result is a beam coder _frame_ with all of its data payloads included. Otherwise, an exception is thrown.
 
-### retrieveFrameMetadata(nameOrKey, [stream_id], [pts])
+### redisio.retrieveFrameMetadata(nameOrKey, [stream_id], [pts])
 
 Retrieve metadata for a specific single frame, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
@@ -103,7 +103,7 @@ If the frame is found and retrieval was a success, the result is a beam coder _f
 
 Array-valued property `.buf-sizes` contains the sizes of the related data payloads.
 
-### retrieveFrameData(nameOrKey, [stream_id], [pts], [data_index])
+### redisio.retrieveFrameData(nameOrKey, [stream_id], [pts], [data_index])
 
 Retrieve payload data for a specific single frame, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`. Where provided, the `data_index` requests data for a specific data plane by zero-based numerical index, otherwise the data for all planes is retrieved and concatenated.
 
@@ -115,7 +115,7 @@ If requesting data for all the planes, the result is an array containing the `da
 
 If the frame does not exist or one of more of the data planes requested is not available, an exception is thrown.
 
-### storeMedia(name, element, [stream_index])
+### redisio.storeMedia(name, element, [stream_index])
 
 Store a single element of media including both its metadata and payload. The media `element` will be either created or replaced for format with the given `name`.
 
@@ -143,22 +143,34 @@ For frames, the number of elements in the array is the number of data planes plu
 
     [ 'OK-ovw', 'OK-ovw', 'OK-ovw', 'OK-ovw' ]
 
-### storePacket(name, packet)
+### redisio.storePacket(name, packet)
 
-As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `packet` and must be a beam coder _packet_.
+As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `packet` and must be a beam coder _packet_. To store just metadata for a packet, set the `.data` property to `null`.
 
-### storeFrame(name, frame, [stream_index])
+### redisio.storePacketData(name, stream_id, pts, data)
 
-As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `frame` and must be a beam coder _frame_.
+Store or replace the data payload `data` for a specific packet. The packet is part of the format with the given `name`, in the stream identified by `stream_id` and has the given presentation timestamp (`pts`).
+
+On success, the response is `'OK-crt'` if the data was created or `'OK-ovw'` if the data was overwritten successfully. If the writing of data failed, `null` is returned. If no associated metadata is available for the packet, an exception is thrown.
+
+### redisio.storeFrame(name, frame, [stream_index])
+
+As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `frame` and must be a beam coder _frame_. To store just metadata for a frame, set the `.data` property to `null` or `[]`.
+
+### redisio.storeFrameData(name, stream_id, pts, data, [data_index])
+
+Store or replace some or all of the payload `data` for a specific frame. The frame is part of the format with the given `name`, in the stream identified by `stream_id` and has the given presentation timestamp (`pts`). If a `data_index` is provided, the call replaces or creates data for just one of the planes and the `data` is a single [Node.js `Buffer`](https://nodejs.org/api/buffer.html). If no `data_index` is provided, the data is expected to be provided as an array of [Node.js `Buffer`s](https://nodejs.org/api/buffer.html), one for each plane.
+
+The response is an array of values representing whether each of the data planes was successfully stored, with `'OK-crt'` if the data plane is created, `'OK-ovw'` if it is overwritten and `null` if an error occurred. If a data index was provided, the array will contain a single element. 
 
 ## API - ephemeral data blobs
 
 As a means to communicate a one-time result of type `Buffer` from a worker to its caller, including a caller that initiated a request, temporary _ephemeral blobs_ may be stored in redis. These blobs expire after `config.redis.ephemeralTTL` milliseconds (defaults to 10000ms).
 
-### storeBlob(data)
+### redisio.storeBlob(data)
 
-Store the given `data` blob into redis. Returns an auto-generated random `key` to use to retrieve the data and starts the time-to-live clock.
+Store the given `data` blob, a [Node.js `Buffer`](https://nodejs.org/api/buffer.html), into redis. Returns an auto-generated random `key` to use to retrieve the data and starts the time-to-live clock.
 
-### retrieveBlob(key)
+### redisio.retrieveBlob(key)
 
-Retrieve the data blob with the given `key`. Returns a `Buffer` containing the data or throws an exception if the buffer cannot be found, possibly because the value has expired in the cache.
+Retrieve the data blob with the given `key`. Returns a [Node.js `Buffer`](https://nodejs.org/api/buffer.html) containing the data or throws an exception if the buffer cannot be found, possibly because the value has expired in the cache.
