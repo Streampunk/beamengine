@@ -145,23 +145,25 @@ For frames, the number of elements in the array is the number of data planes plu
 
 ### redisio.storePacket(name, packet)
 
-As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `packet` and must be a beam coder _packet_. To store just metadata for a packet, set the `.data` property to `null`.
+As [`storeMedia`](#redisiostoremedianame-element-stream_index) except that the `element` is a `packet` and must be a beam coder _packet_. To store just metadata for a packet, set the `.data` property to `null`.
 
 ### redisio.storePacketData(name, stream_id, pts, data)
 
-Store or replace the data payload `data` for a specific packet. The packet is part of the format with the given `name`, in the stream identified by `stream_id` and has the given presentation timestamp (`pts`).
+Store or replace the data payload `data` for a specific packet. The packet is part of the format with the given `name`, in the stream identified by `stream_id` and has the given presentation timestamp (`pts`).  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
 On success, the response is `'OK-crt'` if the data was created or `'OK-ovw'` if the data was overwritten successfully. If the writing of data failed, `null` is returned. If no associated metadata is available for the packet, an exception is thrown.
 
 ### redisio.storeFrame(name, frame, [stream_index])
 
-As [`storeMedia`](#storemedianame-element-stream_index) except that the `element` is a `frame` and must be a beam coder _frame_. To store just metadata for a frame, set the `.data` property to `null` or `[]`.
+As [`storeMedia`](#redisiostoremedianame-element-stream_index) except that the `element` is a `frame` and must be a beam coder _frame_. To store just metadata for a frame, set the `.data` property to `null` or `[]`.
 
 ### redisio.storeFrameData(name, stream_id, pts, data, [data_index])
 
-Store or replace some or all of the payload `data` for a specific frame. The frame is part of the format with the given `name`, in the stream identified by `stream_id` and has the given presentation timestamp (`pts`). If a `data_index` is provided, the call replaces or creates data for just one of the planes and the `data` is a single [Node.js `Buffer`](https://nodejs.org/api/buffer.html). If no `data_index` is provided, the data is expected to be provided as an array of [Node.js `Buffer`s](https://nodejs.org/api/buffer.html), one for each plane.
+Store or replace some or all of the payload `data` for a specific frame. The frame is part of the format with the given `name`, in the stream identified by `stream_id` and has the given presentation timestamp (`pts`).  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
 
-The response is an array of values representing whether each of the data planes was successfully stored, with `'OK-crt'` if the data plane is created, `'OK-ovw'` if it is overwritten and `null` if an error occurred. If a data index was provided, the array will contain a single element. 
+If a `data_index` is provided, the call replaces or creates data for just one of the planes and the `data` is a single [Node.js `Buffer`](https://nodejs.org/api/buffer.html). If no `data_index` is provided, the data is expected to be provided as an array of [Node.js `Buffer`s](https://nodejs.org/api/buffer.html), one for each plane.
+
+The response is an array of values representing whether each of the data planes was successfully stored, with `'OK-crt'` if the data plane is created, `'OK-ovw'` if it is overwritten and `null` if an error occurred. If a data index was provided, the array will contain a single element.
 
 ## API - ephemeral data blobs
 
