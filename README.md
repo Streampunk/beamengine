@@ -600,7 +600,7 @@ Rules for _post_route jobs_ include a status code or codes that must be matched 
 ```json
 {
   "jobs": {
-    "dataMissing" {
+    "dataMissing": {
       "method": "GET",
       "pathPattern": "^/beams/.*(packet|frame)_(\\d+)(\\.raw.*|/data.*)$",
       "statusCode": 404,
