@@ -1,14 +1,14 @@
 # Aerostat Beam Engine
 
-<img align="right" src="images/beamengine_third.jpg"/>[Redis](https://redis.io/)-backed highly-scale-able and cloud-fit distributed media processing engine. A [Node.js](https://nodejs.org/en/) web application and library, _Aerostat Beam Engine_ provides the following:
+<img align="right" src="images/beamengine_third.jpg" width="50%"/>[Redis](https://redis.io/)-backed highly-scale-able and cloud-fit distributed media processing engine. A [Node.js](https://nodejs.org/en/) web application and library, _Aerostat Beam Engine_ provides the following:
 
-* A resilient, media-aware cache of media data structured ready for processing by [FFmpeg](http://ffmpeg.org/) libraries, which can be backed by file or object stores;
-* Connection to stateless clients that provide access to the media-aware cache through the _Content Beam API_, an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed;
-* Job queues allowing multiple worker clients to carry out media transformations _just-in-time_ or _just-in-case_, executing on either the local system, distributed across many systems, GPU accelerated or via serverless compute services like [AWS Lambda](https://aws.amazon.com/lambda/).
+* A resilient, media-aware cache of data structured ready for processing by [FFmpeg](http://ffmpeg.org/) libraries, which can be backed by file or object stores;
+* Connections to stateless clients that provide access to the media-aware cache through the [_Content Beam API_](#content-beam-api), an HTTP/S API for transporting media data, pushed and pulled, compressed or uncompressed, and streamed as if live;
+* Job queues allowing multiple worker clients to carry out media transformations _just-in-time_ or _just-in-case_, executing on the local system, distributed across many systems, GPU accelerated or via serverless compute services like [AWS Lambda](https://aws.amazon.com/lambda/).
 
-The engine is a web server application that provides access to read and write data stored in the underlying Redis cache, which may be a single Redis instance or a cluster of master/slave Redis instances. Also included are some example workers, a library to build customised workders and the ability to trigger work based on rules.
+The engine is a web server application that provides access to read and write data stored in the underlying redis cache, which may be a single redis instance or a cluster of master/slave redis instances. Also included a library to build customised [workers](#workers), triggered by [rules](#setting-up-a-rule), maintaining and building [content relationships](#relationships). A small library of example [pre-built workers](#pre-built workers) is provided.
 
-This is an implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
+Beam engine is an implementation of the core of the [Agile Media Blueprint](https://www.streampunk.media/agile-media-blueprint).
 
 Work in progress. This README describes the _to be_ state of Beam Engine and the current implementation falls short of what is described. See the __TODO__ notes for details of implementation still to be done. For Node.js FFmpeg native bindings, please see [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder).
 
@@ -17,20 +17,20 @@ Work in progress. This README describes the _to be_ state of Beam Engine and the
 Before installation can take place, it is necessary to identify some connected networked resources, to include:
 
 * system(s)/container(s)/VM(s) to run the [Node.js](https://nodejs.org/en/) Beam Engine web apps, possibly behind a load balancer such as [NGINX](https://www.nginx.com/) or [AWS Elastic Load Balancing](https://aws.amazon.com/elasticloadbalancing/).
-* system(s)/container(s)/VM(s) to run [Redis](https://redis.io/), either a single instance, replicated or as a cluster. Alternatively, use a Redis-backed cache service such as [AWS Elasticache](https://aws.amazon.com/elasticache/) or [Azure Cache for Redis](https://azure.microsoft.com/en-gb/services/cache/).
+* system(s)/container(s)/VM(s) to run [redis](https://redis.io/), either a single instance, replicated or as a cluster. Alternatively, use a redis-backed cache service such as [AWS Elasticache](https://aws.amazon.com/elasticache/) or [Azure Cache for Redis](https://azure.microsoft.com/en-gb/services/cache/).
 * system(s)/container(s)/VM(s) to run workers written in Node.js, some of which may need access to a shared file system to persist cached data.
 * access to serverless processing capability such as [AWS Lambda](https://aws.amazon.com/lambda/) or [Azure Functions](https://azure.microsoft.com/en-gb/services/functions/) (optional).
 * systems with GPUs for workers that can do accelerated GPU processing (optional).
 
 It is recommended that for the distributed processing of uncompressed HD video data, all network interconnects run at speeds at or over 10Gbs.
 
-For development purposes, it is possible to run Redis, Beam Engine and workers all on the same system.
+For development purposes, it is possible to run redis, beam engine and workers all on the same system.
 
 ### Node.js prerequisites
 
 On x86_64 Windows, Mac or Linux platforms, Beam Engine uses the latest Long Term Support version of Node.js which is currently the most recent v10. Download or install Node.js from [here](https://nodejs.org/en/) or use a [system package manager](https://nodejs.org/en/download/package-manager/).
 
-The Aerostat Beam Engine web app and workers depend on [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder), a module that is a native addon that requires compilation as part of its installation process. The Node.js native addon build tool is called `node-gyp`. Follow the [node-gyp installation instructions](https://github.com/nodejs/node-gyp#installation) to ensure that each Node.js system is ready to build native extensions.
+The Aerostat Beam Engine web app and workers depend on [Aerostat Beam Coder](https://github.com/Streampunk/beamcoder), a module that as a native addon requires compilation as part of its installation process. The Node.js native addon build tool is called `node-gyp`. Follow the [node-gyp installation instructions](https://github.com/nodejs/node-gyp#installation) to ensure that each Node.js system is ready to build native extensions.
 
 Note: For MacOSX Mojave, install the following package after `xcode-select --install`:
 
@@ -40,21 +40,21 @@ The Beam Coder installer downloads suitable FFmpeg `.dll`s on Windows and uses _
 
 ### Redis
 
-For local working, install Redis on a system or systems with a substantial amount of memory. Follow the instructions from Redis themselves. For testing and low criticality systems, a single Redis instance or replicating instance may be sufficient.
+For local working, install redis on a system or systems with a substantial amount of memory. Follow the instructions from redis themselves. For testing and low criticality systems, a single Redis instance or replicating instance may be sufficient.
 
-For mission critical applications, consider establishing a cluster. Beam Engine uses [ioredis], a package with support for single connections as well as self-healing connections to members of a Redis cluster.
+For mission critical applications, consider establishing a cluster. Beam engine uses [ioredis](https://github.com/luin/ioredis), a module with support for single connections and connections to members of a redis cluster.
 
 For cloud environments, consider using Redis backed cache service, creating a connection to a virtual private network where the beam engines and workers are located. Such services include:
 
-* aws
-* MS
-* Google
+* [AWS ElastiCache for Redis](https://aws.amazon.com/elasticache/redis/);
+* Microsoft's [Azure Cache for Redis](https://azure.microsoft.com/en-gb/services/cache/)
+* Google Cloud Platform [Cloud Memorystore](https://cloud.google.com/memorystore/)
 
-For development and testing on Windows, consider installing Redis using the [Windows Subsystem for Linux](). Note that for some operations, this approach is one or two orders of magnitude slower than installing Redis on a Linux build directly and, as such, should only be used for feature testing and not performance testing.
+Many pre-built redis packages exist for Linux distributions, such as the [`redis-server` package for Ubuntu](https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-redis-on-ubuntu-18-04). Redis is also available as a container, such as the [redis docker container](https://hub.docker.com/_/redis). For development and testing on Windows, consider installing [redis using the Windows Subsystem for Linux](https://medium.com/@RedisLabs/windows-subsystem-for-linux-wsl-10e3ca4d434e). Note that for some operations, this approach is one or two orders of magnitude slower than installing Redis on a Linux build directly and, as such, should only be used for feature testing and not performance testing.
 
 ### Development
 
-To run a Beam Engine in development mode, clone the module from github. In the modules root folder, edit the `config.json` file to match local settings. Then run `npm install` followed by `npm run dev`. This will install dependencies and start the development web server that runs using the automated restart module [nodemon](). To restart, type `rs`.
+To run a Beam Engine in development mode, clone the module from github. In the modules root folder, edit the `config.json` file to match local settings. Then run `npm install` followed by `npm run dev`. This will install dependencies and start the development web server that runs using the automated restart module [nodemon](https://github.com/remy/nodemon). To restart, type `rs`.
 
 To see debug information from Redis connections (ioredis), the web framework (Koa 2) and from the job queues (Bull), set the debug flag as follows.
 
@@ -68,13 +68,13 @@ From Windows Powershell:
 PS > $env:DEBUG="*,-not_this"; npm run dev
 ```
 
-To create workers, install Beam Engine in your project.
+To create your own workers, install beam engine in your project.
 
     npm install beamengine
 
 ### Production
 
-__TODO__ - to follow.
+__TODO__ - to follow. Create beam engine application.-
 
 ## Configuration
 
@@ -103,20 +103,20 @@ The configuration has the following properties:
 
 ## Content Beam API
 
-The _content beam API_ transports FFmpeg-like media data structures over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows _content items_ in the form of streams of related media - a _virtual format_ or _logical cable_ - to be accessed for processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a [mechanism to start streaming at the latest frame](#stream_as_live). As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
+The _content beam API_ transports FFmpeg-like media data structures over [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) and [HTTPS](https://en.wikipedia.org/wiki/HTTPS) protocols. This allows _content items_ in the form of streams of related media - a _virtual format_ or _logical cable_ - to be accessed for capture, processing, storage or presentation, either streamed in order or worked on in parallel. Assuming backing by a cache, live streams can be stored and retrieved with minimal delay - recorded and played back - with a [mechanism to start streaming at the latest frame](#stream_as_live). As _content beams_, API endpoints can both host the content they represent through a pull-based mechanism and/or push media to other endpoints.
 
 All content beam API requests start with `/beams/`. The content beam API for HTTP/S (HTTP or HTTPS) breaks down as:
 
 `/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;`/`&langle;_data_ref_&rangle;
 
-* _content_name_: a reference to the source of the content, set by default to the `url` property of the underlying format context (encoded to safe representation for use in a component of a URL). This is a unique name for the content that can be beamed to or from this endpoint.
-* _stream_name_: Content is subdivided into streams of _video_, _audio_, _captions_/_subtitles_ and _data_. Streams can be referenced by their index and/or type, e.g. `stream_0`, `stream_1`, ... or aliases `video`, `audio`, `subtitle`, `data` or `attachment` ... or aliases for the first audio stream `audio_0`, the second `audio_1` ... or alias `default` for the stream that FFmpeg considers to be the default stream.
-* _media_ref_: The _presentation timestamp_ that uniquely represents a specific media element - a _frame_ or a _packet_ - or range of media elements in a stream. Most streams have a _time base_ that the presentation time stamps of each element are measured. When ommitting the _data_ref_, such a URL refers to JSON metadata only.
-* _data_ref_: Access to data payloads associated with a single media element, usually simply `data`. For planar data used in some frame formats, `data` refers to the planes concatenated and `data_0`, `data_1` ... refer to each plane.
+* _content_name_: an identifier or locator for the source of the content that is used as a unique name for the content as it is beamed to or from this endpoint.
+* _stream_name_: Content is subdivided into streams of _video_, _audio_, _captions_/_subtitles_ and _data_. Streams can be referenced by their index and/or type, e.g. `stream_0`, `stream_1`, ... or with media type aliases `video`, `audio`, `subtitle`, `data` or `attachment`.
+* _media_ref_: The _presentation timestamp_ that uniquely represents a specific _media element_ - a _frame_ or a _packet_ - or range of media elements in a stream.  When omitting the _data_ref_, such a URL refers to JSON metadata only.
+* _data_ref_: Access to data payloads associated with a single media element, usually simply `data`. For planar data used in some frame formats, `data` refers to the planes concatenated and `data_0`, `data_1` ... refer to each plane separately.
 
-Content can be created, pulled and pushed, streamed, read, written and deleted using this API. A few introductory examples follow and then the rest of this section breaks down the API in further detail.
+Content can be created, pulled and pushed, streamed, read, written and deleted using this API. A few introductory examples follow directly and then the rest of this section breaks down the API in further detail.
 
-To read a single video frame from a compressed stream at timestamp `108000` in content called `newswatch_20190312` for a stream with a time base of 90,000Hz, two GET requests are required:
+To read a single video frame from a compressed stream at timestamp `108000` in content called `newswatch_20190312` for the single video stream with a time base of 90,000Hz, two GET requests are required:
 
     https://production.news.zbc.tv/beams/newswatch_20190312/video/108000
     https://production.news.zbc.tv/beams/newswatch_20190312/video/108000/data
@@ -142,15 +142,15 @@ The first retrieves the metadata and the second retrieves the associated payload
 }
 ```
 
-The second _data_ URL retrieves a payload of type `application/octet-stream` with content length `16383`. To create the packet, PUT the metadata and payload to the same URLs.
+The second _data_ URL retrieves a payload of type `application/octet-stream` with content length `16383`. To create the packet, PUT the metadata and payload to the same URLs as the example GET requests. The metadata must exist before the payload data is posted.
 
-The packet metadata contains no details as to the relative timing of the media element wrt other elements of the stream, the type of data payload or the encoding used. To be able to decode that packet, it is necessary to find out the details of the associated stream. This can be retrieved from a GET request to one of following URLs:
+The packet metadata contains no details as to the relative timing of the media element wrt other elements of the stream, the type of data payload or the encoding used. To be able to decode the payload of a packet, it is necessary to find out the details of the associated stream. This can be retrieved from a GET request to one of following URLs:
 
     https://production.news.zbc.tv/beams/newswatch_20190312/video
     https://production.news.zbc.tv/beams/newswatch_20190312/stream_0
     https://production.news.zbc.tv/beams/newswatch_20190312/stream_0.json
 
-The URLs are equivalent and produce the following response:
+The URLs are equivalent and produce the following response (some properties removed):
 
 ```json
 {
@@ -200,11 +200,11 @@ The names of all the items of content items stored at an endpoint can be retriev
 
     [ 'newswatch_live', 'newswatch_20190312', 'newswatch_20190311' ]
 
-It is assumed that an external search service, such as [Elasticsearch](https://www.elastic.co/), will be used in tandem with beam engine to provide a competent index of available streams.
+It is assumed that an external search service, such as [Elasticsearch](https://www.elastic.co/), will be used in tandem with beam engine to provide a more competent index of available streams.
 
 ### Format - the logical cable
 
-Content items have a _format_ that provides the recipe for reproducing that content. This consists of overall format description, the streams that make up the content and the technical parameters required to configure decoders. When used to access files, the streams of the beam API format label the virtual storage compartments of a virtual container. When used to access a live stream, the _format_ can be considered as if the description of a multicore _cable_, where each core wire of that cable carries the latest media elements for a particular stream. As media elements in beams are associated by URL path structure only, beams of the beam API represent _virtual formats_ and _logical cables_.
+Content items have a _format_ that provides the technical parameters for reproducing that content. This consists of overall format description, the streams that make up the content and the technical parameters required to configure decoders. When used to access files, the streams of the beam API format correspond to the storage compartments of a virtual container. When used to access a live stream, the _format_ can be considered as if the description of a multicore _cable_, where each core wire of that cable carries the latest media elements for a particular stream. As media elements in beams are associated by URL path structure only, beams of the beam API represent _virtual formats_ and _logical cables_.
 
 Each content item has a format that is used to create, query, update or delete that content from a beam engine. All requests take the form `/beams/`&langle;_content_name_&rangle;.
 
@@ -294,7 +294,7 @@ Streams are the sub-components of a format, the virtual core wires of a multicor
 
 The primary _stream_name_ is based on the stream index, made by appending the index to `stream_`, e.g. `stream_0`, `stream_42`. This can be shortened to just the index number, e.g. `0`, `42`.
 
-Streams define a `time_base` for the unit of measurement for any of the media elements of the stream. Any two streams in the same format may have a different time bases. Any timestamp measured to have the same time value relative to the time base within the foramt should be presented at the same moment to the viewer. For example, for a video and audio time element:
+Streams define a `time_base` for the unit of measurement for any timestamps or durations of the media elements of the stream. Streams of the same format may have a different time bases. Across the streams of a format, a media element with a timestamp calculated relative to the stream time base as having an equal time value should be presented at the same moment to the viewer. For example, for a video and audio media element:
 
 * Video stream time base is `[1, 90000]` and the frame's presentation timestamp is `90000` then the video frame must be presented at content item time of 1s.
 * Audio stream time base is `[1, 48000]` and the audio frame's presentation timestamp is `48000` then the audio samples must be played at content item time 1s, co-timed with the video frame.
@@ -303,7 +303,7 @@ Streams have codec parameters describing how data is encoded (or not), reprsente
 
 To make it easier to make reference a stream, the codec type can be used as the name of a stream in the URL. If more than one stream of a particular type exists, a type-scoped index can be added, with for example `audio` and `audio_0` referencing the first audio stream, `audio_1` the second and so on. This is an alias ... the primary _stream_name_ is always based on the stream index.
 
-A final alias, `default`, is a reference to the stream that FFmpeg nominates as the default for a format. This is normally the main video track. The dafault track provides a time base for making reference to all the streams of a format.
+A final alias, `default`, is a reference to the stream that FFmpeg nominates as the default for a format. This is normally the main video track. The dafault track provides a time base for making time references across all the streams of a format.
 
 Details about a stream can be retrieved in the form of a JSON document with a GET request. The following four requests are equivalent (`.json` extension is optional):
 
@@ -336,7 +336,7 @@ __TODO__ - updating details of a stream.
 
 ### Media elements - metadata
 
-The sub-components of a stream of media are its _media elements_, a generic term referring to either a _packet_ of encoded data or an uncompressed _frame_ of media. A frame is either a single video frame or a sequential grouping of audio samples, where the size of the group is related to either the video frame timing (e.g. 1920 samples for every video frame at 25fps) or by the _blocksize_ for a given audio codec (e.g. AAC uses a blocksize of either 960 or 1024 samples). Media elements are located in time within a stream at a given _presentation timestamp_ (PTS) and the PTS is the primary identifier for a media element.
+The sub-components of a stream of media are its _media elements_, a generic term referring to either a _packet_ of encoded data or an uncompressed _frame_ of media. Typically, a media element is either a single video frame or a sequential grouping of audio samples, whereby the size of the group is related to either the video frame timing (e.g. 1920 samples for every video frame at 25fps) or by the _blocksize_ for a given audio codec (e.g. AAC uses a blocksize of either 960 or 1024 samples). Media elements are located in time within a stream at a given _presentation timestamp_ (PTS) and the PTS is the primary identifier for a media element.
 
 A beam engine stores data about every media element, its _metadata_, and may also store the payload of the media element. For packets, this is a sparse amount of data including the presentation timestamp, decode timestamp (e.g. for streams of H.264 video where the stored decode order and presentation order differ), duration and position in the source stream. For frames, additional details of the format, resolution, sample rate etc. are included.
 
@@ -344,15 +344,15 @@ Media element metadata can be read and queried with GET requests and written wit
 
 `/beams/`&langle;_content_name_&rangle;`/`&langle;_stream_name_&rangle;`/`&langle;_media_ref_&rangle;
 
-GET requests can be for either a single media element or an inclusive range of media elements. Whereas PUT requests are for a single media element only. The body of requests and responses have type `application/json`. Five kinds of request can be made with a _media_ref_:
+GET requests can be made for either a single media element or an inclusive range of media elements. Whereas PUT requests are for a single media element only. The body of requests and responses have type `application/json`. Five kinds of request can be made with a _media_ref_:
 
-* _direct by timestamp_: GET and PUT. Retrieve, create or update metadata about a specific packet or frame, using a direct media reference of the form `packet_`&langle;pts&rangle; or `frame_`&langle;pts&rangle;. Direct requests bypass index lookup but require that the PTS value in the path is exact.
-* _presentation timestamp_: GET only. Request contains a presentations timestamp or range of presentation timestamps, e.g. `7200` or `7200-43200`. Useful when clock sampling errors, jitter or sampling conversion cause timestamps to be non exact, fuzzy match is enabled by adding an `f` to the timestamp, e.g. `7200f` will match the closest media element to `7200`, either before or after.
-* _index_: GET only. Request contains a media element that is a given count into the stream in its current state, from the `first` to the `last` element. For example, `first` or `1st`, `2nd`, `3rd`, ... up to e.g. `41st`, `42nd` or `last`. Ranges can be used, such as `first-last` for all media elements or `345th-723rd`. Media element index values are 1-based.
+* _direct by timestamp_: GET and PUT. Retrieve, create or update metadata about a specific packet or frame, using a direct media reference of the form `packet_`&langle;_pts_&rangle; or `frame_`&langle;_pts_&rangle;. Such direct requests bypass index lookup but require that the PTS value in the path is exact.
+* _presentation timestamp_: GET only. Request contains a single presentation timestamp or range of presentation timestamps, e.g. `7200` or `7200-43200` respectively. Useful when clock sampling errors, jitter or sampling conversion cause timestamps to be non exact, fuzzy match is enabled by adding an `f` to the timestamp, e.g. `7200f` will match the closest media element to `7200`, either before or after.
+* _index_: GET only. Request contains a media element that is a given count of elements through the stream in its current state, from the `first` to the `last` element. For example, `first` or `1st`, `2nd`, `3rd`, ... up to e.g. `41st`, `42nd` or `last`. Ranges can be used, such as `first-last` for all media elements or `345th-723rd`. Media element index values are 1-based.
 * _real timestamps_: GET only. Request contains a real time value or range that is measured in seconds, with the beam engine converting presentation timestamps to real time based on the stream time base. For example, in a stream with a time base of 25fps, real timestamp `1.4s` resolves to frame `35`  and real timestamp range `1.2s-2.2s` refers to frames `30-55`.
-* _relative timestamp_: GET only. Retrieve a media element at a given offset before or after the specified presentation timestamp. If following a live stream, this allows a request to be made for the next frame based on the current frames timestamp. For scrubbing, this allows jumping backwards and or forwards from a given point. The format is the PTS, follows by `+`/`-`, follows by an offset value signified with `d`, e.g. `7200+1d` references the frame after one with timestamp `7200`, say `10800`, and `7200-1d` is the frame before, say `3600`.
+* _relative timestamp_: GET only. Retrieve a media element at a given offset before or after the specified presentation timestamp. If following a live stream, this allows a request to be made for the next frame based on the current frames timestamp. For scrubbing, this allows jumping backwards and or forwards from a given point. The format is the base PTS, followed by `+`/`-`, followed by an offset value signified with `d`. For example, `7200+1d` references the frame after one with timestamp `7200`, say `10800`, and `7200-1d` is the frame before, say `3600`.
 
-As with listing content items, requests can the query parameters `offset` and `limit` to control how many values are returned and the pagination of values. GET requests return JSON arrays, even for a single value, or `404 - Not Found` if no results are found. All requests can have `.json` as an optional file extension.
+As with listing content items, requests can by _paged_ with the query parameters `offset` and `limit` to control how many values are returned and the pagination of values. GET requests return JSON arrays, even for a single value, or `404 - Not Found` if no results are found. All requests can have `.json` as an optional file extension in their paths.
 
 Here is an example of a relative timestamp request.
 
@@ -396,20 +396,20 @@ __TODO__ - delete media elements - is this necessary or only when deleting the p
 
 ### Payload data
 
-The payload data for a media element is stored separately from the metadata that describes it and may have a different lifetime in the underlying cache. It is possible to be able to retrieve the metadata but not get access to the payload because it has expired. See details on creating relationships and workers that can mitigate against the issue.
+The payload data for a media element is stored separately from the metadata that describes it and may have a different lifetime in the underlying cache. A situation can exist whereby it is possible to retrieve the metadata but not get access to the payload because it has expired from the cache. See details on creating relationships and workers that can mitigate against the issue.
 
 Payload data has the same base path as the associated media element's _direct by timestamp_, then add an extension `.raw` or sub-path part `.../data`. This additional part is the _data_ref_. It is only possible to reference one media element, frame or packet, at a time:
 
 * For packets, the path URL refers to the single [_blob_](https://en.wikipedia.org/wiki/Binary_large_object) of data contained in a packet.
-* For frames that often contain more than one _blob_, e.g. a frame with three separate planes of data - one for each colour component, an unqualified data reference of `/data` or `.raw` refers to all of the _blobs_ concatenated together. Reference can be made to each separate plane by adding an zero-based index, e.g. `.raw_0` or `/data_0` for the first plane, `.raw_1` or `/data_1` for the second, and so on.
+* For frames that have more than one _blob_ of payload, e.g. a frame with three separate planes of data, an unqualified data reference of `/data` or `.raw` refers to all of these _blobs_ concatenated together. Reference can be made to each separate plane by adding an zero-based index, e.g. `.raw_0` or `/data_0` for the first plane, `.raw_1` or `/data_1` for the second, and so on.
 
-In the following example of retrieving the data payload for a specific frame, the data for each plane for a format of `yuv422p` is retrieved separately, possibly concurrently:
+In the following example of retrieving the data payload for a specific frame, the data for each plane for a format of `yuv422p` is retrieved independently, possibly concurrently:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data_0
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data_1
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data_2
 
-Alternatively, the data for all the planes can be retrieved as follows:
+Alternatively, the data for all the planes can be retrieved in one go as follows:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200/data
 
@@ -419,13 +419,21 @@ The value returned contains a header `Beam-Buf-Sizes`, a JSON array with the siz
 
 Note that due to the way FFmpeg code reads buffers, the size of each data plane buffer is generally slightly larger than the minimum required to represent a plane of data.
 
+In this example, the data for each plane can be established as follows:
+
+```javascript
+[ response.body.slice(0, 2073664),
+  response.body.slice(2073664, 2073664 + 1036864),
+  repsonse.body.slice(2073664 + 1036864) ]
+```
+
 An equivalent request using the `.raw` extension:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/frame_7200.raw
 
-Data payloads can be retrieved with GET and created or updated with PUT. Even if a payload has a specific MIME type, all payload data sent to or from a beam engine has content type `application/octet-stream`. For example, the payloads produced by the `png` codec could have MIME type `image/png` but beam engine uses the general type.
+Data payloads can be retrieved with GET and created or updated with PUT. Even if a payload is associated with a MIME type, all payload data sent to or from a beam engine has content type `application/octet-stream`. For example, the payloads produced by the `png` codec could have MIME type `image/png` but beam engine uses the general type.
 
-If the payload data is not available for whatever reason, a `404 - Not Found` status response is created. This is case even if the payload was once cached and has now longer available from the cache where, arguably, a `410 - Gone` might have been more appropriate. This is because it is possible that the payload for a given element might be cached again in the future - it has not been permanently removed - so requesting the element again is not unreasonable behaviour for a client.
+If the payload data is not available for whatever reason, a `404 - Not Found` status response is created. This is case even if the payload was once cached and has now longer available from the cache where, arguably, a `410 - Gone` might have been more appropriate. This is because it is possible that the payload for a given media element might be cached again in the future - it has not been permanently removed - so requesting the element again is not unreasonable behaviour for a client.
 
 The following is an example of a [got](https://www.npmjs.com/package/got) request to retrieve payload data:
 
@@ -439,60 +447,60 @@ let payload = response.body;
 
 ### Streaming as live
 
-A beam can chase the progress of a growing live stream and give the impression of playing the stream live, with only a small latency of one or two frames for uncompressed data. To do this and with knowledge of the stream's time base:
+A beam can chase the progress of a growing live stream and give the impression of playing the stream live, with only a small latency of one or two frames for uncompressed data. With knowledge of the stream's time base, the process is:
 
 1. A client requests the _latest_ frame in a stream, noting the real time (_t_) of the request, using sub-path `/latest` (or `/end`) as the media reference (_media_ref_).
 2. A response with status `302 - Found` is returned with the `Location` header containing a _direct by timestamp_ link to the frame with the highest timestamp in the stream.
-3. The client retrieves the metadata about the packet or frame, noting the presentation time stamp (`pts`) and duration (`duration` or `pkt_duration`).
+3. The client retrieves the metadata for the packet or frame, noting the presentation time stamp (`pts`) and duration (`duration` or `pkt_duration`).
 4. Based on the metadata and media element type, the client retrieves the data payload, e.g. `/packet_10800`.
-5. At time _t_ plus `duration`, request metadata and/or payload data for the next frame with timestamp `pts`&nbsp;+&nbsp;`duration`, e.g. `packet_14400`. A _relative timestamp_ could be used, e.g. `10800+1d`. Note that a `404` response might indicate a difference in clocks between client, server and media source, so the client should be prepared to retry a few times.
-6. A beam has no defined end point, so the client should assume that stream has ended when repeated requests for the next element, i.e. ten repeated requests, all generate a `404` response. A further `/latest` request can be used to check that the latest frame is not longer incrementing or to resync with the stream.
+5. At time _t_ plus `duration`, request metadata and/or payload data for the next frame with timestamp `pts`&nbsp;+&nbsp;`duration`, e.g. `packet_14400`. A _relative timestamp_ could be used, e.g. `10800+1d`. Note that a `404` response might be caused by a difference in clocks between client, server and media source, so the client should be prepared to retry a few times.
+6. A beam has no defined end point, so the client should assume that stream has ended when repeated requests for the next element, i.e. ten repeated requests, all generate a `404` response. A further `/latest` request can be used to check that the latest frame is not longer advancing and/or to resync with the stream.
+
+__TODO__ - consider if beams should have decent endings!?!
 
 The following is a request for the latest frame in the example stream:
 
     https://production.news.zbc.tv/beams/newswatch_2019031/stream_1/latest
 
-An HTTP/S client set to follow redirects will retrieve media element metadata from this request, subject to at least one media element being available.
+Subject to at least one media element being available, an HTTP/S client that has _follow redirects_ enabled will retrieve media element metadata from this request.
 
-With a suitably high-bandwidth network of 10Gbps or higher, uncompressed formats can be transported as if SDI or SMPTE ST 2110 streams, with slightly increased latency but no need to establish accurate clocks that synchronize source and destination.
+With a suitably high-bandwidth network, say 10Gbps or higher, uncompressed formats can be transported as if SDI or SMPTE ST 2110 streams, trading a frame or so of latency for location independence and Internet-like scaling.
 
-It is also possible to stream from the start using `start` as the media reference, allowing for a scenario such as the catch-up watching of an event that has already started. In this case, the redirect response is to the first media element known for the stream.
+It is also possible to stream from the start using `start` as the media reference, for scenarios such as catch-up watching of an event that has already started. In this case, the redirect response is to the first media element known for the stream.
 
 ## Relationships
 
-Items of content may be related to other items because they are:
+<img align="right" src="images/rels.png" width="50%"/>Items of content may be related to other items because they are:
 
 * byte-for-byte _equivalent_, stored in different locations but otherwise with exactly the same encoding, format and other metadata;
 * visually equivalent _renditions_, such as some source material and all of the encodings made from it, generally with the same resolution;
 * _transformations_ that create a new item of content by applying a filter such as scaling or mixing, possibly with one or more inputs.
 
-<img align="center" src="images/rels.png" width="50%"/>
-
-These kinds of relationships can be stored in the beamengine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
+These kinds of relationships can be stored in the beam engine to allow a worker to select the most appropriate format or location from which to retrieve source data and/or deliver a result.
 
 ### Equivalent
 
-Beam Engine uses Redis as a RAM cache for media data but this cannot be a permanent, medium or long term storage medium. The time-to-live from creation to cache expiry for media data payloads can be set in the config file. When data payloads expire, they are no longer available unless they have also been stored in an external equivalent content item. An equivalent content item is a byte-for-byte copy of the source data. Typically, an equivalent content item will have content name that represents a resolvable storage reference, such as a local file path of AWS S3 bucket identifier, where a version of the cached content was persisted by a worker.
+A beam engine uses redis as a RAM cache for media data but this cannot be a permanent, medium or long term storage medium. The time-to-live from creation to cache expiry for media data payloads can be set in the [configuraion](#configuration). When data payloads expire, they are no longer available unless they have also been stored in an external equivalent content item. An equivalent content item is a byte-for-byte copy of the source data. Typically, an equivalent content item will have content name that represents a resolvable storage reference, such as a local file path or an AWS S3 bucket identifier, where a version of the cached content was persisted by a worker.
 
 Equivalent content representations are one-to-one relationships. Although there will often be a content source, any equivalent content item should be able to be substituted by another.
 
 Here is an example workflow for a content item being recorded via the Beam Content API.
 
-1. A new content item is created. A file backup worker with access to a shred storage drive responds to all content creation requests by creating an equivalent content items with the same format and streams. An equivalent content relationship is stored in the Beam Engine.
+1. A new content item is created. A file backup worker with access to a shared storage drive responds to all beam API content creation requests by creating an equivalent content item with the same format and streams. An equivalent content relationship between the source item and its copy is stored into redis.
 
-2. Each packet that is stored into the Beam Engine creates a post-response job that stores the packet's metadata and payload onto the shared storage.
+2. Each packet that is stored into the beam engine creates a post-response backgroud job that copies the packet's metadata and payload from the cache onto the shared storage.
 
-3. Requests for the packet's payload that take place prior to the expiry of the packet in the cache are services from the cache.
+3. Requests for the packet's payload that take place within the time-to-live of the packet's payload in the cache are serviced from the data in the cache.
 
-4. Requests for the packet's payload that occur after the cache expiry cause a `404` error that is intercepted and creates a job. A worker checks to see if any equivalent off-line items of content exists. If so, the packet is retrieved from that storage. By policy, the packet's payload can be re-created in Redis if further requests are expected within the TTL.
+4. Requests for the packet's payload that occur after the cache expiry cause a `404` error from the beam API. This is intercepted and creates a job. A worker checks to see if any equivalent items of content exist on persistent storage. If so, the packet is retrieved from one of those locations. By policy, the packet's payload can be re-cached in redis if further requests are expected within the subsequent TTL.
 
-As an optimisation, it may be possible to predict that if a particular packet is requested then the next few packets in sequence may be required, so pre-emptive read-ahead jobs can be used to pre-populate the cache for anticipated requests.
+As an optimisation, it may be possible to predict that if the payload of a particular packet is requested then the paylaods of the next few packets in sequence may be required, so pre-emptive read-ahead jobs can be used to pre-populate the cache for anticipated requests.
 
 __TODO__ - description of asserting a equivalent relationship
 
 ### Rendition
 
-As experienced by the viewer, a rendition content item is a visually- and/or audibly-equivalent representation of an item of content. Typically, a rendition has the same resolution its source but may have different parameters such as format or codec, meaning that it is not an exact byte-for-byte copy. Renditions relationships between content items are one-to-one and directional, with a source and a target. A rendition without a source is not a rendition as such and is considered to be the _original_ version.
+As experienced from the perspective of a viewer, a rendition content item is a visually- and/or audibly-equivalent representation of an item of content. Typically, a rendition has the same resolution its source but may have different parameters such as pixel/sample format or codec, meaning that it is not an exact byte-for-byte copy. Renditions relationships between content items are one-to-one and directional, with a source and a target. A rendition without a source is not a rendition as such and is considered to be the _original_ version.
 
 A rendition has a many-to-many stream mapping within two related content items. For example, a source professional format video file - such as `.mxf` or `.mov` - may have a video stream and sixteen separate mono audio streams. A target rendition has a video stream and a stereo audio stream. The rendition relationship must include which of the source audio streams, say the 3rd and 4th, are used to make the left and right tracks for the target.
 
