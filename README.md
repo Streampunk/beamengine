@@ -500,42 +500,42 @@ __TODO__ - description of asserting a equivalent relationship
 
 ### Rendition
 
-As experienced from the perspective of a viewer, a rendition content item is a visually- and/or audibly-equivalent representation of an item of content. Typically, a rendition has the same resolution its source but may have different parameters such as pixel/sample format or codec, meaning that it is not an exact byte-for-byte copy. Renditions relationships between content items are one-to-one and directional, with a source and a target. A rendition without a source is not a rendition as such and is considered to be the _original_ version.
+As experienced from the perspective of a viewer, a content item that is a rendition of another is a visually- and/or audibly-equivalent representation. Typically, a rendition has the same resolution or shape as its source but may have different parameters such as pixel/sample format or codec, meaning that it is not an exact byte-for-byte copy. Rendition relationships between content items are one-to-one and directional, with a _source_ end and a _target_ end. A content item without a rendition source is the _original_ version.
 
-A rendition has a many-to-many stream mapping within two related content items. For example, a source professional format video file - such as `.mxf` or `.mov` - may have a video stream and sixteen separate mono audio streams. A target rendition has a video stream and a stereo audio stream. The rendition relationship must include which of the source audio streams, say the 3rd and 4th, are used to make the left and right tracks for the target.
+A rendition relationship describes a many-to-many stream mapping between two related content items. For example, a source professional format video file - such as `.mxf` or `.mov` - may have a video stream and sixteen separate mono audio streams. A target rendition has a video stream and a stereo audio stream. The rendition relationship must include which of the source audio streams, say the 3rd and 4th, are used to make the left and right tracks for the target.
 
-One-to-one transformations of a stream that are experientially equivalent may be represented as a rendition, even if the result is a different resolution, number or samples or number of packets. For example:
+One-to-one transformations of a stream that are experientially equivalent may be associated by a rendition relationship, even if the result is a different resolution, number or samples or number of packets. For example:
 
 * scaling a video stream for presentation on a lower resolution device, as this is a form of compression;
 * similarly, reducing the sample rate of high-definition audio;
 * compressing audio and adding a short amount of additional silence at the beginning or end to facilitate better lip sync.
 
-Decode rendition relationships have source media elements that are packets and target media elements that are frames, whereas encode rendition relationships start with frames and end up with packets. A rendition target may be a lossless rendition of its source, such as a different packing of samples into a transport. For example, an interleaved V210 packing of an uncompressed 10-bit-per-sample video packet that is otherwise represented as 16-bits-per-sample as separate planes as a frame.
+_Decode rendition relationships_ have source media elements that are packets and target media elements that are frames. _Encode rendition relationships_ start with frames and end up with packets. A rendition target may be a lossless transormation of its source, such as a different packing of samples into a transport. For example, an interleaved [V210 packing](https://www.loc.gov/preservation/digital/formats/fdd/fdd000353.shtml) of an uncompressed 10-bit-per-sample video as a packet is losslessly decoded from, or encoded to, a frame with 16-bit values (only 10-bits-per-sample active) with separate data planes per component.
 
 In a workflow, a rendition relationship can be used as follows:
 
-1. Create a new item of content and a rendition relationship to its source. The format of the content items declares details of the target transformation from the source. The relationship includes any stream mappings from source to target and may suggest how the data payloads are to be made.
+1. Create a new item of content with a rendition relationship to its source. The difference between the format of the two content items provides details of the transformation required from source to target. Optionally included with the relationship are stream mappings from source to target.
 
 2. The media element metadata and payloads of a rendition can be made in one of three ways:
    * _provided_: the payloads are sent in over the Content Beam API in the usual way.
    * _just-in-case_: payloads are made be a worker or workers from the source material as soon as possible.
    * _just-in-time_: payloads are made as requested and, where appropriate, cached for subsequent requests.
 
-3. If a request is made for rendition media element metadata payload that does not exist, a worker can be assigned to determine whether to respond with `404 - Not Found` or to assign another worker to make the response _just-in-time_.
+3. If a request is made for rendition media element metadata payload that does not exist, a worker can be assigned to determine whether to respond with `404 - Not Found` or whether to assign another worker to make the rendition response _just-in-time_.
 
 __TODO__ - description of asserting a rendition relationship
 
 ### Transformation
 
-A content item that is made by applying a filter to one or more other content items such as what a viewer experiences is different from the source is a form of transformation. Transformations include cropping, scaling, mixing, graphics, shaping, retiming (e.g. slow motion), filtering (e.g. remove noise) etc.. A transformation relationship is a means of specifying the correspondence between items of source material that are transformed to make items of target material.
+A content item that is made by applying a [_filter_](https://github.com/Streampunk/beamcoder#filtering) to one or more other content items, causing a change of viewing experience, is a form of transformation. Transformations include cropping, scaling, mixing, graphics, shaping, retiming (e.g. slow motion), filtering (e.g. remove noise) etc.. A transformation relationship is a means to describe the correspondence between items of source material that are transformed to make items of target material.
 
-Transformation relationships may be time bounded and only exist for part of the target's timeline. This is a bit like a combination of the timeline in an editor and a live vision mixer:
+Transformation relationships may be time-bounded and only exist for part of the target's timeline. This is a bit like a combination of the timeline in an editor and a live vision mixer:
 
-* For timelines, recipes can be specified in advance.
+* For timelines, recipes can be specified in advance by a form of _edit decision list_.
 * For live streams, parameters such as mix level or graphics position can be updated on-the-fly.
-* Or you can have a mix of the two, with recipes triggered by live events and/or recipes configuring potential live interaction.
+* Or you can have a mix of the two, with recipes triggered by live triggers and/or recipes configuring potential live interaction.
 
-At a content-item level, transformations are typically one-to-many, a target with one or more sources. However, in some cases, a transformation may create more than one target, for example making separate key and fill versions of video with graphics overlay. At a stream level, relationships may be many-to-many and exists between media elements that are frames rather than packets.
+At a content-item level, transformations are typically one-to-many, a target item with one or more sources. However, in some cases, a transformation may create more than one target, for example making separate key and fill versions of video with graphics overlay. At a stream level, relationships may be many-to-many. Transformation relationships tend to be specified between media elements that are frames rather than packets as they operate on uncompressed data.
 
 As with rendition relationships, transformation relationships can be externally _provided_, made _just-in-case_ or made _just-in-time_.
 
@@ -543,7 +543,7 @@ __TODO__ - description of asserting a transformation relationship
 
 ## Workers
 
-Workers run jobs, either just-in-time to create a response to an HTTP request or triggered to do some just-in-vase background work - e.g. housekeeping - as the result of a request. For example:
+Workers run jobs, either just-in-time to create a response to an HTTP/S request or triggered to do some just-in-vase background work - e.g. housekeeping - as the result of a request. For example:
 
 * create an image from a frame of video _on-the-fly_;
 * change the sample rate of some audio as it is being played without storing the result, e.g. 44,100Hz to 48,000Hz;
@@ -551,9 +551,9 @@ Workers run jobs, either just-in-time to create a response to an HTTP request or
 
 <img src="images/workers.png" width="75%"/>
 
-Workers can run in the same application and on the same system as a Beam Engine. However, the design idea behind the beam engine is that work is distributed across many systems and processors, with the front end is scaled by having multiple instances of Beam Engines with a common data source. Redis is the data source glue in the middle, ensuring that jobs are queued and executed to order using [Bull](https://www.npmjs.com/package/bull).
+Workers can run in the same application and on the same system as a beam engine. However, the design idea behind the beam engine is that work is distributed across many systems and processors. The front end is scaled by having multiple instances of beam engines with a common data source, with load balancing and caching. Redis is the data source glue in the middle, ensuring that jobs are queued and executed to order using [bull](https://www.npmjs.com/package/bull). The back end is scaled using a pool of workers that have access to redis to both consume bull job queues and access media data.
 
-A Beam Engine is configured with _rules_ that determine what jobs are scheduled and when depending on beam engine requests, classifying the work to different queues. Workers service queues, executing jobs using the shared Redis as both the job manager and primary access point for data payloads. A worker is taken from a catalogue of microservices, may service one or more queues and can be implemented as:
+A beam engine is configured with _rules_ that determine what jobs are scheduled and when, depending on beam engine requests, classifying the work to different queues. A worker services one or more queues and is selected at runtime from a catalogue of microservices. A worker can be implemented as:
 
 * A single-threaded Node.js process that can execute one job at a time;
 * A [Node.js cluster](https://nodejs.org/docs/latest-v10.x/api/cluster.html) that can execute a number of concurrent _workers_;
@@ -564,8 +564,8 @@ A Beam Engine is configured with _rules_ that determine what jobs are scheduled 
 
 Jobs are configured in the configuration file `config.json`. This allows the content beam API routes to be overridden or supplemented by some additional work. This work can be:
 
-* _pre_route job_: jobs executed before content beam API requests, either starting a background process or providing the response to the method;
-* _post_route job_: jobs executed after the content beam API request has created a response, either starting a background process or modifying the response.
+* _pre-route job_: jobs executed before content beam API requests, either starting a background process or providing the response to the method;
+* _post-route job_: jobs executed after the content beam API request has created a response, either starting a background process or modifying the response.
 
 The rules that trigger jobs are listed in the `jobs` object of the configuration file, with each rule being a separate property. The value of the property is an object that describes the rule and how it is to be executed. The rule object has the following properties:
 
@@ -576,7 +576,7 @@ The rules that trigger jobs are listed in the `jobs` object of the configuration
 | `statusCode`   | int or array of int | Match only responses with these status codes |
 | `queue`        | string  | Name of the queue to which jobs should be added          |
 | `function`     | string  | Name of the function to execute.                         |
-| `postRoute`    | Boolean | Set for a _post_route job_, defaults to _pre_route job_  |
+| `postRoute`    | Boolean | Set for a _post-route job_, defaults to _pre-route job_  |
 
 For example, here is a rule that matches all requests that end in `.jpg` or `.jpeg`:
 
@@ -594,16 +594,18 @@ For example, here is a rule that matches all requests that end in `.jpg` or `.jp
 }
 ```
 
+In implementation, the result of a job can indicate that it has generated a response to be returned immediately, or that the job determined that the it could not produce a response and other routes and rules should be applied. Rules are applied in the order that they appear.
+
 This rule catches any GET request starting `beams` and ending `.jpg` or `.jpeg` and sends the details to a job queue called `media_workers`. As `postRoute` is set to `false`, this match happens before processing relating to the content beam API. The reason for naming a queue is that different kinds workers may have access to different kinds of resources. Some contrived examples:
 
-* _media workers_: Workers that execute encoding or decoding operations that require significant amounts of CPU, possibly multi-core, and sufficiently large RAM.
+* _media workers_: Workers that execute encoding or decoding operations that require significant amounts of CPU, probably multi-threaded, and requiring sufficient amounts of RAM.
 * _file workers_: Workers that have access to a shared file system that is keeping a copy of some of the content items.
 * _lambda workers_: Workers that execute functions using serverless compute resource.
 * _accelerated workers_: Workers that execute part of a job on a GPU or another form of hardware-accelerated device.
 
 The function name is used by a worker to select a function to execute from the library of functions it has available locally.
 
-Rules for _post_route jobs_ include a status code or codes that must be matched in addition to the path pattern and method type. Here is an example of a rule that catches all data payload cache misses and attempts to retrieve the data from another source:
+Rules for _post-route jobs_ include a status code or codes that must be matched in addition to the path pattern and method type. Here is an example of a rule that catches all data payload cache misses and attempts to retrieve the data from another source:
 
 ```json
 {
@@ -620,21 +622,21 @@ Rules for _post_route jobs_ include a status code or codes that must be matched 
 }
 ```
 
-When a _pre_route job_ has been executed by a worker, the job signals whether it has created a response to be returned directly without further processing. This could be success or an error. However, if a worker indicates that further work may be required, the request continues through the content beam API router and onto the _post_route jobs_. This means that it is possible to run more than one job per HTTP request.
+When a _pre-route job_ has been executed by a worker, the job signals whether it has created a response to be returned directly without further processing. This could be success or an error. However, if a worker indicates that further work may be required, the request continues through the content beam API router and onto the _post-route jobs_. This means that it is possible to run more than one job per HTTP/S request.
 
 Changing a rule requires a modification to the configuration file and a restart of the associated app server. If a number of application servers are running behind a load balancer, changing the configuration file requires restarting each server.
 
 ### Pre-built workers
 
-__TODO__ - implement and document some pre-built workers
+__TODO__ - implement and document some pre-built workers - JPEG and MP4 in progress
 
 ### Building a worker
 
-Workers are Node.js programs that execute on systems with access to the same Redis store as the beam engines that provide them with job to do. Workers are consumers of jobs from Bull queues. Workers use the information they are provided with to select a function to execute.
+Workers are Node.js programs that execute on systems with access to the same redis store as the beam engines that provide them with job to do. Workers are consumers of jobs from Bull queues. Workers use the configuration information they are provided with to select a function to execute.
 
-Functions are expected to communicate directly with Redis about content items, streams and media elements, either via the content beam API or by requiring the `redisio` capability provided by the beam engine. Data payloads are not intended for transport over jobs requests and responses, which go via fairly basic serialization into Redis.
+Functions are expected to communicate directly with redis about content items, streams and media elements, either via the content beam API or by requiring the [`redisio`](doc/redisio.js) capability provided by the beam engine. Data payloads are transported between jobs and the creator of the job via redis.
 
-Workers are composable, in other words it is possible for one worker to put jobs onto other queues to be serviced by another worker. Care must be taken that this does not result in a circular activity!
+Workers are composable, in other words it is possible for one worker to put jobs onto other queues to be serviced by another worker. Care must be taken that this does not result in circular work!
 
 A worker is provided with details of the rule defined in the configuration (`rule`), the request path (`path`), request headers (`headers`) and HTTP request method (`method`). It is then expected to carry out some work, often asynchronously, creating either a successful or errored response. The response consists of a `status`, `body` and `type` (the `Content-Type` header) to be used as the Koa context properties of the same name. For data _blobs_ with type `application/octet-stream`, the body is assumed to be a Redis key for a value to be retrieved from Redis as the body of the associated response.
 
