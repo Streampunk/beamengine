@@ -36,6 +36,7 @@ const beforeTest = async () => {
 test.onFinish(() => {
   console.log('Disabling database test mode.');
   redisio.redisPool.testing = false;
+  redisio.close();
 });
 
 test('Packet store and retrieve', async t => {
