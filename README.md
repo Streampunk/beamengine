@@ -60,12 +60,12 @@ To see debug information from Redis connections (ioredis), the web framework (Ko
 
 From bash:
 ```
-$ DEBUG="*,-not_this"; npm run dev
+$ DEBUG="*,-not_this"; NODE_DEBUG='bull'; npm run dev
 ```
 
 From Windows Powershell:
 ```
-PS > $env:DEBUG="*,-not_this"; npm run dev
+PS > $env:DEBUG="*,-not_this"; $env:NODE_DEBUG="bull"; npm run dev
 ```
 
 To create your own workers, install beam engine in your project.
@@ -638,21 +638,20 @@ Functions are expected to communicate directly with redis about content items, s
 
 Workers are composable, in other words it is possible for one worker to put jobs onto other queues to be serviced by another worker. Care must be taken that this does not result in circular work!
 
-A worker is provided with details of the rule defined in the configuration (`rule`), the request path (`path`), request headers (`headers`) and HTTP request method (`method`). It is then expected to carry out some work, often asynchronously, creating either a successful or errored response. The response consists of a `status`, `body` and `type` (the `Content-Type` header) to be used as the Koa context properties of the same name. For data _blobs_ with type `application/octet-stream`, the body is assumed to be a Redis key for a value to be retrieved from Redis as the body of the associated response.
+A worker is provided with details of the rule defined in the configuration (`rule`), the request path (`path`), request headers (`headers`) and HTTP request method (`method`). It is then expected to carry out some work, often asynchronously, creating either a successful or errored response. The response consists of a `status`, `body` and `type` (the `Content-Type` header) to be used as the Koa context properties of the same name. For data _blobs_ with type `application/octet-stream`, the body is assumed to be a redis key for a value to be retrieved from redis as the body of the associated response.
 
 Beam engine workers can access their source data or store generated results in four different ways:
 
 1. Using the methods of the [redisio API](doc/redisio.md).
 2. Using HTTP or HTTPS [content beam API](#content_beam_api) requests.
-3. Directly communicating with Redis (not recommended).
+3. Directly communicating with redis (not recommended).
 4. Via URLs and a third-party store (not ideal).
 
-Here is an example of a simple worker for a request to get a simple textual description of a stream of the form `/beams/some_content/video.txt`.
+Here is an example of a simple worker that processes a request to get a textual description of a stream at a URL like `/beams/some_content/video.txt`.
 
 ```javascript
-const Queue = require('bull'); // Set Redis parameters
-const consumer = new Queue('media_workers');
-const { redisio } = require('beamengine');
+const { redisio, queue } = require('beamengine');
+const consumer = queue('media_workers');
 const Boom = require('boom');
 
 async function extractMetadata (job) {
@@ -687,6 +686,8 @@ consumer.process(async job => {
   throw new Error(`Unknown worker ${job.job.function} on queue "media_workers".`);
 });
 ```
+
+The `beamengine` modules exports access to the [`redisio` API](doc/redisio.md) and the ability to listen to craete a job queue consumer. The benefit of using the `queue` function to create the worker is that it will be configured using the local configuration parameters for connection to redis.
 
 Exceptions thrown from within redisio calls are [Javascript Errors](https://nodejs.org/api/errors.html#errors_class_error). The code above translates appropriate errors to [Boom](https://www.npmjs.com/package/boom) so as to provide an informative response with an appropriate status code.
 

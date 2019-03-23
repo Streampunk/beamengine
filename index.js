@@ -20,6 +20,8 @@
 */
 
 const redisio = require('./lib/redisio.js');
+const Queue = require('bull');
+const config = require('./config.json');
 
 const splash = `Aerostat Beam Engine  Copyright (C) 2019  Streampunk Media Ltd
 GPL v3.0 or later license. This program comes with ABSOLUTELY NO WARRANTY.
@@ -30,5 +32,13 @@ https://github.com/Streampunk/beamengine/blob/master/LICENSE`;
 console.log(splash);
 
 module.exports = {
-  redisio
+  redisio,
+  queue: name => {
+    return new Queue(name, {
+      redis: {
+        port: config.redis.port,
+        host: config.redis.host,
+        db: config.redis.db
+      } });
+  }
 };
