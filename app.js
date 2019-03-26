@@ -24,7 +24,7 @@ const Router = require('koa-router');
 const bodyParser = require('koa-bodyparser');
 // const Bull = require('bull');
 // const producer = new Bull('my-first-queue');
-const config = require('./config.json');
+const config = require('./config.js').load();
 const routes = require('./lib/routes.js');
 const { jobCatcher, closeQueues } = require('./lib/jobCatcher.js');
 const Boom = require('boom');
@@ -35,7 +35,7 @@ app.use(bodyParser());
 
 router
   .get('/beams', routes.beamsRoute)
-  .get('/beams/:fmtSpec', routes.formatRoute) // .json supported 
+  .get('/beams/:fmtSpec', routes.formatRoute) // .json supported
   .get('/beams/:fmtSpec/:streamSpec', routes.streamRoute)
   .get('/beams/:fmtSpec/:streamSpec/start', routes.startRedirect)
   .get('/beams/:fmtSpec/:streamSpec/(end|latest)', routes.endRedirect)

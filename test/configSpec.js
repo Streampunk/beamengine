@@ -48,12 +48,16 @@ test('Override some parameters with env variables', t => {
 });
 
 test('Loading external config', t => {
+  config.loaded = false;
+  let { port, host, password } =  config.redis;
   process.argv[2] = __dirname + '/test_config.json';
+  // console.log('Preparing to load', process.argv[2]);
   let updatedConfig = config.load();
   t.equal(updatedConfig, config, 'updated config changes original.');
   t.equal(config.redis.port, 9876, 'redis port overridden by change.');
   t.equal(config.redis.host, '192.168.1.100', 'redis host overriden by change.');
   t.equal(config.redis.password, 'auth', 'redis password has been set.');
+  Object.assign(config.redis, { port, host, password });
   t.end();
 });
 

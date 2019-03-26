@@ -598,12 +598,12 @@ A beam engine is configured with _rules_ that determine what jobs are scheduled 
 
 ### Setting up a rule
 
-Jobs are configured in the configuration file `config.json`. This allows the content beam API routes to be overridden or supplemented by some additional work. This work can be:
+Rules are configured in the configuration files in the [`config`](./config) folder and can be overridden by command line arguments [as described above](#Configuration). This allows the content beam API routes to be overridden or supplemented by some additional work. This work can be:
 
 * _pre-route job_: jobs executed before content beam API requests, either starting a background process or providing the response to the method;
 * _post-route job_: jobs executed after the content beam API request has created a response, either starting a background process or modifying the response.
 
-The rules that trigger jobs are listed in the `jobs` object of the configuration file, with each rule being a separate property. The value of the property is an object that describes the rule and how it is to be executed. The rule object has the following properties:
+The rules that trigger jobs are listed in the `rules` property of a configuration, with each rule being a separate sub-property. The value of the property is an object that describes the rule and how it is to be executed. The rule object has the following properties:
 
 | property       | type    | description                                              |
 | -------------- | ------- | -------------------------------------------------------- |
@@ -632,7 +632,7 @@ For example, here is a rule that matches all requests that end in `.jpg` or `.jp
 
 In implementation, the result of a job can indicate that it has generated a response to be returned immediately, or that the job determined that the it could not produce a response and other routes and rules should be applied. Rules are applied in the order that they appear.
 
-This rule catches any GET request starting `beams` and ending `.jpg` or `.jpeg` and sends the details to a job queue called `media_workers`. As `postRoute` is set to `false`, this match happens before processing relating to the content beam API. The reason for naming a queue is that different kinds workers may have access to different kinds of resources. Some contrived examples:
+This example rule catches any GET request starting `beams` and ending `.jpg` or `.jpeg` and sends the details to a job queue called `media_workers`. As `postRoute` is set to `false`, this match happens before processing relating to the content beam API. The reason for naming a queue is that different kinds workers may have access to different kinds of resources. Some contrived examples:
 
 * _media workers_: Workers that execute encoding or decoding operations that require significant amounts of CPU, probably multi-threaded, and requiring sufficient amounts of RAM.
 * _file workers_: Workers that have access to a shared file system that is keeping a copy of some of the content items.

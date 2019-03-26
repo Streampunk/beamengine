@@ -21,7 +21,7 @@
 
 const redisio = require('./lib/redisio.js');
 const Queue = require('bull');
-const config = require('./config.json');
+const config = require('./config.js');
 
 const splash = `Aerostat Beam Engine  Copyright (C) 2019  Streampunk Media Ltd
 GPL v3.0 or later license. This program comes with ABSOLUTELY NO WARRANTY.
@@ -34,11 +34,17 @@ console.log(splash);
 module.exports = {
   redisio,
   queue: name => {
+    let redisParams = {
+      port: config.redis.port,
+      host: config.redis.host,
+      db: config.redis.db
+    };
+    if (config.redis.password) {
+      redisParams.password = config.redis.password;
+    }
     return new Queue(name, {
-      redis: {
-        port: config.redis.port,
-        host: config.redis.host,
-        db: config.redis.db
-      } });
-  }
+      redis: redisParams
+    });
+  },
+  config
 };

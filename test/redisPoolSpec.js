@@ -21,10 +21,9 @@
 
 const test = require('tape');
 const redisio = require('../lib/redisio.js');
-const config = require('../config.json');
+const config = require('../config.js');
 
 const beforeTest = async () => {
-  redisio.redisPool.testing = true;
   config.redis.pool = 10;
   let redis = await redisio.redisPool.use();
   let result = await redis.flushdb();
@@ -33,8 +32,6 @@ const beforeTest = async () => {
 };
 
 test.onFinish(() => {
-  console.log('Disabling database test mode.');
-  redisio.redisPool.testing = false;
   redisio.close();
 });
 

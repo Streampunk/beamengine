@@ -23,10 +23,9 @@ const test = require('tape');
 const redisio = require('../lib/redisio.js');
 const beamcoder = require('beamcoder');
 const testUtil = require('./testUtil.js');
-const config = require('../config.json');
+const config = require('../config.js');
 
 const beforeTest = async () => {
-  redisio.redisPool.testing = true;
   let redis = await redisio.redisPool.use();
   let result = await redis.flushdb();
   redisio.redisPool.recycle(redis);
@@ -34,8 +33,6 @@ const beforeTest = async () => {
 };
 
 test.onFinish(() => {
-  console.log('Disabling database test mode.');
-  redisio.redisPool.testing = false;
   redisio.close();
 });
 

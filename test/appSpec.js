@@ -22,16 +22,15 @@
 const beamengine = require('../app.js');
 const beamcoder = require('beamcoder');
 const test = require('tape');
-const config = require('../config.json');
+const config = require('../config.js');
 const redisio = require('../lib/redisio.js');
 const request = require('supertest');
 const testUtil = require('./testUtil.js');
 
-const server = beamengine.listen(+config.testing.port);
+const server = beamengine.listen(+config.app.port);
 
 test.onFinish(() => {
   console.log('Closing test server and clearing redis connection pool.');
-  redisio.redisPool.testing = false;
   let wibble = redisio.close();
   wibble.then(() => console.log('Closed redis pool connections.'));
   server.close();
@@ -47,7 +46,6 @@ const flushdb = async () => {
 const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
 
 test('Checking that server is listening', async t => {
-  redisio.redisPool.testing = true;
   t.ok(await flushdb(), 'test database flushed OK.');
   server.on('close', () => {
     beamengine.closeQueues().then(() => {

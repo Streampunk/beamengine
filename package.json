@@ -62,7 +62,8 @@
       "views",
       "lib",
       "app.js",
-      "config.json"
+      "config",
+      "config.js"
     ],
     "ext": "js,html"
   }

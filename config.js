@@ -24,10 +24,10 @@ const fs = require('fs');
 const env = process.env.NODE_ENV || 'development';
 let base = require(`./config/${env}.js`);
 
-let loaded = false;
+base.loaded = false;
 
 function loadOverride() {
-  if (loaded) return base;
+  if (base.loaded === true) return base;
   if (process.argv.length > 2) {
     try {
       let argConfig = fs.readFileSync(process.argv[2]);
@@ -42,11 +42,12 @@ function loadOverride() {
       console.error(`Failed to open file ${process.argv[2]}: ${err.message}`);
     }
   }
-  loaded = true;
+  base.loaded = true;
   return base;
 }
 
 base.load = loadOverride;
 Object.defineProperty(base, 'load', { enumerable: false });
+Object.defineProperty(base, 'loaded', { enumerable: false });
 
 module.exports = base;

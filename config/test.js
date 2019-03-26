@@ -21,8 +21,6 @@
 
 // Do not put secrets into this configuration file. Use command line or environment variable.
 
-console.log('Hello!!!!', process.env.BEAM_TEST_APP_PORT);
-
 module.exports = {
   // Configuration of connections to Redis
   redis: {
