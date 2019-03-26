@@ -78,17 +78,14 @@ __TODO__ - to follow. Create beam engine application.-
 
 ## Configuration
 
-Configuration of an Aerostat Beam Engine is achieved by editing the `config.json` file. This can also be passed in on the command line as follows:
-
-__TODO__ config on the command line following best practices
-
-The configuration has the following properties:
+Configuration of an Aerostat Beam Engine is achieved based on Javascript files in the [`config`](./config) folder, with one for [`development`](./config/development.js) (default), one for [`test`](/config/test.js) and one for [`production`](./config/production.js). Which base configuration is selected depends on the current value of the `NODE_ENV` environment variable. Each configuration file has the following properties:
 
 | property name             | type    | description                                    |
 | ------------------------- | ------- | ---------------------------------------------- |
 | `redis.cluster`           | Boolean | True if connecting to a redis cluster          |
 | `redis.host`              | string  | IP address of primary redis host               |
 | `redis.port`              | int     | Port number of primary redis host connection   |
+| `redis.password`          | string  | Password to authenticate with redis (optional) |
 | `redis.db`                | int     | Redis database to be used for main cache       |
 | `redis.pool`              | int     | Maximum pool size for Redis connection pool    |
 | `redis.prepend`           | string  | Value to prepend to beamengine database keys   |
@@ -97,9 +94,48 @@ The configuration has the following properties:
 | `redis.ephemeralTTL`      | int     | Time (ms) before expiry of ephemeral data blob |
 | `redis.closeTimeout`      | int     | Time (ms) before error when closing Redis pool |
 | `app.port`                | int     | Local port on which to run the app server      |
-| `testing.db`              | int     | Redis database to use for testing              |
-| `testing.port`            | int     | Port to run test app server on                 |
 | `jobs...`                 | Object  | See [workers](#workers) section                |
+
+The properties can be overridden with these environment variables, depending on `NODE_ENV`:
+
+| property name          | `development`                  | `test`                          | `production`                    |
+| ---------------------- | ---------------------------- | ----------------------------- | ----------------------------- |
+| `redis.cluster`        | BEAM_DEV_REDIS_CLUSTER       | BEAM_TEST_REDIS_CLUSTER       | BEAM_PROD_REDIS_CLUSTER       |
+| `redis.host`           | BEAM_DEV_REDIS_HOST          | BEAM_TEST_REDIS_HOST          | BEAM_PROD_REDIS_HOST          |
+| `redis.port`           | BEAM_DEV_REDIS_PORT          | BEAM_TEST_REDIS_PORT          | BEAM_PROD_REDIS_PORT          |
+| `redis.password`       | BEAM_DEV_REDIS_PASSWORD      | BEAM_DEV_REDIS_PASSWORD       | BEAM_PROD_REDIS_PASSWORD      |
+| `redis.db`             | BEAM_DEV_REDIS_DB            | BEAM_TEST_REDIS_DB            | BEAM_PROD_REDIS_DB            |
+| `redis.pool`           | BEAM_DEV_REDIS_POOL          | BEAM_TEST_REDIS_POOL          | BEAM_PROD_REDIS_POOL          |
+| `redis.prepend`        | BEAM_DEV_REDIS_PREPEND       | BEAM_TEST_REDIS_PREPEND       | BEAM_PROD_REDIS_PREPEND       |
+| `redis.packetTTL`      | BEAM_DEV_REDIS_PACKET_TTL    | BEAM_TEST_REDIS_PACKET_TTL    | BEAM_PROD_REDIS_PACKET_TTL    |
+| `redis.frameTTL`       | BEAM_DEV_REDIS_FRAME_TTL     | BEAM_TEST_REDIS_FRAME_TTL     | BEAM_PROD_REDIS_FRAME_TTL     |
+| `redis.ephemeralTTL`   | BEAM_DEV_REDIS_EPHEMERAL_TTL | BEAM_TEST_REDIS_EPHEMERAL_TTL | BEAM_PROD_REDIS_EPHEMERAL_TTL |
+| `redis.closeTimeout`   | BEAM_DEV_REDIS_CLOSE_TIMEOUT | BEAM_TEST_REDIS_CLOSE_TIMEOUT | BEAM_PROD_REDIS_CLOSE_TIMEOUT |
+| `app.port`             | BEAM_DEV_APP_PORT            | BEAM_TEST_APP_PORT            | BEAM_PROD_APP_PORT            |
+
+The beam engine application server has a single command line option that is the name of a JSON configuration file. All values in the properties of this file are merged with the properties of the configuration, overriding the values. For example, to override only details of the redis connection, create the following `test_config.json` file:
+
+```json
+{
+  "redis": {
+     "port": 9876,
+     "host": "192.168.1.100",
+     "password": "auth"
+  }
+}
+```
+
+Any rules set to `null` will be deleted from the set of active rules.
+
+To use the above configuration with a different application port, on Unix-based systems use:
+
+    NODE_ENV=test BEAM_TEST_APP_PORT=8008 npm run dev test_config.json
+
+Similar on Windows Powershell (with the exception that the environment variables remain altered) is:
+
+    $env:NODE_ENV='test'; $env:BEAM_TEST_APP_PORT=8008; npm run dev test_config.json
+
+__TODO__ - add HTTPS options
 
 ## Content Beam API
 
@@ -687,7 +723,7 @@ consumer.process(async job => {
 });
 ```
 
-The `beamengine` modules exports access to the [`redisio` API](doc/redisio.md) and the ability to listen to craete a job queue consumer. The benefit of using the `queue` function to create the worker is that it will be configured using the local configuration parameters for connection to redis.
+The `beamengine` module exports access to the [`redisio` API](doc/redisio.md) and the ability to listen to craete a job queue consumer. The benefit of using the `queue` function to create the worker is that it will be configured using the local configuration parameters for connection to redis.
 
 Exceptions thrown from within redisio calls are [Javascript Errors](https://nodejs.org/api/errors.html#errors_class_error). The code above translates appropriate errors to [Boom](https://www.npmjs.com/package/boom) so as to provide an informative response with an appropriate status code.
 

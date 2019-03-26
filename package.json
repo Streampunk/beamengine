@@ -1,13 +1,13 @@
 {
   "name": "beamengine",
   "version": "0.0.6",
-  "description": "Redis-backed highly-scale-able and cloud-fit distributed media processing engine..",
+  "description": "Redis-backed highly-scale-able and cloud-fit distributed media processing engine.",
   "main": "index.js",
   "engines": {
     "node": "^8.0.0"
   },
   "scripts": {
-    "test": "tape test/*Spec.js",
+    "test": "cross-env NODE_ENV=test tape test/*Spec.js",
     "dev": "nodemon --signal SIGTERM app.js",
     "lint": "eslint **/*.js",
     "lint-html": "eslint **/*.js -f html -o ./reports/lint-results.html",
@@ -34,6 +34,7 @@
   "author": "Streampunk Media Ltd",
   "license": "GPL-3.0",
   "devDependencies": {
+    "cross-env": "^5.2.0",
     "eslint": "^5.15.1",
     "nodemon": "^1.18.10",
     "supertest": "^3.4.2"
