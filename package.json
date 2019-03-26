@@ -1,6 +1,6 @@
 {
   "name": "beamengine",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Redis-backed highly-scale-able and cloud-fit distributed media processing engine.",
   "main": "index.js",
   "engines": {
@@ -9,6 +9,7 @@
   "scripts": {
     "test": "cross-env NODE_ENV=test tape test/*Spec.js",
     "dev": "nodemon --signal SIGTERM app.js",
+    "start": "cross-env NODE_ENV=production app.js",
     "lint": "eslint **/*.js",
     "lint-html": "eslint **/*.js -f html -o ./reports/lint-results.html",
     "lint-fix": "eslint --fix **/*.js"
@@ -66,5 +67,8 @@
       "config.js"
     ],
     "ext": "js,html"
+  },
+  "bin": {
+    "beamengine": "./app.js"
   }
 }

@@ -74,7 +74,17 @@ To create your own workers, install beam engine in your project.
 
 ### Production
 
-__TODO__ - to follow. Create beam engine application.-
+From a cloned copy of the repository, run (`my_config.json` is optional):
+
+    npm start my_config.json
+
+Alternatively, install beam engine as a global application (prepend `sudo` for Unix platforms):
+
+    npm install -g beamengine
+
+With the `NODE_ENV` variable set to `production`, run beam engine as a command (`my_config.json` is optional):
+
+    beamengine my_config.json
 
 ## Configuration
 

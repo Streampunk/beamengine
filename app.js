@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /*
   Aerostat Beam Engine - Redis-backed highly-scale-able and cloud-fit media beam engine.
   Copyright (C) 2019  Streampunk Media Ltd.
