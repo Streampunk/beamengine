@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "jpeg": null,
+    "mp4": {
+      "method": [ "GET", "POST" ],
+      "pathPattern": "^/beams/.*\\.(mp4)$",
+      "queue": "itred_old_workers",
+      "function": "makeLemonade",
+      "postRoute": false
+    }
+  }
+}
