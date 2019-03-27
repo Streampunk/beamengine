@@ -285,3 +285,99 @@ test('Store and retrieve blob', async t => {
   }
   t.end();
 });
+
+test('Equivalent relationships', async t => {
+  t.ok(await beforeTest(), 'test database flushed OK.');
+  let fmtA = testUtil.fmt;
+  fmtA.url = 'fmtA';
+  t.deepEqual(await redisio.storeFormat(fmtA), ['OK','OK','OK'],
+    'redis reports format A stored OK.');
+  t.deepEqual(await redisio.queryEquivalent(fmtA), [],
+    'equivalent is empty array for fmt when none specified.');
+  t.deepEqual(await redisio.queryEquivalent(fmtA.url), [],
+    'equivalent is empty array for fmt.url when none specified.');
+
+  try {
+    await redisio.createEquivalent(fmtA.url, fmtA);
+    t.fail('Should have thrown when trying to create equivalent to itself.');
+  } catch (err) {
+    t.equal(err.message, 'Source cannot be equivalent to source.', 'expected error on equal sources.');
+  }
+
+  try {
+    await redisio.createEquivalent(fmtA.url, 'wibble');
+    t.fail('Should have thrown when trying to create equivalent to "wibble" as target.');
+  } catch (err) {
+    t.equal(err.message, 'Target \'wibble\' for a new equivalent relationship does not exist.',
+      'non-existant target error message as expected.');
+  }
+
+  try {
+    await redisio.createEquivalent('wibble', fmtA.url);
+    t.fail('Should have thrown when trying to create equivalent to "wibble" as source.');
+  } catch (err) {
+    t.equal(err.message, 'Source \'wibble\' for a new equivalent relationship does not exist.',
+      'non-existant source error message as expected.');
+  }
+
+  try {
+    await redisio.createEquivalent('wibble', 'wobble');
+    t.fail('Should have thrown when trying to create equivalent "wibble" to "wobble".');
+  } catch (err) {
+    t.equal(err.message, 'Both source \'wibble\' and target \'wobble\' for a new equivalent relationship do not exist.',
+      'non-existant source and target error message as expected.');
+  }
+
+  let fmtB = testUtil.fmt;
+  fmtB.url = 'fmtB';
+  t.deepEqual(await redisio.storeFormat(fmtB), ['OK','OK','OK'],
+    'redis reports format B stored OK.');
+  t.deepEqual(await redisio.createEquivalent(fmtA, fmtB), [ 1, 1 ],
+    'relationship created between fmt A and fmt B.');
+
+  try {
+    t.deepEqual(await redisio.queryEquivalent(fmtA), [ 'fmtB' ], 'query A gives B.');
+    t.deepEqual(await redisio.queryEquivalent(fmtB), [ 'fmtA' ], 'query B gives A.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  let fmtC = testUtil.fmt;
+  fmtC.url = 'fmtC';
+  t.deepEqual(await redisio.storeFormat(fmtC), ['OK','OK','OK'],
+    'redis reports format B stored OK.');
+  t.deepEqual(await redisio.createEquivalent(fmtB, fmtC), [ 1, 1 ],
+    'relationship created between fmt A and fmt B.');
+
+  try {
+    t.deepEqual((await redisio.queryEquivalent(fmtA, 3)).sort(), [ 'fmtB', 'fmtC' ],
+      'depth 3 query of A gives B and C.');
+    t.deepEqual((await redisio.queryEquivalent(fmtB, 3)).sort(), [ 'fmtA', 'fmtC' ],
+      'depth 3 query of B gives A and C.');
+    t.deepEqual((await redisio.queryEquivalent(fmtC, 10)).sort(), [ 'fmtA', 'fmtB' ],
+      'depth 10 query of C gives A and B.');
+    t.deepEqual((await redisio.queryEquivalent(fmtA, 1)).sort(), [ 'fmtB' ],
+      'depth 1 query of A gives B.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  // Creaete a loop
+  t.deepEqual(await redisio.createEquivalent(fmtC, fmtA), [ 1, 1 ],
+    'loop relationship created between fmt C and fmt A.');
+
+  try {
+    t.deepEqual((await redisio.queryEquivalent(fmtA, 3)).sort(), [ 'fmtB', 'fmtC' ],
+      'with loop, depth 3 query of A gives B and C.');
+    t.deepEqual((await redisio.queryEquivalent(fmtB, 3)).sort(), [ 'fmtA', 'fmtC' ],
+      'with loop, depth 3 query of B gives A and C.');
+    t.deepEqual((await redisio.queryEquivalent(fmtC, 10)).sort(), [ 'fmtA', 'fmtB' ],
+      'with loop, depth 10 query of C gives A and B.');
+    t.deepEqual((await redisio.queryEquivalent(fmtA, 1)).sort(), [ 'fmtB', 'fmtC' ],
+      'with loop, depth 1 query of A gives B.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  t.end();
+});

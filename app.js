@@ -21,6 +21,9 @@
 */
 
 const Koa = require('koa');
+// TODO consider swapping out for faster routing middleware
+// https://github.com/delvedor/router-benchmark
+// Wait for https://www.npmjs.com/package/koa-router-find-my-way to mature?
 const Router = require('koa-router');
 const bodyParser = require('koa-bodyparser');
 // const Bull = require('bull');
@@ -37,6 +40,12 @@ app.use(bodyParser());
 router
   .get('/beams', routes.beamsRoute)
   .get('/beams/:fmtSpec', routes.formatRoute) // .json supported
+  .get('/beams/:fmtSpec/equivalent', routes.equivalentQuery)
+  .get('/beams/:fmtSpec/equivalent/:relSpec', routes.equivalentQuery)
+  .get('/beams/:fmtSpec/rendition', routes.renditionQuery)
+  .get('/beams/:fmtSpec/rendition/:relSpec', routes.renditionQuery)
+  .get('/beams/:fmtSpec/transformation', routes.transformationQuery)
+  .get('/beams/:fmtSpec/transformation/:relSpec', routes.transformationQuery)
   .get('/beams/:fmtSpec/:streamSpec', routes.streamRoute)
   .get('/beams/:fmtSpec/:streamSpec/start', routes.startRedirect)
   .get('/beams/:fmtSpec/:streamSpec/(end|latest)', routes.endRedirect)
@@ -49,7 +58,12 @@ router
   .get('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaRoute)
   .post('/beams', routes.createBeam)
   .put('/beams/:fmtSpec', routes.formatUpdate) // TODO
-  .post('/beams/:fmtSpec', routes.createRelated) // TODO
+  .post('/beams/:fmtSpec/equivalent', routes.createEquivalent)
+  .post('/beams/:fmtSpec/rendition', routes.createRendition)
+  .post('/beams/:fmtSpec/transformation', routes.createTransformation)
+  .delete('/beams/:fmtSpec/equivalent/:relSpec', routes.deleteEquivalent)
+  .delete('/beams/:fmtSpec/rendition/:relSpec', routes.deleteRendition)
+  .delete('/beams/:fmtSpec/transformation/:relSpec', routes.deleteTransformation)
   .put('/beams/:fmtSpec/:streamSpec/:mediaSpec', routes.mediaUpdate) // .json and .raw(_0) supported
   .put('/beams/:fmtSpec/:streamSpec/:mediaSpec/data(_?):idx(\\d?)', routes.dataUpdate);
 
@@ -93,7 +107,7 @@ app.on('error', (err) => {
 if (server) {
   server.on('close', () => {
     console.log('Closing bull queues.');
-    closeQueues().then(console.log('Bull queues close.'));
+    closeQueues().then(console.log('Bull queues closed.'));
   });
 }
 

@@ -52,6 +52,23 @@ For cloud environments, consider using Redis backed cache service, creating a co
 
 Many pre-built redis packages exist for Linux distributions, such as the [`redis-server` package for Ubuntu](https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-redis-on-ubuntu-18-04). Redis is also available as a container, such as the [redis docker container](https://hub.docker.com/_/redis). For development and testing on Windows, consider installing [redis using the Windows Subsystem for Linux](https://medium.com/@RedisLabs/windows-subsystem-for-linux-wsl-10e3ca4d434e). Note that for some operations, this approach is one or two orders of magnitude slower than installing Redis on a Linux build directly and, as such, should only be used for feature testing and not performance testing.
 
+For large media operations where redis is being used only as a temporary cache, performance will be improved by disabling[ redis persistence features](https://redis.io/topics/persistence). This can be achieved in one of the following two ways:
+
+1. Using the `redis-cli`:
+
+```
+    config set appendonly no
+    config set save ""
+    config rewrite
+```
+
+2. Edit the `redis.conf` file, setting:
+
+```
+    appendonly no
+    save ""
+```
+
 ### Development
 
 To run a Beam Engine in development mode, clone the module from github. In the modules root folder, edit the `config.json` file to match local settings. Then run `npm install` followed by `npm run dev`. This will install dependencies and start the development web server that runs using the automated restart module [nodemon](https://github.com/remy/nodemon). To restart, type `rs`.
