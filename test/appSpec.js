@@ -43,7 +43,7 @@ const flushdb = async () => {
   return result === 'OK';
 };
 
-const stripSize = ({ size, ...other }) => ({ ...other, buf_size: size }); // eslint-disable-line no-unused-vars
+const sizeToBufSize = size => size + beamcoder.AV_INPUT_BUFFER_PADDING_SIZE;
 
 test('Checking that server is listening', async t => {
   t.ok(await flushdb(), 'test database flushed OK.');
@@ -213,9 +213,9 @@ test('GET a packet', async t => {
     t.ok(Array.isArray(response.body), 'result is an array.');
     let pkt = beamcoder.packet(response.body[0]);
     t.ok(pkt, 'roundtrip packet is truthy.');
-    t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
+    t.deepEqual(pkt.toJSON(), testUtil.pkt.toJSON(),
       'retrieved packet as expected.');
-    t.equal(pkt.buf_size, 16383, 'has expected buf_size parameter.');
+    t.equal(pkt.size, 16383, 'has expected size parameter.');
 
     t.comment('### Packet not found');
     response = await request(server).get('/beams/test_url/stream_3/41')
@@ -235,9 +235,9 @@ test('GET a packet', async t => {
     t.ok(Array.isArray(response.body), 'result is an array.');
     pkt = beamcoder.packet(response.body[0]);
     t.ok(pkt, 'roundtrip packet is truthy.');
-    t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
+    t.deepEqual(pkt.toJSON(), testUtil.pkt.toJSON(),
       'retrieved packet as expected.');
-    t.equal(pkt.buf_size, 16383, 'has expected buf_size parameter.');
+    t.equal(pkt.size, 16383, 'has expected size parameter.');
 
     t.comment('### Store ten packets');
     t.ok(await flushdb(), 'database flushed OK.');
@@ -439,9 +439,9 @@ test('GET a packet directly', async t => {
     t.notOk(Array.isArray(response.body), 'result is an array.');
     let pkt = beamcoder.packet(response.body);
     t.ok(pkt, 'roundtrip frame is truthy.');
-    t.deepEqual(pkt.toJSON(), stripSize(testUtil.pkt.toJSON()),
+    t.deepEqual(pkt.toJSON(), testUtil.pkt.toJSON(),
       'retrieved packet as expected.');
-    t.equal(pkt.buf_size, 16383, 'has expected buf_sizes parameter.');
+    t.equal(pkt.size, 16383, 'has expected size parameter.');
 
     t.comment('### Packet not found');
     response = await request(server).get('/beams/test_url/stream_3/packet_41')
@@ -728,8 +728,8 @@ test('GET packet data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length, 16383, 'buffer has expected length.');
-    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.body.length, sizeToBufSize(16383), 'buffer has expected length.');
+    t.equal(response.headers['content-length'], sizeToBufSize(16383).toString(), 'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
 
     t.comment('### Get packet data using /data');
@@ -738,8 +738,8 @@ test('GET packet data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length, 16383, 'buffer has expected length.');
-    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.body.length, sizeToBufSize(16383), 'buffer has expected length.');
+    t.equal(response.headers['content-length'], sizeToBufSize(16383).toString(), 'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
 
     t.comment('### Get packet data with .raw_0');
@@ -748,8 +748,8 @@ test('GET packet data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length, 16383, 'buffer has expected length.');
-    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.body.length, sizeToBufSize(16383), 'buffer has expected length.');
+    t.equal(response.headers['content-length'], sizeToBufSize(16383).toString(), 'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
 
     t.comment('### Get packet data with /data_0');
@@ -758,8 +758,8 @@ test('GET packet data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length, 16383, 'buffer has expected length.');
-    t.equal(response.headers['content-length'], '16383', 'header length correct.');
+    t.equal(response.body.length, sizeToBufSize(16383), 'buffer has expected length.');
+    t.equal(response.headers['content-length'], sizeToBufSize(16383).toString(), 'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
 
     t.comment('### Packet data not found');
@@ -1096,9 +1096,9 @@ test('PUT a packet', async t => {
     t.ok(response.ok, 'response is truthy.');
     t.equal(response.type, 'application/json', 'response is JSON.');
     let rpkt = beamcoder.packet(response.body);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'returned packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'returned packet as expected.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'stored packet as expected.');
 
     t.comment('### Put in a packet for the format with "0"');
     pkt = testUtil.pkt;
@@ -1111,9 +1111,9 @@ test('PUT a packet', async t => {
     t.ok(response.ok, 'response is truthy.');
     t.equal(response.type, 'application/json', 'response is JSON.');
     rpkt = beamcoder.packet(response.body);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'returned packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'returned packet as expected.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'stored packet as expected.');
 
     t.comment('### Put in a packet for the format with "video"');
     pkt = testUtil.pkt;
@@ -1126,9 +1126,9 @@ test('PUT a packet', async t => {
     t.ok(response.ok, 'response is truthy.');
     t.equal(response.type, 'application/json', 'response is JSON.');
     rpkt = beamcoder.packet(response.body);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'returned packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'returned packet as expected.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'stored packet as expected.');
 
     t.comment('### Put in a packet that does not identify');
     pkt = testUtil.pkt;
@@ -1141,9 +1141,9 @@ test('PUT a packet', async t => {
     t.ok(response.ok, 'response is truthy.');
     t.equal(response.type, 'application/json', 'response is JSON.');
     rpkt = beamcoder.packet(response.body);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'returned packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'returned packet as expected.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'stored packet as expected.');
 
     t.comment('### Packet stream mismatch error');
     pkt = testUtil.pkt;
@@ -1373,36 +1373,36 @@ test('PUT packet data', async t => {
     t.ok(response.ok, 'response is truthy.');
     t.equal(response.type, 'application/json', 'response is JSON.');
     let rpkt = beamcoder.packet(response.body);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'returned packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'returned packet as expected.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
-    t.deepEqual(rpkt.toJSON(), stripSize(pkt.toJSON()), 'stored packet as expected.');
+    t.deepEqual(rpkt.toJSON(), pkt.toJSON(), 'stored packet as expected.');
 
     t.comment('### Put packet data with "/data"');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42/data')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size)
+      .set('Beam-Buf-Size', pkt.data.length)
       .send(pkt.data)
       .expect(201);
     t.ok(response.ok, 'data response is OK.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
-    t.equal(rpkt.data.length, 16383, 'stored data has expected length.');
-    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is correct.');
+    t.equal(rpkt.data.length, sizeToBufSize(16383), 'stored data has expected length.');
+    t.equal(rpkt.size, 16383, 'rpkt size is correct.');
     t.ok(Buffer.compare(rpkt.data, pkt.data) === 0, 'buffers are the same.');
 
     t.comment('### Put packet data with "/data_0"');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42/data_0')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size)
+      .set('Beam-Buf-Size', pkt.data.length)
       .send(pkt.data)
       .expect(200);
     t.ok(response.ok, 'data response is OK.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
-    t.equal(rpkt.data.length, 16383, 'stored data has expected length.');
-    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is correct.');
+    t.equal(rpkt.data.length, sizeToBufSize(16383), 'stored data has expected length.');
+    t.equal(rpkt.size, 16383, 'rpkt size is correct.');
     t.ok(Buffer.compare(rpkt.data, pkt.data) === 0, 'buffers are the same.');
 
     t.comment('### Put packet data with ".raw", no Beam-Buf-Size header');
@@ -1414,43 +1414,43 @@ test('PUT packet data', async t => {
     t.ok(response.ok, 'data response is OK.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
-    t.equal(rpkt.data.length, 16383, 'stored data has expected length.');
-    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is correct.');
+    t.equal(rpkt.data.length, sizeToBufSize(16383), 'stored data has expected length.');
+    t.equal(rpkt.size, 16383, 'rpkt size is correct.');
     t.ok(Buffer.compare(rpkt.data, pkt.data) === 0, 'buffers are the same.');
 
     t.comment('### Put packet data with ".raw_0"');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42.raw_0')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size)
+      .set('Beam-Buf-Size', pkt.data.length)
       .send(pkt.data)
       .expect(200);
     t.ok(response.ok, 'data response is OK.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
-    t.equal(rpkt.data.length, 16383, 'stored data has expected length.');
-    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is correct.');
+    t.equal(rpkt.data.length, sizeToBufSize(16383), 'stored data has expected length.');
+    t.equal(rpkt.size, 16383, 'rpkt size is correct.');
     t.ok(Buffer.compare(rpkt.data, pkt.data) === 0, 'buffers are the same.');
 
     t.comment('### Put packet data with stream index "video"');
     response = await request(server)
       .put('/beams/test_url/video/packet_42/data')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size)
+      .set('Beam-Buf-Size', pkt.data.length)
       .send(pkt.data)
       .expect(200);
     t.ok(response.ok, 'data response is OK.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
-    t.equal(rpkt.data.length, 16383, 'stored data has expected length.');
-    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is correct.');
+    t.equal(rpkt.data.length, sizeToBufSize(16383), 'stored data has expected length.');
+    t.equal(rpkt.size, 16383, 'rpkt size is correct.');
     t.ok(Buffer.compare(rpkt.data, pkt.data) === 0, 'buffers are the same.');
 
     t.comment('### Put packet data with "data_1"');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42/data_1')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size)
+      .set('Beam-Buf-Size', pkt.data.length)
       .send(pkt.data)
       .expect(400);
     t.notOk(response.ok, 'error response is not OK.');
@@ -1465,7 +1465,7 @@ test('PUT packet data', async t => {
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_43/data')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size)
+      .set('Beam-Buf-Size', pkt.data.length)
       .send(pkt.data)
       .expect(404);
     t.notOk(response.ok, 'error response is not OK.');
@@ -1480,7 +1480,7 @@ test('PUT packet data', async t => {
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_43/data')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size + 1)
+      .set('Beam-Buf-Size', pkt.data.length + 1)
       .send(pkt.data)
       .expect(400);
     t.notOk(response.ok, 'error response is not OK.');
@@ -1488,22 +1488,22 @@ test('PUT packet data', async t => {
     t.deepEqual(response.body, {
       statusCode: 400,
       error: 'Bad Request',
-      message: 'Packet buffer size \'16384\' exceeds data length of \'16383\'.'
+      message: `Packet buffer size '${sizeToBufSize(16383) + 1}' exceeds data length of '${sizeToBufSize(16383)}'.`
     }, 'has expected error message.');
 
     t.comment('### Put short packet data with "/data"');
     response = await request(server)
       .put('/beams/test_url/stream_0/packet_42/data')
       .type('application/octet-stream')
-      .set('Beam-Buf-Size', pkt.size - 100)
+      .set('Beam-Buf-Size', pkt.data.length - 100)
       .send(pkt.data)
       .expect(200);
     t.ok(response.ok, 'data response is OK.');
     rpkt = await redisio.retrievePacket('test_url', 0, 42);
     console.log(rpkt);
     t.ok(Buffer.isBuffer(rpkt.data), 'data is buffer.');
-    t.equal(rpkt.data.length, 16283, 'stored data has expected length.');
-    t.equal(rpkt.size, rpkt.data.length, 'rpkt size is incorrect.');
+    t.equal(rpkt.data.length, sizeToBufSize(16383) - 100, 'stored data has expected length.');
+    t.equal(rpkt.size, 16383, 'rpkt size is correct.');
     t.ok(Buffer.compare(rpkt.data, pkt.data.slice(0, -100)) === 0, 'stored buffer is a subset.');
   } catch (err) {
     t.fail(err);

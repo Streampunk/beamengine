@@ -41,7 +41,8 @@ test('Packet store and retrieve', async t => {
   let pkt = beamcoder.packet({
     pts: 42,
     dts: 43,
-    data: Buffer.alloc(16383),
+    data: Buffer.alloc(16383 + beamcoder.AV_INPUT_BUFFER_PADDING_SIZE),
+    size: 16383,
     stream_index: 3,
     flags: { KEY: true, TRUSTED: true},
     side_data: { replaygain: Buffer.from('Zen time?') },
@@ -65,14 +66,13 @@ test('Packet store and retrieve', async t => {
 
   let rpkt = await redisio.retrievePacket('test_url', 3, 42);
   t.ok(rpkt, 'roundtrip packet is truthy.');
-  pkt.buf_size = pkt.size;
   t.deepEqual(rpkt, pkt, 'roundtrip packet is the same.');
 
   t.equal(await redis.del(`${config.redis.prepend}:test_url:stream_3:packet_42:data`),
     1, 'deleted the data.');
   rpkt = await redisio.retrievePacket('test_url', 3, 42);
   t.ok(rpkt, 'roundtrip packet without data is truthy.');
-  t.equal(rpkt.size, 0, 'data size reset to zero.');
+  t.equal(rpkt.size, 16383, 'data size remains the same.');
   t.notOk(rpkt.data, 'data is now null.');
   pkt.data = null;
   t.deepEqual(rpkt.toJSON(), pkt.toJSON(),

@@ -92,7 +92,8 @@ module.exports = {
     return beamcoder.packet({
       pts: 42,
       dts: 43,
-      data: Buffer.alloc(16383),
+      data: Buffer.alloc(16383 + beamcoder.AV_INPUT_BUFFER_PADDING_SIZE),
+      size: 16383,
       stream_index: 3,
       flags: { KEY: true, TRUSTED: true},
       side_data: { replaygain: Buffer.from('Zen time?') },
