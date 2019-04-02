@@ -374,10 +374,26 @@ test('Equivalent relationships', async t => {
     t.deepEqual((await redisio.queryEquivalent(fmtC, 10)).sort(), [ 'fmtA', 'fmtB' ],
       'with loop, depth 10 query of C gives A and B.');
     t.deepEqual((await redisio.queryEquivalent(fmtA, 1)).sort(), [ 'fmtB', 'fmtC' ],
-      'with loop, depth 1 query of A gives B.');
+      'with loop, depth 1 query of A gives B and C.');
   } catch (err) {
     t.fail(`Failed to query equivalent relationships: ${err.message}`);
   }
+
+  // Delete a loop
+  t.deepEqual(await redisio.deleteEquivalent(fmtA, fmtC), [1, 1],
+    'loop relationship removed between fmt A and fmt C.');
+  t.deepEqual(await redisio.deleteEquivalent(fmtA, fmtC), [0, 0],
+    'loop relationship second removal _fails_ as expected.');
+
+  try {
+    t.deepEqual((await redisio.queryEquivalent(fmtA, 1)).sort(), [ 'fmtB' ],
+      'loop removed, depth 1 query of A gives just B.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  t.deepEqual(await redisio.createEquivalent(fmtA, fmtB), [0, 0],
+    'remake relationship has expected result.');
 
   t.end();
 });

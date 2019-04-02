@@ -176,3 +176,43 @@ Store the given `data` blob, a [Node.js `Buffer`](https://nodejs.org/api/buffer.
 ### redisio.retrieveBlob(key)
 
 Retrieve the data blob with the given `key`. Returns a [Node.js `Buffer`](https://nodejs.org/api/buffer.html) containing the data or throws an exception if the buffer cannot be found, possibly because the value has expired in the cache.
+
+## API - relationships
+
+The [relationships model of a beam engine](../README.md#relationships) allows three different kinds of  association between items of contents to be recorded. In combination with rules, workers can use the relationships to maintain state or make elements just-in-time.
+
+### redisio.createEquivalent(source, target)
+
+Record an _equivalent relationship_ between a `source` content item and a `target`. The arguments are either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item.
+
+Both `source` and `target` must exist already. Equivalent relationships are commutative and so a relationship is recorded both `source` to `target` and `target` to `source`. The result is an array of numbers that should be `[ 1, 1 ]` if the relatioship is new and `[ 0, 0 ]` if the relationship is already recorded.
+
+### redisio.queryEquivalent(source, [depth])
+
+Query which content items are equivalent to the given `source`. The `source` can be a either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item.
+
+If `A` is equivalent to `B` and `B` is equivalent to `C` then `A` is equivalent to `C`. The optional `depth` parameter that defaults to `1` determines how deep the search in the recorded relationships, so a query for `A` with depth `2` returns `B` and `C`, but with depth `1` returns just `B` as no direct relationship with `C` is recorded.
+
+The result is an array containing the names of the content items that are equivalent, e.g.:
+
+    [ 'B', 'C' ]
+
+Queries are bidirectional and so a query for `B` of depth 1 returns `[ 'A', 'C' ]` as direct relationships are recorded between all three.
+
+### redisio.deleteEquivalent(source, target)
+
+Delete a direct recorded equivalent relationship between two content items, a `source` and a `target`, although the order is not actually important in this case.  The `source` and `target` can be a either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item.
+
+A successful result is `[ 1, 1 ]` indicating that the `source` to `target` and `target` to `source` recorded relationships have been removed.
+
+Note that if `A` is equivalent to `B` and `B` is equivalent to `C`, no direct relationship is recorded between `A` and `C` and so cannot be removed. Expect a result of `[ 0, 0 ]` in that case.
+
+### redisio.createRendition(source, target, [stream_map])
+
+### redisio.queryRendition(source, [depth])
+
+### redisio.deleteRendition(source, target)
+
+### redisio.createTransformation(source, target, [recipe, [bounds]])
+
+### redisio.deleteTransformation(source, target)
