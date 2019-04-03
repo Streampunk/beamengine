@@ -474,7 +474,7 @@ test('GET a frame', async t => {
     t.ok(frm, 'roundtrip frame is truthy.');
     t.deepEqual(frm.toJSON(), frm.toJSON(),
       'retrieved frame as expected.');
-    t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
+    t.deepEqual(frm.buf_sizes, [ 2073600, 1036800, 1036800 ],
       'has expected buf_sizes parameter.');
 
     t.comment('### Frame not found');
@@ -497,7 +497,7 @@ test('GET a frame', async t => {
     t.ok(frm, 'roundtrip frame is truthy.');
     t.deepEqual(frm.toJSON(), testUtil.frm.toJSON(),
       'retrieved frame as expected.');
-    t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
+    t.deepEqual(frm.buf_sizes, [ 2073600, 1036800, 1036800 ],
       'has expected buf_sizes parameter.');
 
     t.comment('### Store ten frames');
@@ -697,7 +697,7 @@ test('GET a frame directly', async t => {
     t.ok(frm, 'roundtrip frame is truthy.');
     t.deepEqual(frm.toJSON(), frm.toJSON(),
       'retrieved frame as expected.');
-    t.deepEqual(frm.buf_sizes, [ 2073664, 1036864, 1036864 ],
+    t.deepEqual(frm.buf_sizes, [ 2073600, 1036800, 1036800 ],
       'has expected buf_sizes parameter.');
 
     t.comment('### Frame not found');
@@ -793,13 +793,13 @@ test('GET frame data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length,  2073664+1036864+1036864,
+    t.equal(response.body.length,  2073600+1036800+1036800,
       'buffer has expected length.');
-    t.equal(response.headers['content-length'], `${2073664+1036864+1036864}`,
+    t.equal(response.headers['content-length'], `${2073600+1036800+1036800}`,
       'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
     t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
-      [ 2073664, 1036864, 1036864 ], 'has expected buffer sizes.');
+      [ 2073600, 1036800, 1036800 ], 'has expected buffer sizes.');
     t.equals(response.headers['beam-data-index'], '', 'has an empty index.');
 
     t.comment('### Get frame data using /data');
@@ -808,13 +808,13 @@ test('GET frame data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length,  2073664+1036864+1036864,
+    t.equal(response.body.length,  2073600+1036800+1036800,
       'buffer has expected length.');
-    t.equal(response.headers['content-length'], `${2073664+1036864+1036864}`,
+    t.equal(response.headers['content-length'], `${2073600+1036800+1036800}`,
       'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
     t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
-      [ 2073664, 1036864, 1036864 ], 'has expected buffer sizes.');
+      [ 2073600, 1036800, 1036800 ], 'has expected buffer sizes.');
     t.equals(response.headers['beam-data-index'], '', 'has an empty index.');
 
     t.comment('### Get frame data using .raw_0');
@@ -823,13 +823,13 @@ test('GET frame data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length,  2073664,
+    t.equal(response.body.length,  2073600,
       'buffer has expected length.');
-    t.equal(response.headers['content-length'], `${2073664}`,
+    t.equal(response.headers['content-length'], `${2073600}`,
       'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
     t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
-      [ 2073664 ], 'has expected buffer sizes.');
+      [ 2073600 ], 'has expected buffer sizes.');
     t.equals(response.headers['beam-data-index'], '0', 'has 0 index.');
 
     t.comment('### Get frame data using /data_0');
@@ -838,13 +838,13 @@ test('GET frame data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length,  2073664,
+    t.equal(response.body.length,  2073600,
       'buffer has expected length.');
-    t.equal(response.headers['content-length'], `${2073664}`,
+    t.equal(response.headers['content-length'], `${2073600}`,
       'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
     t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
-      [ 2073664 ], 'has expected buffer sizes.');
+      [ 2073600 ], 'has expected buffer sizes.');
     t.equals(response.headers['beam-data-index'], '0', 'has 0 index.');
 
     t.comment('### Get frame data using .raw_2');
@@ -853,13 +853,13 @@ test('GET frame data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length, 1036864,
+    t.equal(response.body.length, 1036800,
       'buffer has expected length.');
-    t.equal(response.headers['content-length'], `${1036864}`,
+    t.equal(response.headers['content-length'], `${1036800}`,
       'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
     t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
-      [ 1036864 ], 'has expected buffer sizes.');
+      [ 1036800 ], 'has expected buffer sizes.');
     t.equals(response.headers['beam-data-index'], '2', 'has 2 index.');
 
     t.comment('### Get frame data using /data_2');
@@ -868,13 +868,13 @@ test('GET frame data', async t => {
     t.ok(response.ok, 'response claims OK.');
     t.equal(response.type, 'application/octet-stream', 'is an octet-stream.');
     t.ok(Buffer.isBuffer(response.body), 'body is a buffer.');
-    t.equal(response.body.length,  1036864,
+    t.equal(response.body.length,  1036800,
       'buffer has expected length.');
-    t.equal(response.headers['content-length'], `${1036864}`,
+    t.equal(response.headers['content-length'], `${1036800}`,
       'header length correct.');
     t.equal(response.headers['beam-pts'], '42', 'Beam-PTS header as expected.');
     t.deepEqual(JSON.parse(response.headers['beam-buf-sizes']),
-      [ 1036864 ], 'has expected buffer sizes.');
+      [ 1036800 ], 'has expected buffer sizes.');
     t.equals(response.headers['beam-data-index'], '2', 'has 2 index.');
 
     t.comment('### Get frame PTS not found');
@@ -1684,7 +1684,7 @@ test('PUT frame data', async t => {
     t.deepEqual(response.body, {
       statusCode: 400,
       error: 'Bad Request',
-      message: 'Frame buffer\'s size total \'4147395\' exceeds data length of \'4147392\'.'
+      message: 'Frame buffer\'s size total \'4147203\' exceeds data length of \'4147200\'.'
     }, 'error message as expected.');
   } catch (err) {
     t.fail(err);

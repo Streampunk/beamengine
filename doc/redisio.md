@@ -81,8 +81,6 @@ Retrieve metadata for a specific single packet, where `nameOrKey` is either a co
 
 If the packet is found and retrieval was a success, the result is a beam coder _packet_ without its data payload included. Otherwise, an exception is thrown.
 
-Property `.buf_size` is set to the size of the related data payload.
-
 ### redisio.retrievePacketData(nameOrKey, [stream_id], [pts])
 
 Retrieve payload data for a specific single packet, where `nameOrKey` is either a complete redis key or the name of a format. If the name of a format, a stream identifier (`stream_id`) and exact presentation time stamp (`pts`) must be provided.  [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`.
