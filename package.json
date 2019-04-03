@@ -1,6 +1,6 @@
 {
   "name": "beamengine",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Redis-backed highly-scale-able and cloud-fit distributed media processing engine.",
   "main": "index.js",
   "engines": {
@@ -45,7 +45,7 @@
   },
   "homepage": "https://github.com/Streampunk/aerostat#readme",
   "dependencies": {
-    "beamcoder": "^0.1.14",
+    "beamcoder": "^0.1.15",
     "boom": "^7.3.0",
     "bull": "^3.7.0",
     "got": "^9.6.0",
