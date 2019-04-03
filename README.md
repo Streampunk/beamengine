@@ -425,6 +425,7 @@ Here is an example of a relative timestamp request.
 [ { "type": "Packet",
     "pts": 7200,
     "dts": 7200,
+    "size": 16319,
     "stream_index": 1,
     "flags": {
       "KEY": true,
@@ -434,8 +435,7 @@ Here is an example of a relative timestamp request.
       "DISPOSABLE": false
     },
     "duration": 3600,
-    "pos": 81912,
-    "buf_size": 16383
+    "pos": 81912
   } ]
 ```
 
