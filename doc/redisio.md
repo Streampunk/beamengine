@@ -59,7 +59,7 @@ Access to media elements, which are either [_packets_](https://github.com/Stream
 
 ### redisio.retrieveMedia(name, stream_id, start, [end], [offset], [limit], [flags], [metadataOnly])
 
-Search for and retrieve media elements matching a given query, with or without metadata payload. The search for media elements is carried out in the format with the given `name` within the stream identified by `stream_id`. [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`. The search starts at the given inclusive numerical `start` point, continues to the optional numerical `end` point (defaults to [maximum safe integer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER)), with the type of query configured by the `flags`:
+Search for and retrieve media elements matching a given query, with or without metadata payload. The search for media elements is carried out in the format with the given `name` within the stream identified by `stream_id`. [As described previously](#redisioretrievestreamname-stream_id), the stream identifier may be an index, media type or `default`. The search starts at the given inclusive numerical `start` point, continues to the optional inclusive numerical `end` point (defaults to [maximum safe integer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER)), with the type of query configured by the `flags`:
 
 * `redisio.mediaFlags.DEFAULT` - `start` and `end` are media element timestamps measured in units of stream time base
 * `redisio.mediaFlags.FUZZY` - `start` point is considered to be approximate - find the closest matching value;
@@ -185,7 +185,7 @@ The [relationships model of a beam engine](../README.md#relationships) allows th
 
 Record an _equivalent relationship_ between a `source` content item and a `target`. The arguments are either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item.
 
-Both `source` and `target` must exist already. Equivalent relationships are commutative and so a relationship is recorded both `source` to `target` and `target` to `source`. The result is an array of numbers that should be `[ 1, 1 ]` if the relatioship is new and `[ 0, 0 ]` if the relationship is already recorded.
+Both `source` and `target` must exist already. Equivalent relationships are commutative and so a relationship is recorded both `source` to `target` and `target` to `source`. The result is an array of numbers that should be `[ 1, 1 ]` if the relationship is new and `[ 0, 0 ]` if the relationship is already recorded.
 
 ### redisio.queryEquivalent(source, [depth])
 
@@ -205,13 +205,92 @@ Delete a direct recorded equivalent relationship between two content items, a `s
 
 A successful result is `[ 1, 1 ]` indicating that the `source` to `target` and `target` to `source` recorded relationships have been removed.
 
-Note that if `A` is equivalent to `B` and `B` is equivalent to `C`, no direct relationship is recorded between `A` and `C` and so cannot be removed. Expect a result of `[ 0, 0 ]` in that case.
+Note that if `A` is equivalent to `B` and `B` is equivalent to `C`, no direct relationship is recorded between `A` and `C` and so cannot be removed. Expect a result of `[ 0, 0 ]` in this case.
 
 ### redisio.createRendition(source, target, [stream_map])
 
-### redisio.queryRendition(source, [depth])
+Creates a rendition relationship to record that a `target` is made from its `source`.  The `source` and `target` can be a either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item. The formats of related items have codec parameters and time base parameters and it should be possible to determine a recipe for how the `target` is made from the `source` based on those parameters.
+
+If no `stream_map` is specified, streams are assumed to map one-for-one by stream index. [See below](#stream-map) for details of specifying a stream map.
+
+Both `source` and `target` must exist already or an exception is thrown. Rendition relationships are directional, as a `target` is rendered from its `source`. It is not possible to record a relationship from a `source` to a `target` and from the same `target` back to the same `source`. A `target` cannot have more than one `source` as that would be a form of transformation relationship. If a `stream_map` is provided then this is checked to see that all streams exist in the source and target and that target streams are specified uniquely, i.e. `audio`, `audio_0` and `stream_6` are aliases for the same stream.
+
+The result is an array of numbers that should be `[ 1, "OK" ]` or `[ 1, "OK", "OK" ]` if the relationship is new and `[ 0, "OK" ]` or `[ 0, "OK", "OK" ]` if the relationship is already recorded. The third element of the array indicates
+
+#### Stream map
+
+The `stream_map` is a JSON object that describes how the target tracks are made from the source tracks, with a bit of special notation to help out. The stream name aliases previously defined can be used to specify the stream mappings. Any stream not described for the target does not exist in the target.
+
+```json
+{
+  "video": "video",
+  "audio_0": "audio_2",
+  "audio_1": "audio_3",
+  "audio_2": [ "audio_0", "audio_1" ],
+  "audio_3": "audio_7[3]",
+  "subtitle": "subtitle_2",
+  "data": "data"
+}
+```
+
+This example stream map can be read as:
+
+* The target rendition has 7 streams related to the source `video`, `audio_0`, `audio_1`, `audio_2`, `audio_3`, `subtitle`, `data`. It may have more as specified in its format.
+* `video` and `data` streams map one-to=one, transformed according to their codec parameters.
+* The first pair of audio streams `audio_0` and `audio_1` in the target are renditions of the second pair of audio streams `audio_2` and `audio_3` in the source.
+* The stream `audio_2` has more than one channel made by concatenating together channels from `audio_0` and `audio_1` in the source. So if the source streams are flagged as mono and the target track as stereo, the stereo stream has `audio_0` on the left channel and `audio_1` on the right channel.
+* Single channel audio stream `audio_3` of the target rendition consists of the fourth (`[3]`) channel of the `audio_7` stream from the source.
+* The single `subtitle`-type stream of the target is made from the third subtitle stream of the source.
+
+More formally, the target streams are the property names of the object and their value specifies how they are made from source streams. Stream names can be by:
+
+* stream index of the form `stream_0`, `stream_1`, `stream_2` etc.
+* media type aliases `video`, `audio`, `subtitle`, `data` or `attachment`, with by-media-type index added `audio_0` for the first audio stream, `audio_2` for the second etc.
+* `default` to identify the default stream, as determined by FFmpeg
+
+The channels of multiple audio streams can be concatenated to make a multi-channel source track using an array. For example, if source audio streams `audio_6` has 2 channels and `audio_8` has 3 channels, `[ "audio_6", "audio_8" ]` creates a target stream with 5 audio channels, the first two from `audio_6` and the final three from `audio_8`.
+
+A specific audio stream can be selected using array index notation with a zero-based channel index, for example `audio_1[1]` for the second audio channel from audio stream `audio_1`.
+
+Channel concatenation and channel selection can be combined, with single channels from sources selected and then concatenated. For example, creating a 2-channel target stream:
+
+    [ "audio_8[1]", "audio_6[0]" ]
+
+### redisio.queryRendition(target, [reverse], [depth])
+
+Query rendition relationships recorded between a `target` content items and either the content item it depends on (forward relationships) or content items that depend on / are rendered from it (`reverse` relationships).
+
+The `depth` of the query, which defaults to `1`, determines how many levels of recorded rendition relationships are included in the response. For example, if `C` is a rendition of `B` and `B` is a rendition of `A`, then a query for target `A` returns `B` and `C`.
+
+If `reverse` is set to `true` (the default is `false`) then the response includes every content item that is recorded as a rendition of the `target`, the _dependencies_. This is direct dependencies only, the `depth` value has no impact.
+
+If the `target` does not exist or no direct rendition relationship is recorded then an appropriate exception is thrown.
+
+The result of a successful query is an object containing the list of `sources` (array of source content item names) and any `stream_map` that was specified between the `target` and the direct `source`. If `reverse` is `true`, the `dependencies` property contains an array of content item names that are renditions of the `target`. For example:
+
+```javascript
+let result = queryRendition('A', true, 2);
+```
+
+An example `result` is:
+
+```javascript
+{
+  sources: [ 'B', 'C' ],
+  stream_map: {
+    video: 'video',
+    audio: [ 'audio_0', 'audio_1' ],
+    subtitle: 'subtitle'
+  },
+  dependencies: [ 'X', 'Y', 'Z' ]
+}
+```
 
 ### redisio.deleteRendition(source, target)
+
+Delete a direct rendition relationship recorded between a `target` and `source`.  The `source` and `target` can be a either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item. The order of `source` and `target` is important.
+
+The result of a successful deletion is `[ 1, 1 ]` indicating that both the forward and reverse recording of the relationship have been removed. A result of `[ 0, 0 ]` indicates that no such rendition relationship is recorded.
 
 ### redisio.createTransformation(source, target, [recipe, [bounds]])
 
