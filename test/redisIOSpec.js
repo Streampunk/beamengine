@@ -36,6 +36,11 @@ test.onFinish(() => {
   redisio.close();
 });
 
+const checkEmpty = t => {
+  t.ok(redisio.redisPool.pool.every(x => x !== redisio.redisPool.EMPTY_SLOT),
+    'pool has returned to empty state.');
+};
+
 test('Packet store and retrieve', async t => {
   t.ok(await beforeTest(), 'test database flushed OK.');
   let pkt = beamcoder.packet({
@@ -81,6 +86,7 @@ test('Packet store and retrieve', async t => {
   redisio.redisPool.recycle(redis);
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
+  checkEmpty(t);
   t.end();
 });
 
@@ -142,6 +148,7 @@ test('Frame store and retrieve', async t => {
   await redisio.redisPool.recycle(redis);
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
+  checkEmpty(t);
   t.end();
 });
 
@@ -210,6 +217,7 @@ test('Retrieve media', async t => {
   await redisio.close();
   t.equal(redisio.redisPool.size(), 0, 'redis pool is reset.');
 
+  checkEmpty(t);
   t.end();
 });
 
@@ -283,11 +291,15 @@ test('Store and retrieve blob', async t => {
   } catch (err) {
     t.fail(err);
   }
+
+  checkEmpty(t);
   t.end();
 });
 
 test('Equivalent relationships', async t => {
   t.ok(await beforeTest(), 'test database flushed OK.');
+  t.deepEqual(await redisio.queryEquivalent('fmtA'), [],
+    'equivalent is empty array for name when no format stored.');
   let fmtA = testUtil.fmt;
   fmtA.url = 'fmtA';
   t.deepEqual(await redisio.storeFormat(fmtA), ['OK','OK','OK'],
@@ -345,9 +357,9 @@ test('Equivalent relationships', async t => {
   let fmtC = testUtil.fmt;
   fmtC.url = 'fmtC';
   t.deepEqual(await redisio.storeFormat(fmtC), ['OK','OK','OK'],
-    'redis reports format B stored OK.');
+    'redis reports format C stored OK.');
   t.deepEqual(await redisio.createEquivalent(fmtB, fmtC), [ 1, 1 ],
-    'relationship created between fmt A and fmt B.');
+    'relationship created between fmt B and fmt C.');
 
   try {
     t.deepEqual((await redisio.queryEquivalent(fmtA, 3)).sort(), [ 'fmtB', 'fmtC' ],
@@ -395,5 +407,216 @@ test('Equivalent relationships', async t => {
   t.deepEqual(await redisio.createEquivalent(fmtA, fmtB), [0, 0],
     'remake relationship has expected result.');
 
+  checkEmpty(t);
+  t.end();
+});
+
+test('Rendition relationships', async t => {
+  t.ok(await beforeTest(), 'test database flushed OK.');
+  t.deepEqual(await redisio.queryRendition('fmtA'), { sources: [] },
+    'rendition is empty array for name when no fmt stored.');
+  let fmtA = testUtil.fmt;
+  fmtA.url = 'fmtA';
+  t.deepEqual(await redisio.storeFormat(fmtA), ['OK','OK','OK'],
+    'redis reports format A stored OK.');
+  t.deepEqual(await redisio.queryRendition(fmtA), { sources: [] },
+    'rendition is empty array for fmt when none specified.');
+  t.deepEqual(await redisio.queryRendition(fmtA.url), { sources: [] },
+    'rendition is empty array for fmt.url when none specified.');
+
+  try {
+    await redisio.createRendition(fmtA.url, fmtA);
+    t.fail('Should have thrown when trying to create rendition to itself.');
+  } catch (err) {
+    t.equal(err.message, 'Source cannot be a rendition of itself.', 'expected error on equal sources.');
+  }
+
+  try {
+    await redisio.createRendition(fmtA.url, 'wibble');
+    t.fail('Should have thrown when trying to create rendition to "wibble" as target.');
+  } catch (err) {
+    t.equal(err.message, 'Target \'wibble\' for a new rendition relationship does not exist.',
+      'non-existant target error message as expected.');
+  }
+
+  try {
+    await redisio.createRendition('wibble', fmtA.url);
+    t.fail('Should have thrown when trying to create rendition to "wibble" as source.');
+  } catch (err) {
+    t.equal(err.message, 'Source \'wibble\' for a new rendition relationship does not exist.',
+      'non-existant source error message as expected.');
+  }
+
+  try {
+    await redisio.createRendition('wibble', 'wobble');
+    t.fail('Should have thrown when trying to create rendition "wibble" to "wobble".');
+  } catch (err) {
+    t.equal(err.message, 'Both source \'wibble\' and target \'wobble\' for a new rendition relationship do not exist.',
+      'non-existant source and target error message as expected.');
+  }
+
+  let fmtB = testUtil.fmt;
+  fmtB.url = 'fmtB';
+  t.deepEqual(await redisio.storeFormat(fmtB), ['OK','OK','OK'],
+    'redis reports format B stored OK.');
+  t.deepEqual(await redisio.createRendition(fmtA, fmtB), [ 1, 'OK' ],
+    'relationship created between fmt A and fmt B.');
+
+  try {
+    t.deepEqual(await redisio.queryRendition(fmtA), { sources: [] }, 'query A gives empty.');
+    t.deepEqual(await redisio.queryRendition(fmtB), { sources: [ 'fmtA' ] },
+      'query B gives A.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  t.deepEqual(await redisio.createRendition(fmtA, fmtB, { video: 'video' }),
+    [ 0, 'OK', 'OK' ], 'adding source map is OK.');
+  try {
+    t.deepEqual(await redisio.queryRendition(fmtB),
+      { sources: [ 'fmtA' ], stream_map: { video: 'video' }},
+      'query B gives A.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  try {
+    await redisio.createRendition(fmtB, fmtA);
+    t.fail('Successully created a relationship loop ... which is bad.');
+  } catch (err) {
+    t.equal(err.message, 'Target \'fmtA\' cannot be a rendition of itself.');
+  }
+
+  let fmtC = testUtil.fmt;
+  fmtC.url = 'fmtC';
+  t.deepEqual(await redisio.storeFormat(fmtC), ['OK','OK','OK'],
+    'redis reports format C stored OK.');
+  t.deepEqual(await redisio.createRendition(fmtB, fmtC), [ 1, 'OK' ],
+    'relationship created between fmt B and fmt C.');
+
+  try {
+    t.deepEqual(await redisio.queryRendition(fmtA, 3),
+      { sources: [] },
+      'depth 3 query of A gives empty (original source).');
+    t.deepEqual(await redisio.queryRendition(fmtB, 3),
+      { sources: [ 'fmtA' ], stream_map: { video: 'video' } },
+      'depth 3 query of B gives A.');
+    t.deepEqual(await redisio.queryRendition(fmtC, false, 10),
+      { sources: [ 'fmtB', 'fmtA' ] },
+      'depth 10 query of C gives B then A.');
+    t.deepEqual(await redisio.queryRendition(fmtC, 1),
+      { sources: [ 'fmtB' ] },
+      'depth 1 query of C gives B.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  try {
+    await redisio.createRendition(fmtC, fmtA);
+    t.fail('Successully created a relationship loop depth 2 ... which is bad.');
+  } catch (err) {
+    t.equal(err.message, 'Target \'fmtA\' cannot be a rendition of itself.');
+  }
+
+  try {
+    t.deepEqual(await redisio.queryRendition(fmtA, true, 3),
+      { sources: [], dependencies: [ 'fmtB' ] },
+      'depth 3 query of A gives empty (original source) with reverse.');
+    t.deepEqual(await redisio.queryRendition(fmtB, true, 3),
+      { sources: [ 'fmtA' ], stream_map: { video: 'video' }, dependencies: [ 'fmtC' ] },
+      'depth 3 query of B gives A with reverse.');
+    t.deepEqual(await redisio.queryRendition(fmtC, true, 10),
+      { sources: [ 'fmtB', 'fmtA' ], dependencies: [] },
+      'depth 10 query of C gives B then A with reverse.');
+    t.deepEqual(await redisio.queryRendition(fmtB, true, 1),
+      { sources: [ 'fmtA' ], stream_map: { video: 'video' }, dependencies: [ 'fmtC' ] },
+      'depth 1 query of C gives B with reverse.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  try {
+    await redisio.createRendition(fmtB, fmtC, { subtitle: 'video' });
+    t.fail('Reference to stream that does not exist succeeded.');
+  } catch (err) {
+    t.equal(err.message,
+      'Stream map for target \'fmtC\' references stream \'subtitle\' that is not present.',
+      'missing target stream spotted.');
+  }
+
+  try {
+    await redisio.createRendition(fmtB, fmtC, { video: 'subtitle' });
+    t.fail('Reference to stream that does not exist succeeded.');
+  } catch (err) {
+    t.equal(err.message,
+      'Stream map for source \'fmtB\' references stream \'subtitle\' that is not present.',
+      'missing target stream spotted.');
+  }
+
+  try {
+    await redisio.createRendition(fmtB, fmtC, { stream_2: 'audio' });
+    t.fail('Reference to stream that does not exist succeeded.');
+  } catch (err) {
+    t.equal(err.message,
+      'Stream map for target \'fmtC\' references stream \'stream_2\' that is not present.',
+      'missing target stream that exceeds index.');
+  }
+
+  try {
+    t.deepEqual(await redisio.createRendition(fmtB, fmtC, { stream_1: 'audio[3]' }),
+      [ 0, 'OK', 'OK' ], 'created stream map with channel reference.');
+  } catch (err) {
+    t.fail(`Should have created stream map with channel reference but failed: ${err.message}`);
+  }
+
+  try {
+    t.deepEqual(await redisio.createRendition(fmtB, fmtC, { stream_1: ['audio[3]', 'audio_0' ] }),
+      [ 0, 'OK', 'OK' ], 'created stream map with arrays and channel reference.');
+  } catch (err) {
+    t.fail(`Should have created stream map with channel reference but failed: ${err.message}`);
+  }
+
+  try {
+    t.deepEqual(await redisio.queryRendition(fmtC, 3),
+      { sources: [ 'fmtB', 'fmtA' ], stream_map: { stream_1: [ 'audio[3]', 'audio_0' ] }},
+      'depth 3 query of A gives empty (original source) with expected stream map.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  try {
+    await redisio.createRendition(fmtB, fmtC, { stream_1: ['audio[3]', 'subtitle' ] });
+    t.fail('Reference to stream that does not exist succeeded.');
+  } catch (err) {
+    t.equal(err.message,
+      'Stream map for source \'fmtB\' references stream \'subtitle\' that is not present.',
+      'missing target stream in array.');
+  }
+
+  t.deepEqual(await redisio.deleteRendition(fmtB, fmtC), [ 1, 1, 1 ],
+    'recorded rendition C of B deleted.');
+
+  try {
+    t.deepEqual(await redisio.queryRendition(fmtC, 3),
+      { sources: [ ] },
+      'rendition relationship from C to B is no more.');
+    t.deepEqual(await redisio.queryRendition(fmtB, true, 3),
+      { sources: [ 'fmtA' ], stream_map: { video: 'video' }, dependencies: [] },
+      'and reverse relationship is also gone.');
+  } catch (err) {
+    t.fail(`Failed to query equivalent relationships: ${err.message}`);
+  }
+
+  t.deepEqual(await redisio.deleteRendition(fmtB, fmtC), [ 0, 0, 0 ],
+    'second delete changes nothing.');
+
+  t.deepEqual(await redisio.deleteRendition(fmtA, fmtB), [ 1, 1, 1 ],
+    'reset to nout OK.');
+
+  let redis = await redisio.redisPool.use();
+  t.deepEqual(await redis.keys('*rendition*'), [], 'nothing about renditions left.');
+  redisio.redisPool.recycle(redis);
+
+  checkEmpty(t);
   t.end();
 });

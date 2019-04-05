@@ -262,7 +262,9 @@ The `depth` of the query, which defaults to `1`, determines how many levels of r
 
 If `reverse` is set to `true` (the default is `false`) then the response includes every content item that is recorded as a rendition of the `target`, the _dependencies_. This is direct dependencies only, the `depth` value has no impact.
 
-If the `target` does not exist or no direct rendition relationship is recorded then an appropriate exception is thrown.
+If the `target` does not exist or has no recorded rendition relationships, the following object is returned:
+
+    { sources: [] }
 
 The result of a successful query is an object containing the list of `sources` (array of source content item names) and any `stream_map` that was specified between the `target` and the direct `source`. If `reverse` is `true`, the `dependencies` property contains an array of content item names that are renditions of the `target`. For example:
 
@@ -288,7 +290,7 @@ An example `result` is:
 
 Delete a direct rendition relationship recorded between a `target` and `source`.  The `source` and `target` can be a either a beam coder value of format type (`format`, `muxer` or `demuxer`) or the name of a content item. The order of `source` and `target` is important.
 
-The result of a successful deletion is `[ 1, 1 ]` indicating that both the forward and reverse recording of the relationship have been removed. A result of `[ 0, 0 ]` indicates that no such rendition relationship is recorded.
+The result of a successful deletion is `[ 1, 1, 1 ]` indicating that the forward and reverse recording of the relationship have been removed along with the stream map. A result of `[ 0, 0, 0 ]` indicates that no such rendition relationship is currently recorded. A result `[ 1, 1, 0 ]` indicates that the rendition is no longer recorded and it did not have a stream map.
 
 ### redisio.createTransformation(source, target, [recipe, [bounds]])
 
