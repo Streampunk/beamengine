@@ -294,4 +294,6 @@ The result of a successful deletion is `[ 1, 1, 1 ]` indicating that the forward
 
 ### redisio.createTransformation(source, target, [recipe, [bounds]])
 
+A transformation relationship records that a `source` or sources are transformed to make a `target` or targets. The relationship may include the `recipe`, a filter graph for the relationship, and optional time `bounds` representing presentation time stamps between which the relationship is valid. 
+
 ### redisio.deleteTransformation(source, target)
