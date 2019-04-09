@@ -620,3 +620,27 @@ test('Rendition relationships', async t => {
   checkEmpty(t);
   t.end();
 });
+
+test('Tranformation relationships', async t => {
+  t.ok(await beforeTest(), 'test database flushed OK.');
+  let fmtA = testUtil.fmt;
+  fmtA.url = 'fmtA';
+  t.deepEqual(await redisio.storeFormat(fmtA), ['OK','OK','OK'],
+    'redis reports format A stored OK.');
+
+  let fmtB = testUtil.fmt;
+  fmtB.url = 'fmtB';
+  t.deepEqual(await redisio.storeFormat(fmtB), ['OK','OK','OK'],
+    'redis reports format B stored OK.');
+
+  let fmtC = testUtil.fmt;
+  fmtC.url = 'fmtC';
+  t.deepEqual(await redisio.storeFormat(fmtC), ['OK','OK','OK'],
+    'redis reports format C stored OK.');
+
+  t.deepEqual(await redisio.createTransformation(fmtA, [fmtB, fmtC]), [2, 4],
+    'result of creating transformation is as expected.');
+
+  checkEmpty(t);
+  t.end();
+});

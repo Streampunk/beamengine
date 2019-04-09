@@ -294,6 +294,20 @@ The result of a successful deletion is `[ 1, 1, 1 ]` indicating that the forward
 
 ### redisio.createTransformation(source, target, [recipe, [bounds]])
 
-A transformation relationship records that a `source` or sources are transformed to make a `target` or targets. The relationship may include the `recipe`, a filter graph for the relationship, and optional time `bounds` representing presentation time stamps between which the relationship is valid. 
+A transformation relationship records that a `source` or sources are transformed to make a `target` or targets. The relationship may include the `recipe`, a specification of the filter graph for the relationship, and optional time `bounds` representing presentation time stamps between which the relationship is valid. As a simple example, consider a target content item that is made by scaling the video stream of its source.
+
+The `source` and `target` parameters are either single values or arrays of values, either beam coder values of format type (`format`, `muxer` or `demuxer`) or content item names. The content items must already exist. It should not be possible to define a transformation loop from a source back to a source and an exception will be thrown if this is the case.
+
+A successful result is an array containing integers, something like `[2, 3]` representing the number of source and target records created in Redis.  
+
+### redisio.queryTransformation(target, [reverse])
+
+```json
+{
+  "sources": [ ],
+  "targets": [ ],
+  "recipe" : ""
+}
+```
 
 ### redisio.deleteTransformation(source, target)
