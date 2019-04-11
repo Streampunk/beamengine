@@ -296,18 +296,71 @@ The result of a successful deletion is `[ 1, 1, 1 ]` indicating that the forward
 
 A transformation relationship records that a `source` or sources are transformed to make a `target` or targets. The relationship may include the `recipe`, a specification of the filter graph for the relationship, and optional time `bounds` representing presentation time stamps between which the relationship is valid. As a simple example, consider a target content item that is made by scaling the video stream of its source.
 
-The `source` and `target` parameters are either single values or arrays of values, either beam coder values of format type (`format`, `muxer` or `demuxer`) or content item names. The content items must already exist. It should not be possible to define a transformation loop from a source back to a source and an exception will be thrown if this is the case.
+The `source` and `target` parameters are either single values or arrays of values, either beam coder values of format type (`format`, `muxer` or `demuxer`) or content item names. The content items must already exist. The source and targets must meet the following rules:
 
-A successful result is an array containing integers, something like `[2, 3]` representing the number of source and target records created in Redis.  
+* Targets must be unique within a single transformation relationship.
+* It should not be possible to define a transformation loop from a target to itself at any depth.
+* Any target cannot be recorded as the target of another rendition or transformation.
+
+A successful result is an array containing integers, something like `[2, 3]` representing the number of source and target records created in Redis. A consequence of the rules is that transformation relationships cannot be overwritten, meaning that that the values returned should not be zero. To change a transformation relationship, first [delete it](#redisiodeletetransformationsource-target) and then recreate it.
+
+A `recipe` describes how targets are made from sources and can be expressed in the same format as the object passed in to create a [beam coder filterer](https://github.com/Streampunk/beamcoder#filterer). The recipe is not processed in any way as it is just stored in redis and returned on query, so could be an FFmpeg filter (assumed) or some other recipe description. If the `recipe` is a Javascript object, it is serialized to JSON before storage. If the `recipe` is a string, it is stored as is. If no `recipe` is provided, this should be interpreted as meaning that a transformation relationship should be acknowledged as in existence but not explicitly recorded.
+
+__TODO__ consider whether time bounded transformation relationships add value at this level?
 
 ### redisio.queryTransformation(target, [reverse])
 
-```json
+Query any transformation relationship associated with the given `target`, or if the `reverse` flag is set then show any targets that this relationship is part of. The `target` parameter can be a beam coder value of format type (`format`, `muxer` or `demuxer`) or a content item's name.
+
+Unlike for renditions or equivalent relationships, transformation queries do not support depth queries.
+
+The result of a successful _forward_ query (`reverse` flag not set) is the complete details of the transformation relationship recorded for the target. For example, the Javascript object:
+
+```javascript
 {
-  "sources": [ ],
-  "targets": [ ],
-  "recipe" : ""
+  sources: [ 'C', 'D', 'E'],
+  targets: [ 'A', 'B' ],
+  recipe : {
+    filterType: 'video',
+    inputParams: {
+      width: 1920,
+      height: 1080,
+      // More parameters
+    },
+    outputParams: {
+      pixelFormat: 'yuv422'
+    },
+    filterSpec: 'scale=1280:720'
+  }
 }
 ```
 
-### redisio.deleteTransformation(source, target)
+The `recipe` will be one of the following:
+
+* An empty string (`""`) signifying that no recipe has been explicitly recorded
+* If the recipe could be parsed as a JSON object, the JSON object parsed
+* Otherwise a string describing the recipe
+
+For a query where the `reverse` flag is set to `true` (default is `false`), the results is an array of sub-arrays of targets for the given source (as the `target` parameter). Each sub-array is a single transformation relationship that the source participates in. For example, in JSON format:
+
+```json
+{
+  "source" : "C",
+  "tranformations": [
+    [ "A", "B" ],
+    [ "X", "Y", "Z"]
+  ]
+}
+```
+
+If the `target` is not found as the result of the query, an empty value is returned as follows, whatever `reverse` is set to:
+
+```javascript
+{ sources: [] }
+```
+
+### redisio.deleteTransformation(target)
+
+A transformation relationship is uniquely identified by the content items that make up its targets. To delete a transformation, pass in the name or one or more of the `target`s. If a single target is passed in, the transformation relationship it participates in is found and deleted. If more than one target is passed in, this list must contain all the targets that participate in the relationship before it is deleted.
+
+On success, the
