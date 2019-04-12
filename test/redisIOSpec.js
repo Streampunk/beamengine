@@ -725,6 +725,9 @@ test('Tranformation relationships', async t => {
     t.fail(`Failed to query transformation relationships in reverse: ${err.message}`);
   }
 
+  t.deepEqual(await redisio.deleteTransformation(['fmtC', 'fmtD']), [],
+    'delete many-to-many transformation as expected.');
+
 
   checkEmpty(t);
   t.end();
