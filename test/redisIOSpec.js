@@ -698,7 +698,7 @@ test('Tranformation relationships', async t => {
       'query fmt D - relationship redorded as expected.');
     t.deepEqual(await redisio.queryTransformation('fmtE'),
       { sources: [ 'fmtA' ], targets: [ 'fmtE' ], recipe: 'recipe' },
-      'query fmt E - relationship redorded as expected.');
+      'query fmt E - relationship recorded as expected.');
   } catch (err) {
     t.fail('Failed to query transformation relationships forward.');
   }
@@ -725,9 +725,122 @@ test('Tranformation relationships', async t => {
     t.fail(`Failed to query transformation relationships in reverse: ${err.message}`);
   }
 
-  t.deepEqual(await redisio.deleteTransformation(['fmtC', 'fmtD']), [],
+  try {
+    await redisio.deleteTransformation(['fmtC']);
+    t.fail('Should have thrown exception becauase target missing.');
+  } catch (err) {
+    t.equal(err.message,
+      'Could not identify a transformation identifieed by all given targets: \'[fmtC]\'.',
+      'missing target causes delete failure.');
+  }
+
+  try {
+    await redisio.deleteTransformation(['fmtC', 'fmtE']);
+    t.fail('Should have thrown exception becauase target missing.');
+  } catch (err) {
+    t.equal(err.message,
+      'Could not identify a transformation identifieed by all given targets: \'[fmtC,fmtE]\'.',
+      'missing target causes delete failure.');
+  }
+
+  try {
+    await redisio.deleteTransformation(['fmtC', 'fmtD', 'fmtE']);
+    t.fail('Should have thrown exception becauase target missing.');
+  } catch (err) {
+    t.equal(err.message,
+      'Could not identify a transformation identifieed by all given targets: \'[fmtC,fmtD,fmtE]\'.',
+      'missing target causes delete failure.');
+  }
+
+  t.deepEqual(await redisio.deleteTransformation(['fmtC', 'fmtD']), [ 3, 4],
     'delete many-to-many transformation as expected.');
 
+  try {
+    t.deepEqual(await redisio.queryTransformation('fmtC'),
+      { sources: [] },
+      'query fmt C - no longer a target.');
+    t.deepEqual(await redisio.queryTransformation('fmtD'),
+      { sources: [] },
+      'query fmt D - no longer a target.');
+    t.deepEqual(await redisio.queryTransformation('fmtE'),
+      { sources: [ 'fmtA' ], targets: [ 'fmtE' ], recipe: 'recipe' },
+      'query fmt E - relationship still recorded as expected.');
+  } catch (err) {
+    t.fail('Failed to query transformation relationships forward.');
+  }
+
+  try {
+    await redisio.createTransformation(['fmtC'], [fmtA, 'fmtC']);
+    t.fail('Should have detected source in targets.');
+  } catch (err) {
+    t.equal(err.message,
+      'Source \'fmtC\' is also listed as a transformation target.',
+      'detected source in targets.');
+  }
+
+  try {
+    await redisio.createTransformation('fmtE', fmtA);
+    t.fail('Should not be able to create a loop from fmt A to fmt A via fmt E.');
+  } catch (err) {
+    t.equal(err.message, 'Loop detected in new transformation for element fmtA.',
+      'cannot create a loop.');
+  }
+
+  try {
+    await redisio.createTransformation(['fmtA', 'fmtZ'], fmtE);
+    t.fail('Should have detected that source Z does not exist.');
+  } catch (err) {
+    t.equal(err.message,
+      'A source of \'[fmtA,fmtZ]\' for a new transformation relationship does not exist.',
+      'source does not exist was detected.');
+  }
+
+  try {
+    await redisio.createTransformation(['fmtA', 'fmtB'], ['fmtZ', 'fmtC']);
+    t.fail('Should have detected that target Z does not exist.');
+  } catch (err) {
+    t.equal(err.message,
+      'A target of \'[fmtZ,fmtC]\' for a new transformation relationship does not exist.',
+      'target does not exist was detected.');
+  }
+
+  try {
+    await redisio.createTransformation(['wibble', 'wobble'], ['jelly', 'on', 'plate']);
+    t.fail('Should have detected that all sources and targets do not exist.');
+  } catch (err) {
+    t.equal(err.message,
+      'Both a source of \'[wibble,wobble]\' and a target of \'[jelly,on,plate]\' for a new transformation relationship do not exist.',
+      'sources and targets do not exist detected.');
+  }
+
+  try {
+    await redisio.createTransformation('fmtC', 'fmtE');
+    t.fail('Should have detected that fmt E is already a target.');
+  } catch (err) {
+    t.equal(err.message,
+      'Target \'fmtE\' is already recorded as the target of another transformation.',
+      'detected that specified target is already a target.');
+  }
+
+  try {
+    await redisio.createTransformation('fmtC', [ 'fmtA', fmtA ]);
+    t.fail('Should have detected as repeated target.');
+  } catch (err) {
+    t.equal(err.message,
+      'Targets must be unique.',
+      'detected a repeated target.');
+  }
+
+  // FIXME - cannot recreate relatinship with repeated sources 
+  try {
+    t.deepEqual(await redisio.createTransformation(['fmtA', fmtA], 'fmtC'), [2, 3],
+      'successfully created relationship with repeated source.');
+    t.deepEqual(await redisio.queryTransformation('fmtC'),
+      { sources: [ 'fmtA', 'fmtA' ], targets: [ 'fmtC' ], recipe: '' },
+      'should be able to retrieve relationship with repeated sources.');
+  } catch (err) {
+    t.fail('Should have been able to create a relationship with a repeated source.');
+  }
 
   checkEmpty(t);
   t.end();
