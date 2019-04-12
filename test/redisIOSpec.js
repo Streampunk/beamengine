@@ -704,9 +704,11 @@ test('Tranformation relationships', async t => {
   }
 
   try {
-    t.deepEqual(await redisio.queryTransformation('fmtA', true),
-      { source: 'fmtA', transformations: [ [ 'fmtC', 'fmtD' ], [ 'fmtE' ]] },
-      'query fmt A in reverse - relationship recorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtA', true)
+      .then(({ source, transformations }) =>
+        ({ source, transformations: transformations.sort() })), /* eslint-disable indent */
+      { source: 'fmtA', transformations: [ [ 'fmtC', 'fmtD' ], [ 'fmtE' ]] }, /* eslint-disable indent */
+      'query fmt A in reverse - relationship recorded as expected.'); /* eslint-disable indent */
     t.deepEqual(await redisio.queryTransformation('fmtB', true),
       { source: 'fmtB', transformations: [ [ 'fmtC', 'fmtD' ]] },
       'query fmt B in reverse - relationship recorded as expected.');
@@ -720,7 +722,7 @@ test('Tranformation relationships', async t => {
       { sources: [] },
       'query fmt E in reverse - relationship recorded as expected.');
   } catch (err) {
-    t.fail('Failed to query transformation relationships forward.');
+    t.fail(`Failed to query transformation relationships in reverse: ${err.message}`);
   }
 
 
