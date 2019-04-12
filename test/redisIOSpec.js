@@ -639,7 +639,7 @@ test('Tranformation relationships', async t => {
     'redis reports format C stored OK.');
 
   t.deepEqual(await redisio.createTransformation(fmtA, [fmtB, fmtC]), [2, 4],
-    'result of creating transformation is as expected.');
+    'result of creating one to many transformation is as expected.');
 
   try {
     let transResult = { sources: [ 'fmtA' ], targets: [ 'fmtB', 'fmtC' ], recipe: ''};
@@ -658,6 +658,71 @@ test('Tranformation relationships', async t => {
   }  catch (err) {
     t.fail('Failed to query transformation in reverse.');
   }
+
+  t.deepEqual(await redisio.deleteTransformation(fmtB), [ 2, 4 ],
+    'delete of relationship completes OK.');
+
+  let fmtD = testUtil.fmt;
+  fmtD.url = 'fmtD';
+  t.deepEqual(await redisio.storeFormat(fmtD), ['OK','OK','OK'],
+    'redis reports format D stored OK.');
+
+  let recipeObj = { recipe: 'for', the: 'people' };
+  t.deepEqual(
+    await redisio.createTransformation(
+      [fmtA, fmtB], [fmtC, fmtD],
+      JSON.stringify(recipeObj)),
+    [3, 5],
+    'result of creating many-to-many transformation is as expected.');
+
+  let fmtE = testUtil.fmt;
+  fmtE.url = 'fmtE';
+  t.deepEqual(await redisio.storeFormat(fmtE), ['OK','OK','OK'],
+    'redis reports format E stored OK.');
+
+  t.deepEqual(await redisio.createTransformation(fmtA, fmtE, 'recipe'), [2, 3],
+    'result of creating one-to-one transformation is as expected.');
+
+  try {
+    t.deepEqual(await redisio.queryTransformation('fmtA'),
+      { sources: [] },
+      'query fmt A - not a target.');
+    t.deepEqual(await redisio.queryTransformation('fmtB'),
+      { sources: [] },
+      'query fmt B - not a target.');
+    t.deepEqual(await redisio.queryTransformation('fmtC', false),
+      { sources: [ 'fmtB', 'fmtA' ], targets: [ 'fmtC', 'fmtD' ], recipe: recipeObj },
+      'query fmt C - relationship recorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtD'),
+      { sources: [ 'fmtB', 'fmtA' ], targets: [ 'fmtC', 'fmtD' ], recipe: recipeObj },
+      'query fmt D - relationship redorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtE'),
+      { sources: [ 'fmtA' ], targets: [ 'fmtE' ], recipe: 'recipe' },
+      'query fmt E - relationship redorded as expected.');
+  } catch (err) {
+    t.fail('Failed to query transformation relationships forward.');
+  }
+
+  try {
+    t.deepEqual(await redisio.queryTransformation('fmtA', true),
+      { source: 'fmtA', transformations: [ [ 'fmtC', 'fmtD' ], [ 'fmtE' ]] },
+      'query fmt A in reverse - relationship recorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtB', true),
+      { source: 'fmtB', transformations: [ [ 'fmtC', 'fmtD' ]] },
+      'query fmt B in reverse - relationship recorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtC', true),
+      { sources: [] },
+      'query fmt C in reverse - relationship recorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtD', true),
+      { sources: [] },
+      'query fmt D in reverse - relationship recorded as expected.');
+    t.deepEqual(await redisio.queryTransformation('fmtE', true),
+      { sources: [] },
+      'query fmt E in reverse - relationship recorded as expected.');
+  } catch (err) {
+    t.fail('Failed to query transformation relationships forward.');
+  }
+
 
   checkEmpty(t);
   t.end();
