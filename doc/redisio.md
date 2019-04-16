@@ -335,6 +335,8 @@ The result of a successful _forward_ query (`reverse` flag not set) is the compl
 }
 ```
 
+Note that `sources` can be repeated. The array returned is similar to an array of arguments passed to a function. 
+
 The `recipe` will be one of the following:
 
 * An empty string (`""`) signifying that no recipe has been explicitly recorded
@@ -348,12 +350,12 @@ For a query where the `reverse` flag is set to `true` (default is `false`), the 
   "source" : "C",
   "tranformations": [
     [ "A", "B" ],
-    [ "X", "Y", "Z"]
+    [ "X", "Y", "Z" ]
   ]
 }
 ```
 
-If the `target` is not found as the result of the query, an empty value is returned as follows, whatever `reverse` is set to:
+If the `target` is not found as the result of the query, an empty value is returned as follows, whatever `reverse` flag is set to:
 
 ```javascript
 { sources: [] }
@@ -363,4 +365,4 @@ If the `target` is not found as the result of the query, an empty value is retur
 
 A transformation relationship is uniquely identified by the content items that make up its targets. To delete a transformation, pass in the name or one or more of the `target`s. If a single target is passed in, the transformation relationship it participates in is found and deleted. If more than one target is passed in, this list must contain all the targets that participate in the relationship before it is deleted.
 
-On success, the
+On success, the result of the delete is an array of two positive integers, e.g. `[3, 4]`. If a matching transformation relationship is not found then an exception is thrown.

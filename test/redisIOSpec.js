@@ -659,7 +659,7 @@ test('Tranformation relationships', async t => {
     t.fail('Failed to query transformation in reverse.');
   }
 
-  t.deepEqual(await redisio.deleteTransformation(fmtB), [ 2, 4 ],
+  t.deepEqual(await redisio.deleteTransformation(fmtB), [ 2, 5 ],
     'delete of relationship completes OK.');
 
   let fmtD = testUtil.fmt;
@@ -690,11 +690,12 @@ test('Tranformation relationships', async t => {
     t.deepEqual(await redisio.queryTransformation('fmtB'),
       { sources: [] },
       'query fmt B - not a target.');
+    // Order of sources should be preserved
     t.deepEqual(await redisio.queryTransformation('fmtC', false),
-      { sources: [ 'fmtB', 'fmtA' ], targets: [ 'fmtC', 'fmtD' ], recipe: recipeObj },
+      { sources: [ 'fmtA', 'fmtB' ], targets: [ 'fmtC', 'fmtD' ], recipe: recipeObj },
       'query fmt C - relationship recorded as expected.');
     t.deepEqual(await redisio.queryTransformation('fmtD'),
-      { sources: [ 'fmtB', 'fmtA' ], targets: [ 'fmtC', 'fmtD' ], recipe: recipeObj },
+      { sources: [ 'fmtA', 'fmtB' ], targets: [ 'fmtC', 'fmtD' ], recipe: recipeObj },
       'query fmt D - relationship redorded as expected.');
     t.deepEqual(await redisio.queryTransformation('fmtE'),
       { sources: [ 'fmtA' ], targets: [ 'fmtE' ], recipe: 'recipe' },
@@ -752,7 +753,7 @@ test('Tranformation relationships', async t => {
       'missing target causes delete failure.');
   }
 
-  t.deepEqual(await redisio.deleteTransformation(['fmtC', 'fmtD']), [ 3, 4],
+  t.deepEqual(await redisio.deleteTransformation(['fmtC', 'fmtD']), [3, 5],
     'delete many-to-many transformation as expected.');
 
   try {
@@ -831,7 +832,6 @@ test('Tranformation relationships', async t => {
       'detected a repeated target.');
   }
 
-  // FIXME - cannot recreate relatinship with repeated sources 
   try {
     t.deepEqual(await redisio.createTransformation(['fmtA', fmtA], 'fmtC'), [2, 3],
       'successfully created relationship with repeated source.');
