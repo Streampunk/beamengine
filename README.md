@@ -573,7 +573,7 @@ One-to-one transformations of a stream that are experientially equivalent may be
 * similarly, reducing the sample rate of high-definition audio;
 * compressing audio and adding a short amount of additional silence at the beginning or end to facilitate better lip sync.
 
-_Decode rendition relationships_ have source media elements that are packets and target media elements that are frames. _Encode rendition relationships_ start with frames and end up with packets. A rendition target may be a lossless transormation of its source, such as a different packing of samples into a transport. For example, an interleaved [V210 packing](https://www.loc.gov/preservation/digital/formats/fdd/fdd000353.shtml) of an uncompressed 10-bit-per-sample video as a packet is losslessly decoded from, or encoded to, a frame with 16-bit values (only 10-bits-per-sample active) with separate data planes per component.
+_Decode rendition relationships_ have source media elements that are packets and target media elements that are frames. _Encode rendition relationships_ start with frames and end up with packets. A rendition target may be a lossless transformation of its source, such as a different packing of samples into a transport. For example, an interleaved [V210 packing](https://www.loc.gov/preservation/digital/formats/fdd/fdd000353.shtml) of an uncompressed 10-bit-per-sample video as a packet is losslessly decoded from, or encoded to, a frame with 16-bit values (only 10-bits-per-sample active) with separate data planes per component.
 
 In a workflow, a rendition relationship can be used as follows:
 
