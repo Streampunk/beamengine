@@ -92,6 +92,25 @@ function diceFrames(frameDicer, frames, srcStrm, flush = false) {
   return frames;
 }
 
+const serialBalancer = numStreams => {
+  let pending = [];
+  // initialise with negative ts and no pkt
+  // - there should be no output until each stream has sent its first packet
+  for (let s = 0; s < numStreams; ++s)
+    pending.push({ ts: -Number.MAX_VALUE, streamIndex: s });
+
+  return (pkt, streamIndex, ts) => {
+    return new Promise(resolve => {
+      Object.assign(pending[streamIndex], { pkt: pkt, ts: ts, resolve: resolve });
+      const minTS = pending.reduce((acc, pend) => Math.min(acc, pend.ts), Number.MAX_VALUE);
+      // console.log(streamIndex, pending.map(p => p.ts), minTS);
+      const nextPend = pending.find(pend => pend.pkt && (pend.ts === minTS));
+      if (nextPend) nextPend.resolve(nextPend.pkt);
+      if (!pkt) resolve();
+    });
+  };
+};
+
 const adjustTS = (pkt, srcTB, dstTB) => {
   const adj = (srcTB[0] * dstTB[1]) / (srcTB[1] * dstTB[0]);
   pkt.pts = Math.round(pkt.pts * adj);
@@ -99,39 +118,17 @@ const adjustTS = (pkt, srcTB, dstTB) => {
   pkt.duration > 0 ? Math.round(pkt.duration * adj) : Math.round(adj);
 };
 
-const balancedMuxer = (srcStreams, mux) => {
-  const muxStreams = mux.streams;
-  let pending = [];
-  mux.streams.forEach(() => pending.push({}));
-  const write = async (pkt, srcIndex, muxIndex) => {
-    return new Promise(async resolve => {
-      const pktTS = pkt ? pkt.pts * srcStreams[srcIndex].time_base[0] / srcStreams[srcIndex].time_base[1] : Number.MAX_VALUE;
-      if (pkt) adjustTS(pkt, srcStreams[srcIndex].time_base, muxStreams[muxIndex].time_base);
-      pending[muxIndex] = { pkt: pkt, ts: pktTS, muxIndex: muxIndex, resolve: resolve };
-
-      const minTS = pending.reduce((acc, pend) => Math.min(acc, pend.ts), Number.MAX_VALUE);
-      const muxPkt = pending.find(pend => pend && (pend.ts === minTS) && (pend.ts !== Number.MAX_VALUE));
-      if (muxPkt) {
-        await mux.writeFrame(muxPkt.pkt);
-        pending[muxPkt.muxIndex] = {};
-        muxPkt.resolve();
-      }
-
-      if (!pkt) resolve();
-    });
-  };
-  return write;
-};
-
-async function writeMux(packets, srcIndex, muxIndex, muxWrite, final) {
+async function writeMux(mux, packets, muxIndex, srcStream, muxStream, muxBalancer, final) {
   if (packets.length) {
     return packets.reduce(async (promise, pkt) => {
       await promise;
       pkt.stream_index = muxIndex;
-      return muxWrite(pkt, srcIndex, muxIndex);
+      adjustTS(pkt, srcStream.time_base, muxStream.time_base);
+      const pktTS = pkt.pts * muxStream.time_base[0] / muxStream.time_base[1];
+      return mux.writeFrame(await muxBalancer(pkt, muxIndex, pktTS));
     }, Promise.resolve());
   } else if (final)
-    return await muxWrite(null, srcIndex, muxIndex);
+    return muxBalancer(null, muxIndex, Number.MAX_VALUE);
 }
 
 const srcPktsGen = async function*(url, mediaSpec, index) {
@@ -140,26 +137,31 @@ const srcPktsGen = async function*(url, mediaSpec, index) {
   }
 };
 
-function genToStream(gen) {
+function genToStream(params, gen) {
   return new Readable({
     objectMode: true,
-    highWaterMark: 4,
+    highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     read() {
       (async () => {
-        const result = await gen.next();
-        if (result.done)
-          this.push(null);
-        else
-          this.push(result.value);
+        try {
+          const result = await gen.next();
+          if (result.done)
+            this.push(null);
+          else
+            this.push(result.value);
+        } catch(err) {
+          console.log(err);
+          this.push(null); // end the stream
+        }
       })();
     }
   });
 }
 
-function createTransform(params, muxIndex, name, processFn, flushFn) {
+function createTransform(params, processFn, flushFn) {
   return new Transform({
     objectMode: true,
-    highWaterMark: 4,
+    highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     transform(val, encoding, cb) {
       (async () => {
         try { cb(null, await processFn(val)); } 
@@ -175,40 +177,44 @@ function createTransform(params, muxIndex, name, processFn, flushFn) {
   });
 }
 
-function createMuxStream(params, srcIndex, muxIndex, muxWrite) {
+function createMuxStream(params, mux, muxIndex, srcStream, muxStream, muxBalancer) {
   return new Writable({
     objectMode: true,
-    highWaterMark: 4,
+    highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     write(pkts, encoding, cb) {
       (async () => {
-        await writeMux(pkts.packets, srcIndex, muxIndex, muxWrite, false);
-        cb();
+        try { 
+          await writeMux(mux, pkts.packets, muxIndex, srcStream, muxStream, muxBalancer, false);
+          cb();
+        } catch (err) { cb(err); }
       })();
     },
     final(cb) {
-      // unlock any other channels in balanced muxer that are waiting
+      // unlock any other streams in balancer that are waiting
       (async () => {
-        await writeMux([], srcIndex, muxIndex, muxWrite, true);
-        cb();
+        try {
+          await writeMux(mux, [], muxIndex, srcStream, muxStream, muxBalancer, true);
+          cb();
+        } catch (err) { cb(err); }
       })();
     }
   });
 }
 
 async function makeStreams(url, fmt, ms, indexes, decoders, filterers, encoders, mux) {
-  const muxWrite = balancedMuxer(fmt.streams, mux);
+  const muxBalancer = serialBalancer(mux.streams.length);
   const frameDicers = indexes.map((srcIndex, muxIndex) => new frameDicer(mux.streams[muxIndex]));
   await Promise.all(
     indexes.map(async (srcIndex, muxIndex) => {
       return new Promise(resolve => {
-        const srcStream = genToStream(srcPktsGen(url, ms, srcIndex));
-        const decStream = createTransform({}, muxIndex, 'decoder', pkts => decoders[muxIndex].decode(pkts), () => decoders[muxIndex].flush());
-        const filtStream = createTransform({}, muxIndex, 'filterer', frms => filterers[muxIndex].filter(frms.frames));
-        const diceStream = createTransform({}, muxIndex, 'dicer',
+        const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(url, ms, srcIndex));
+        const decStream = createTransform({ highWaterMark : 2 }, pkts => decoders[muxIndex].decode(pkts), () => decoders[muxIndex].flush());
+        const filtStream = createTransform({ highWaterMark : 2 }, frms => filterers[muxIndex].filter(frms.frames));
+        const diceStream = createTransform({ highWaterMark : 2 },
           frms => diceFrames(frameDicers[muxIndex], frms[0].frames, fmt.streams[srcIndex]), 
           () => diceFrames(frameDicers[muxIndex], [], fmt.streams[srcIndex], true));
-        const encStream = createTransform({}, muxIndex, 'encoder', frms => encoders[muxIndex].encode(frms), () => encoders[muxIndex].flush());
-        const muxStream = createMuxStream({}, srcIndex, muxIndex, muxWrite);
+        const encStream = createTransform({ highWaterMark : 2 }, frms => encoders[muxIndex].encode(frms), () => encoders[muxIndex].flush());
+        const muxStream = createMuxStream({ highWaterMark : 2 }, mux, muxIndex, fmt.streams[srcIndex], mux.streams[muxIndex], muxBalancer);
 
         muxStream.on('error', console.error);
         muxStream.on('finish', resolve);
