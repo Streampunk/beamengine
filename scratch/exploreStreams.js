@@ -304,13 +304,13 @@ function runStreams(streamType, sources, decoders, filterer, encoder, mux, muxIn
   if (!sources.length) 
     return Promise.resolve();
 
-  const timeBaseStream = sources[0].fmt.streams[sources[0].streamIndex];
+  const timeBaseStream = sources[0].format.streams[sources[0].streamIndex];
   const filterBalancer = parallelBalancer({ highWaterMark : 2 }, streamType, decoders.length);
 
   sources.map((src, srcIndex) => {
-    const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.url, src.ms, src.streamIndex));
+    const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.format.url, src.ms, src.streamIndex));
     const decStream = createTransform({ highWaterMark : 2 }, pkts => decoders[srcIndex].decode(pkts), () => decoders[srcIndex].flush());
-    const filterSource = createFilterStream({ highWaterMark : 2 }, src.fmt.streams[src.streamIndex], srcIndex, filterBalancer);
+    const filterSource = createFilterStream({ highWaterMark : 2 }, src.format.streams[src.streamIndex], srcIndex, filterBalancer);
     srcStream.pipe(decStream).pipe(filterSource);
   });
 
@@ -330,8 +330,11 @@ function runStreams(streamType, sources, decoders, filterer, encoder, mux, muxIn
 }
 
 async function makeStreams(sources, params) {
-  const vidDecs = sources.video.map(src => beamcoder.decoder({ demuxer: src.fmt, stream_index: src.streamIndex }));
-  const audDecs = sources.audio.map(src => beamcoder.decoder({ demuxer: src.fmt, stream_index: src.streamIndex }));
+  await Promise.all(sources.video.map(async src => src.format = await redisio.retrieveFormat(src.url)));
+  await Promise.all(sources.audio.map(async src => src.format = await redisio.retrieveFormat(src.url)));
+
+  const vidDecs = sources.video.map(src => beamcoder.decoder({ demuxer: src.format, stream_index: src.streamIndex }));
+  const audDecs = sources.audio.map(src => beamcoder.decoder({ demuxer: src.format, stream_index: src.streamIndex }));
 
   let vidFilt = null;
   let vidEnc = null; 
@@ -339,7 +342,7 @@ async function makeStreams(sources, params) {
     vidFilt = await beamcoder.filterer({ // Create a filterer for video
       filterType: 'video',
       inputParams: sources.video.map((src, i) => {
-        const stream = src.fmt.streams[src.streamIndex];
+        const stream = src.format.streams[src.streamIndex];
         return {
           name: `in${i}:v`,
           width: stream.codecpar.width,
@@ -353,7 +356,7 @@ async function makeStreams(sources, params) {
     // console.log(vidFilt.graph.dump());
 
     // use first video stream for output time base, sample aspect ratio
-    const vidStr = sources.video[0].fmt.streams[sources.video[0].streamIndex];
+    const vidStr = sources.video[0].format.streams[sources.video[0].streamIndex];
 
     vidEnc = beamcoder.encoder({
       name: 'libx264',
@@ -376,7 +379,7 @@ async function makeStreams(sources, params) {
     audFilt = await beamcoder.filterer({ // Create a filterer for audio
       filterType: 'audio',
       inputParams: sources.audio.map((src, i) => {
-        const stream = src.fmt.streams[src.streamIndex];
+        const stream = src.format.streams[src.streamIndex];
         return {
           name: `in${i}:a`,
           sampleRate: audDecs[i].sample_rate,
@@ -408,7 +411,7 @@ async function makeStreams(sources, params) {
 
   if (sources.video.length) {
     // use first video stream for time base, sample aspect ratio
-    const vidStr = sources.video[0].fmt.streams[sources.video[0].streamIndex];
+    const vidStr = sources.video[0].format.streams[sources.video[0].streamIndex];
 
     muxVidIndex = mux.streams.length;
     let oVidStr = mux.newStream({
@@ -457,15 +460,15 @@ async function testStreams() {
 
   const spec = mediaSpec.parseMediaSpec('70s-72s');
   const urls = [ 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf', 'file:../../Media/big_buck_bunny_1080p_h264.mov' ];
-  const fmts = await Promise.all(urls.map(async url => await redisio.retrieveFormat(url)));
+
   const sources = {
     video: [
-      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 0 },
-      { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 0 },
+      { ms: spec, url: urls[0], streamIndex: 0 },
+      { ms: spec, url: urls[1], streamIndex: 0 },
     ],
     audio: [
-      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 1 },
-      // { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 2 }
+      { ms: spec, url: urls[0], streamIndex: 1 },
+      // { ms: spec, url: urls[1], streamIndex: 2 }
     ]
   };
 
