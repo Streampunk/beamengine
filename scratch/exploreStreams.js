@@ -300,7 +300,7 @@ function createMuxStream(params, mux, muxIndex, srcStream, muxStream, muxBalance
   });
 }
 
-function makeStreams(streamType, sources, decoders, filterer, encoder, mux, muxIndex, muxBalancer) {
+function runStreams(streamType, sources, decoders, filterer, encoder, mux, muxIndex, muxBalancer) {
   if (!sources.length) 
     return Promise.resolve();
 
@@ -329,29 +329,9 @@ function makeStreams(streamType, sources, decoders, filterer, encoder, mux, muxI
   });
 }
 
-async function testStreams() {
-  console.log('Running testStreams');
-  let start = Date.now();
-
-  const spec = mediaSpec.parseMediaSpec('70s-72s');
-  const urls = [ 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf', 'file:../../Media/big_buck_bunny_1080p_h264.mov' ];
-  const fmts = await Promise.all(urls.map(async url => await redisio.retrieveFormat(url)));
-  const sources = {
-    video: [
-      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 0 },
-      { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 0 },
-    ],
-    audio: [
-      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 1 },
-      // { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 2 }
-    ]
-  };
-
+async function makeStreams(sources, params) {
   const vidDecs = sources.video.map(src => beamcoder.decoder({ demuxer: src.fmt, stream_index: src.streamIndex }));
   const audDecs = sources.audio.map(src => beamcoder.decoder({ demuxer: src.fmt, stream_index: src.streamIndex }));
-
-  const outWidth = 1280;
-  const outHeight = 720;
 
   let vidFilt = null;
   let vidEnc = null; 
@@ -369,8 +349,7 @@ async function testStreams() {
           pixelAspect: stream.sample_aspect_ratio };
       }),
       outputParams: [{ name: 'out0:v', pixelFormat: 'yuv422p' }],
-      // filterSpec: `[in0:v] scale=${outWidth}:${outHeight}, colorspace=all=bt709 [out0:v]` });
-      filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]' });
+      filterSpec: params.video.filter });
     // console.log(vidFilt.graph.dump());
 
     // use first video stream for output time base, sample aspect ratio
@@ -378,8 +357,8 @@ async function testStreams() {
 
     vidEnc = beamcoder.encoder({
       name: 'libx264',
-      width: outWidth,
-      height: outHeight,
+      width: params.video.width,
+      height: params.video.height,
       pix_fmt: 'yuv422p',
       sample_aspect_ratio: vidStr.sample_aspect_ratio,
       time_base: vidStr.time_base,
@@ -394,8 +373,6 @@ async function testStreams() {
   let audFilt = null; 
   let audEnc = null; 
   if (sources.audio.length) {
-    const outSampleRate = 48000;
-
     audFilt = await beamcoder.filterer({ // Create a filterer for audio
       filterType: 'audio',
       inputParams: sources.audio.map((src, i) => {
@@ -409,10 +386,10 @@ async function testStreams() {
       }),
       outputParams: [{
         name: 'out0:a',
-        sampleRate: outSampleRate,
+        sampleRate: params.audio.sampleRate,
         sampleFormat: 'fltp',
         channelLayout: 'mono' }], //audDec.channel_layout }],
-      filterSpec: '[in0:a] aformat=sample_fmts=fltp:channel_layouts=mono [out0:a]' });
+      filterSpec: params.audio.filter });
     // console.log(audFilt.graph.dump());
 
     audEnc = beamcoder.encoder({
@@ -440,8 +417,8 @@ async function testStreams() {
       sample_aspect_ratio: vidStr.sample_aspect_ratio,
       interleaved: true }); // Set to false for manual interleaving, true for automatic
     Object.assign(oVidStr.codecpar, {
-      width: outWidth,
-      height: outHeight,
+      width: params.video.width,
+      height: params.video.height,
       format: 'yuv422p',
       sample_aspect_ratio: vidStr.sample_aspect_ratio,
       field_order: vidStr.codecpar.field_order,
@@ -467,11 +444,46 @@ async function testStreams() {
 
   const muxBalancer = serialBalancer(mux.streams.length);
   await Promise.all([
-    makeStreams('video', sources.video, vidDecs, vidFilt, vidEnc, mux, muxVidIndex, muxBalancer),
-    makeStreams('audio', sources.audio, audDecs, audFilt, audEnc, mux, muxAudIndex, muxBalancer)
+    runStreams('video', sources.video, vidDecs, vidFilt, vidEnc, mux, muxVidIndex, muxBalancer),
+    runStreams('audio', sources.audio, audDecs, audFilt, audEnc, mux, muxAudIndex, muxBalancer)
   ]).catch(console.error);
 
   await mux.writeTrailer();
+}
+
+async function testStreams() {
+  console.log('Running testStreams');
+  let start = Date.now();
+
+  const spec = mediaSpec.parseMediaSpec('70s-72s');
+  const urls = [ 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf', 'file:../../Media/big_buck_bunny_1080p_h264.mov' ];
+  const fmts = await Promise.all(urls.map(async url => await redisio.retrieveFormat(url)));
+  const sources = {
+    video: [
+      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 0 },
+      { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 0 },
+    ],
+    audio: [
+      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 1 },
+      // { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 2 }
+    ]
+  };
+
+  const params = {
+    video: {
+      width: 1280,
+      height: 720,
+      filter: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]' 
+      // filter: '[in0:v] scale=1280:720, colorspace=all=bt709 [out0:v]'
+    },
+    audio: {
+      sampleRate: 48000,
+      filter: '[in0:a] aformat=sample_fmts=fltp:channel_layouts=mono [out0:a]'
+    }
+  };
+
+  await makeStreams(sources, params);
+
   console.log(`Finished ${Date.now() - start}ms`);
 }
 
