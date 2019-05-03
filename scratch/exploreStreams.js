@@ -29,6 +29,8 @@ function frameDicer(dstStrm) {
   const dstNumSamples = dstStrm.codecpar.frame_size;
   const dstFrmBytes = dstNumSamples * dstStrm.codecpar.channels * sampleBytes;
 
+  this.isAudio = () => 'audio' === dstStrm.codecpar.codec_type;
+
   this.addFrame = srcFrm => {
     let result = [];
     let dstFrm;
@@ -76,20 +78,93 @@ function frameDicer(dstStrm) {
   };
 }
 
-function diceFrames(frameDicer, frames, srcStrm, flush = false) {
-  if ('audio' == srcStrm.codecpar.codec_type) {
+function diceFrames(dicer, frames, flush = false) {
+  if (dicer.isAudio()) {
     let result = frames.reduce((muxFrms, frm) => {
-      frameDicer.addFrame(frm).map(f => muxFrms.push(f));
+      dicer.addFrame(frm).map(f => muxFrms.push(f));
       return muxFrms;
     }, []);
 
     if (flush)
-      frameDicer.getLast().map(f => result.push(f));
+      dicer.getLast().map(f => result.push(f));
 
     return result;
   }
 
   return frames;
+}
+
+function parallelBalancer(params, streamType, numStreams) {
+  let resolveGet = null;
+  const tag = 'video' === streamType ? 'v' : 'a';
+  const pending = [];
+  // initialise with negative ts and no pkt
+  // - there should be no output until each stream has sent its first packet
+  for (let s = 0; s < numStreams; ++s)
+    pending.push({ ts: -Number.MAX_VALUE, streamIndex: s });
+
+  const makeSet = (resolve) => {
+    if (resolve) {
+      // console.log('makeSet', pending.map(p => p.ts));
+      const nextPends = pending.every(pend => pend.pkt) ? pending : null;
+      const final = pending.filter(pend => true === pend.final);
+      if (nextPends) {
+        nextPends.map(pend => pend.resolve());
+        resolve({
+          value: nextPends.map(pend => { 
+            return { name: `in${pend.streamIndex}:${tag}`, frames: [ pend.pkt ] }; }), 
+          done: false });
+        resolveGet = null;
+        pending.map(pend => Object.assign(pend, { pkt: null, ts: Number.MAX_VALUE }));
+      } else if (final.length > 0) {
+        final.map(f => f.resolve());
+        resolve({ done: true });
+      } else {
+        resolveGet = resolve;
+      }
+    }
+  };
+
+  const pushPkt = async (pkt, streamIndex, ts) =>
+    new Promise(resolve => {
+      Object.assign(pending[streamIndex], { pkt: pkt, ts: ts, final: pkt ? false : true, resolve: resolve });
+      makeSet(resolveGet);
+    });
+
+  const pullSet = async () => new Promise(resolve => makeSet(resolve));
+
+  const readStream = new Readable({
+    objectMode: true,
+    highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
+    read() {
+      (async () => {
+        try {
+          const result = await pullSet();
+          if (result.done)
+            this.push(null);
+          else
+            this.push(result.value);
+        } catch(err) {
+          console.log(err);
+          this.push(null); // end the stream
+        }
+      })();
+    },
+  });
+
+  readStream.pushPkts = (packets, stream, streamIndex, final = false) => {
+    if (packets.length) {
+      return packets.reduce(async (promise, pkt) => {
+        await promise;
+        const ts = pkt.pts * stream.time_base[0] / stream.time_base[1];
+        return pushPkt(pkt, streamIndex, ts);
+      }, Promise.resolve());
+    } else if (final) {
+      return pushPkt(null, streamIndex, Number.MAX_VALUE);
+    }
+  };
+
+  return readStream;
 }
 
 const serialBalancer = numStreams => {
@@ -118,7 +193,7 @@ const adjustTS = (pkt, srcTB, dstTB) => {
   pkt.duration > 0 ? Math.round(pkt.duration * adj) : Math.round(adj);
 };
 
-async function writeMux(mux, packets, muxIndex, srcStream, muxStream, muxBalancer, final) {
+async function writeMux(mux, packets, muxIndex, srcStream, muxStream, muxBalancer, final = false) {
   if (packets.length) {
     return packets.reduce(async (promise, pkt) => {
       await promise;
@@ -177,14 +252,38 @@ function createTransform(params, processFn, flushFn) {
   });
 }
 
+function createFilterStream(params, stream, streamIndex, balancer) {
+  return new Writable({
+    objectMode: true,
+    highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
+    write(pkts, encoding, cb) {
+      (async () => {
+        try {
+          await balancer.pushPkts(pkts.frames, stream, streamIndex);
+          cb();
+        } catch (err) { cb(err); }
+      })();
+    },
+    final(cb) {
+      // unlock any other streams in balancer that are waiting
+      (async () => {
+        try {
+          await balancer.pushPkts([], stream, streamIndex, true);
+          cb();
+        } catch (err) { cb(err); }
+      })();
+    }
+  });
+}
+
 function createMuxStream(params, mux, muxIndex, srcStream, muxStream, muxBalancer) {
   return new Writable({
     objectMode: true,
     highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     write(pkts, encoding, cb) {
       (async () => {
-        try { 
-          await writeMux(mux, pkts.packets, muxIndex, srcStream, muxStream, muxBalancer, false);
+        try {
+          await writeMux(mux, pkts.packets, muxIndex, srcStream, muxStream, muxBalancer);
           cb();
         } catch (err) { cb(err); }
       })();
@@ -201,129 +300,176 @@ function createMuxStream(params, mux, muxIndex, srcStream, muxStream, muxBalance
   });
 }
 
-async function makeStreams(url, fmt, ms, indexes, decoders, filterers, encoders, mux) {
-  const muxBalancer = serialBalancer(mux.streams.length);
-  const frameDicers = indexes.map((srcIndex, muxIndex) => new frameDicer(mux.streams[muxIndex]));
-  await Promise.all(
-    indexes.map(async (srcIndex, muxIndex) => {
-      return new Promise(resolve => {
-        const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(url, ms, srcIndex));
-        const decStream = createTransform({ highWaterMark : 2 }, pkts => decoders[muxIndex].decode(pkts), () => decoders[muxIndex].flush());
-        const filtStream = createTransform({ highWaterMark : 2 }, frms => filterers[muxIndex].filter(frms.frames));
-        const diceStream = createTransform({ highWaterMark : 2 },
-          frms => diceFrames(frameDicers[muxIndex], frms[0].frames, fmt.streams[srcIndex]), 
-          () => diceFrames(frameDicers[muxIndex], [], fmt.streams[srcIndex], true));
-        const encStream = createTransform({ highWaterMark : 2 }, frms => encoders[muxIndex].encode(frms), () => encoders[muxIndex].flush());
-        const muxStream = createMuxStream({ highWaterMark : 2 }, mux, muxIndex, fmt.streams[srcIndex], mux.streams[muxIndex], muxBalancer);
+function makeStreams(streamType, sources, decoders, filterer, encoder, mux, muxIndex, muxBalancer) {
+  if (!sources.length) 
+    return Promise.resolve();
 
-        muxStream.on('error', console.error);
-        muxStream.on('finish', resolve);
+  const timeBaseStream = sources[0].fmt.streams[sources[0].streamIndex];
+  const filterBalancer = parallelBalancer({ highWaterMark : 2 }, streamType, decoders.length);
 
-        srcStream.pipe(decStream).pipe(filtStream).pipe(diceStream).pipe(encStream).pipe(muxStream);
-      });
-    })
-  );
+  sources.map((src, srcIndex) => {
+    const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.url, src.ms, src.streamIndex));
+    const decStream = createTransform({ highWaterMark : 2 }, pkts => decoders[srcIndex].decode(pkts), () => decoders[srcIndex].flush());
+    const filterSource = createFilterStream({ highWaterMark : 2 }, src.fmt.streams[src.streamIndex], srcIndex, filterBalancer);
+    srcStream.pipe(decStream).pipe(filterSource);
+  });
+
+  return new Promise(resolve => {
+    const filtStream = createTransform({ highWaterMark : 2 }, frms => filterer.filter(frms));
+    const dicer = new frameDicer(mux.streams[muxIndex]);
+    const diceStream = createTransform({ highWaterMark : 2 },
+      frms => diceFrames(dicer, frms[0].frames), () => diceFrames(dicer, [], true));
+    const encStream = createTransform({ highWaterMark : 2 }, frms => encoder.encode(frms), () => encoder.flush());
+    const muxStream = createMuxStream({ highWaterMark : 2 }, mux, muxIndex, timeBaseStream, mux.streams[muxIndex], muxBalancer);
+
+    muxStream.on('error', console.error);
+    muxStream.on('finish', resolve);
+
+    filterBalancer.pipe(filtStream).pipe(diceStream).pipe(encStream).pipe(muxStream);
+  });
 }
 
 async function testStreams() {
-  // const url = 'file:../../Media/big_buck_bunny_1080p_h264.mov';
-  const url = 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf';
-
-  const spec = '70s-80s';
-
   console.log('Running testStreams');
   let start = Date.now();
-  const fmt = await redisio.retrieveFormat(url);
-  const ms = mediaSpec.parseMediaSpec(spec);
 
-  const vidIndex = 0;
-  const vidStr = fmt.streams[vidIndex];
-  let audIndex = 1;
-  if (0 == fmt.streams[audIndex].codecpar.codec_id)
-    audIndex += 1;
-  const audStr = fmt.streams[audIndex];
+  const spec = mediaSpec.parseMediaSpec('70s-72s');
+  const urls = [ 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf', 'file:../../Media/big_buck_bunny_1080p_h264.mov' ];
+  const fmts = await Promise.all(urls.map(async url => await redisio.retrieveFormat(url)));
+  const sources = {
+    video: [
+      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 0 },
+      { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 0 },
+    ],
+    audio: [
+      { ms: spec, url: urls[0], fmt: fmts[0], streamIndex: 1 },
+      // { ms: spec, url: urls[1], fmt: fmts[1], streamIndex: 2 }
+    ]
+  };
 
-  const width = 1280;
-  const height = 720;
-  const vidDec = beamcoder.decoder({ demuxer: fmt, stream_index: vidIndex }); // Create a video decoder
-  const audDec = beamcoder.decoder({ demuxer: fmt, stream_index: audIndex }); // Create an audio decoder
+  const vidDecs = sources.video.map(src => beamcoder.decoder({ demuxer: src.fmt, stream_index: src.streamIndex }));
+  const audDecs = sources.audio.map(src => beamcoder.decoder({ demuxer: src.fmt, stream_index: src.streamIndex }));
 
-  const vidFilt = await beamcoder.filterer({ // Create a filterer for video
-    filterType: 'video',
-    inputParams: [{
-      width: vidStr.codecpar.width,
-      height: vidStr.codecpar.height,
-      pixelFormat: vidStr.codecpar.format,
-      timeBase: vidStr.time_base,
-      pixelAspect: vidStr.sample_aspect_ratio }],
-    outputParams: [{ pixelFormat: 'yuv422p' }],
-    filterSpec: `scale=${width}:${height}, colorspace=all=bt709` });
+  const outWidth = 1280;
+  const outHeight = 720;
 
-  const audFilt = await beamcoder.filterer({ // Create a filterer for audio
-    filterType: 'audio',
-    inputParams: [{
-      sampleRate: audDec.sample_rate,
-      sampleFormat: audDec.sample_fmt,
-      channelLayout: audDec.channel_layout,
-      timeBase: audStr.time_base }],
-    outputParams: [{
-      sampleRate: audDec.sample_rate,
-      sampleFormat: 'fltp',
-      channelLayout: 'mono' }], //audDec.channel_layout }],
-    filterSpec: 'aformat=sample_fmts=fltp:channel_layouts=mono' });
+  let vidFilt = null;
+  let vidEnc = null; 
+  if (sources.video.length) {
+    vidFilt = await beamcoder.filterer({ // Create a filterer for video
+      filterType: 'video',
+      inputParams: sources.video.map((src, i) => {
+        const stream = src.fmt.streams[src.streamIndex];
+        return {
+          name: `in${i}:v`,
+          width: stream.codecpar.width,
+          height: stream.codecpar.height,
+          pixelFormat: stream.codecpar.format,
+          timeBase: stream.time_base,
+          pixelAspect: stream.sample_aspect_ratio };
+      }),
+      outputParams: [{ name: 'out0:v', pixelFormat: 'yuv422p' }],
+      // filterSpec: `[in0:v] scale=${outWidth}:${outHeight}, colorspace=all=bt709 [out0:v]` });
+      filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]' });
+    // console.log(vidFilt.graph.dump());
 
-  const vidEnc = beamcoder.encoder({
-    name: 'libx264',
-    width: width,
-    height: height,
-    pix_fmt: 'yuv422p',
-    sample_aspect_ratio: vidStr.sample_aspect_ratio,
-    time_base: vidStr.time_base,
-    framerate: [vidStr.time_base[1], vidStr.time_base[0]],
-    // bit_rate: 2000000,
-    // gop_size: 10,
-    // max_b_frames: 1,
-    // priv_data: { preset: 'slow' }
-    priv_data: { crf: 23 } }); // ... more required ...
-  const audEnc = beamcoder.encoder({
-    name: 'aac',
-    sample_fmt: 'fltp',
-    sample_rate: audDec.sample_rate,
-    channels: 1, //audDec.channels,
-    channel_layout: 'mono', //audDec.channel_layout,
-    flags: { GLOBAL_HEADER: true } });
-    
+    // use first video stream for output time base, sample aspect ratio
+    const vidStr = sources.video[0].fmt.streams[sources.video[0].streamIndex];
+
+    vidEnc = beamcoder.encoder({
+      name: 'libx264',
+      width: outWidth,
+      height: outHeight,
+      pix_fmt: 'yuv422p',
+      sample_aspect_ratio: vidStr.sample_aspect_ratio,
+      time_base: vidStr.time_base,
+      // framerate: [vidStr.time_base[1], vidStr.time_base[0]],
+      // bit_rate: 2000000,
+      // gop_size: 10,
+      // max_b_frames: 1,
+      // priv_data: { preset: 'slow' }
+      priv_data: { crf: 23 } }); // ... more required ...
+  }
+
+  let audFilt = null; 
+  let audEnc = null; 
+  if (sources.audio.length) {
+    const outSampleRate = 48000;
+
+    audFilt = await beamcoder.filterer({ // Create a filterer for audio
+      filterType: 'audio',
+      inputParams: sources.audio.map((src, i) => {
+        const stream = src.fmt.streams[src.streamIndex];
+        return {
+          name: `in${i}:a`,
+          sampleRate: audDecs[i].sample_rate,
+          sampleFormat: audDecs[i].sample_fmt,
+          channelLayout: audDecs[i].channel_layout,
+          timeBase: stream.time_base };
+      }),
+      outputParams: [{
+        name: 'out0:a',
+        sampleRate: outSampleRate,
+        sampleFormat: 'fltp',
+        channelLayout: 'mono' }], //audDec.channel_layout }],
+      filterSpec: '[in0:a] aformat=sample_fmts=fltp:channel_layouts=mono [out0:a]' });
+    // console.log(audFilt.graph.dump());
+
+    audEnc = beamcoder.encoder({
+      name: 'aac',
+      sample_fmt: 'fltp',
+      sample_rate: audDecs[0].sample_rate,
+      channels: 1, //audDec.channels,
+      channel_layout: 'mono', //audDec.channel_layout,
+      flags: { GLOBAL_HEADER: true } });
+  }
+
   const mux = beamcoder.muxer({ format_name: 'mp4' });
 
-  let oVidStr = mux.newStream({
-    name: 'h264',
-    time_base: [1, 90000],
-    sample_aspect_ratio: vidStr.sample_aspect_ratio,
-    interleaved: true }); // Set to false for manual interleaving, true for automatic
-  Object.assign(oVidStr.codecpar, {
-    width: width,
-    height: height,
-    format: 'yuv422p',
-    sample_aspect_ratio: vidStr.sample_aspect_ratio,
-    field_order: vidStr.codecpar.field_order,
-    color_space: 'bt709' }); // ... how much is required ?
+  let muxVidIndex = 0;
+  let muxAudIndex = 0;
 
-  let oAudStr = mux.newStream({
-    name: 'aac',
-    time_base: [1, 90000],
-    interleaved: true }); // Set to false for manual interleaving, true for automatic
-  Object.assign(oAudStr.codecpar, {
-    sample_rate: audDec.sample_rate,
-    frame_size: 1024,
-    channels: 1,
-    channel_layout: 'mono' });
+  if (sources.video.length) {
+    // use first video stream for time base, sample aspect ratio
+    const vidStr = sources.video[0].fmt.streams[sources.video[0].streamIndex];
+
+    muxVidIndex = mux.streams.length;
+    let oVidStr = mux.newStream({
+      name: 'h264',
+      time_base: [1, 90000],
+      sample_aspect_ratio: vidStr.sample_aspect_ratio,
+      interleaved: true }); // Set to false for manual interleaving, true for automatic
+    Object.assign(oVidStr.codecpar, {
+      width: outWidth,
+      height: outHeight,
+      format: 'yuv422p',
+      sample_aspect_ratio: vidStr.sample_aspect_ratio,
+      field_order: vidStr.codecpar.field_order,
+      color_space: 'bt709' }); // ... how much is required ?
+  }
+  if (sources.audio.length) {
+    muxAudIndex = mux.streams.length;
+    let oAudStr = mux.newStream({
+      name: 'aac',
+      time_base: [1, 90000],
+      interleaved: true }); // Set to false for manual interleaving, true for automatic
+    Object.assign(oAudStr.codecpar, {
+      sample_rate: audDecs[0].sample_rate,
+      frame_size: 1024,
+      channels: 1,
+      channel_layout: 'mono' });
+  }
 
   await mux.openIO({
     url: 'file:temp.mp4'
   });
   await mux.writeHeader();
 
-  await makeStreams(url, fmt, ms, [vidIndex, audIndex], [vidDec, audDec], [vidFilt, audFilt], [vidEnc, audEnc], mux);
+  const muxBalancer = serialBalancer(mux.streams.length);
+  await Promise.all([
+    makeStreams('video', sources.video, vidDecs, vidFilt, vidEnc, mux, muxVidIndex, muxBalancer),
+    makeStreams('audio', sources.audio, audDecs, audFilt, audEnc, mux, muxAudIndex, muxBalancer)
+  ]).catch(console.error);
 
   await mux.writeTrailer();
   console.log(`Finished ${Date.now() - start}ms`);
