@@ -323,7 +323,7 @@ function runStreams(streamType, sources, filterer, streams, mux, muxBalancer) {
 
     sources.forEach((src, srcIndex) => {
       const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.format.url, src.ms, src.streamIndex), reject);
-      const decStream = createTransform({ highWaterMark : 2 }, async pkts => src.decoder.decode(pkts), () => src.decoder.flush(), reject);
+      const decStream = createTransform({ highWaterMark : 2 }, pkts => src.decoder.decode(pkts), () => src.decoder.flush(), reject);
       const filterSource = createWriteStream({ highWaterMark : 2 },
         pkts => filterBalancer.pushPkts(pkts.frames, src.format.streams[src.streamIndex], srcIndex),
         () => filterBalancer.pushPkts([], src.format.streams[src.streamIndex], srcIndex, true), reject);
@@ -332,7 +332,7 @@ function runStreams(streamType, sources, filterer, streams, mux, muxBalancer) {
     });
 
     const streamTee = teeBalancer({ highWaterMark : 2 }, streams.length);
-    const filtStream = createTransform({ highWaterMark : 2 }, async frms => filterer.filter(frms), () => {}, reject);
+    const filtStream = createTransform({ highWaterMark : 2 }, frms => filterer.filter(frms), () => {}, reject);
     const streamSource = createWriteStream({ highWaterMark : 2 },
       frms => streamTee.pushFrames(frms), () => streamTee.pushFrames([], true), reject);
 
@@ -341,8 +341,8 @@ function runStreams(streamType, sources, filterer, streams, mux, muxBalancer) {
     streams.forEach((str, i) => {
       const dicer = new frameDicer(str.stream);
       const diceStream = createTransform({ highWaterMark : 2 },
-        async frms => diceFrames(dicer, frms), () => diceFrames(dicer, [], true), reject);
-      const encStream = createTransform({ highWaterMark : 2 }, async frms => str.encoder.encode(frms), () => str.encoder.flush(), reject);
+        frms => diceFrames(dicer, frms), () => diceFrames(dicer, [], true), reject);
+      const encStream = createTransform({ highWaterMark : 2 }, frms => str.encoder.encode(frms), () => str.encoder.flush(), reject);
       const muxStream = createWriteStream({ highWaterMark : 2 }, 
         pkts => writeMux(mux, pkts.packets, str.stream.index, timeBaseStream, str.stream, muxBalancer),
         () => writeMux(mux, [], str.stream.index, timeBaseStream, str.stream, muxBalancer, true), reject);
