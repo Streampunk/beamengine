@@ -138,16 +138,11 @@ function parallelBalancer(params, streamType, numStreams) {
     highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     read() {
       (async () => {
-        try {
-          const result = await pullSet();
-          if (result.done)
-            this.push(null);
-          else
-            this.push(result.value);
-        } catch(err) {
-          console.log(err);
-          this.push(null); // end the stream
-        }
+        const result = await pullSet();
+        if (result.done)
+          this.push(null);
+        else
+          this.push(result.value);
       })();
     },
   });
@@ -216,16 +211,11 @@ function teeBalancer(params, numStreams) {
       highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
       read() {
         (async () => {
-          try {
-            const result = await pullFrame(s);
-            if (result.done)
-              this.push(null);
-            else
-              this.push(result.value);
-          } catch(err) {
-            console.log(err);
-            this.push(null); // end the stream
-          }
+          const result = await pullFrame(s);
+          if (result.done)
+            this.push(null);
+          else
+            this.push(result.value);
         })();
       },
     }));
@@ -281,99 +271,81 @@ const srcPktsGen = async function*(url, mediaSpec, index) {
   }
 };
 
-function genToStream(params, gen) {
+function genToStream(params, gen, reject) {
   return new Readable({
     objectMode: true,
     highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     read() {
       (async () => {
-        try {
-          const result = await gen.next();
-          if (result.done)
-            this.push(null);
-          else
-            this.push(result.value);
-        } catch(err) {
-          console.log(err);
-          this.push(null); // end the stream
-        }
-      })();
+        const result = await gen.next();
+        if (result.done)
+          this.push(null);
+        else
+          this.push(result.value);
+      })().catch(err => reject(err));
     }
   });
 }
 
-function createTransform(params, processFn, flushFn) {
+function createTransform(params, processFn, flushFn, reject) {
   return new Transform({
     objectMode: true,
     highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     transform(val, encoding, cb) {
-      (async () => {
-        try { cb(null, await processFn(val)); } 
-        catch (err) { cb(err); }
-      })();
+      (async () => cb(null, await processFn(val)))().catch(cb);
     },
     flush(cb) {
-      (async () => {
-        try { cb(null, flushFn ? await flushFn() : null); } 
-        catch (err) { cb(err); }
-      })();
+      (async () => cb(null, flushFn ? await flushFn() : null))().catch(cb);
     }
-  });
+  }).on('error', err => reject(err));
 }
 
-function createWriteStream(params, processFn, finalFn) {
+function createWriteStream(params, processFn, finalFn, reject) {
   return new Writable({
     objectMode: true,
     highWaterMark: params.highWaterMark ? params.highWaterMark || 4 : 4,
     write(val, encoding, cb) {
-      (async () => {
-        try { cb(null, await processFn(val)); }
-        catch (err) { cb(err); }
-      })();
+      (async () => cb(null, await processFn(val)))().catch(cb);
     },
     final(cb) {
-      (async () => {
-        try { cb(null, finalFn ? await finalFn() : null); } 
-        catch (err) { cb(err); }
-      })();
+      (async () => cb(null, finalFn ? await finalFn() : null))().catch(cb);
     }
-  });
+  }).on('error', err => reject(err));
 }
 
 function runStreams(streamType, sources, filterer, streams, mux, muxBalancer) {
   if (!sources.length) 
     return Promise.resolve();
 
-  const timeBaseStream = sources[0].format.streams[sources[0].streamIndex];
-  const filterBalancer = parallelBalancer({ highWaterMark : 2 }, streamType, sources.length);
+  return new Promise((resolve, reject) => {
+    const timeBaseStream = sources[0].format.streams[sources[0].streamIndex];
+    const filterBalancer = parallelBalancer({ highWaterMark : 2 }, streamType, sources.length);
 
-  sources.forEach((src, srcIndex) => {
-    const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.format.url, src.ms, src.streamIndex));
-    const decStream = createTransform({ highWaterMark : 2 }, pkts => src.decoder.decode(pkts), () => src.decoder.flush());
-    const filterSource = createWriteStream({ highWaterMark : 2 },
-      pkts => filterBalancer.pushPkts(pkts.frames, src.format.streams[src.streamIndex], srcIndex),
-      () => filterBalancer.pushPkts([], src.format.streams[src.streamIndex], srcIndex, true));
+    sources.forEach((src, srcIndex) => {
+      const srcStream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.format.url, src.ms, src.streamIndex), reject);
+      const decStream = createTransform({ highWaterMark : 2 }, async pkts => src.decoder.decode(pkts), () => src.decoder.flush(), reject);
+      const filterSource = createWriteStream({ highWaterMark : 2 },
+        pkts => filterBalancer.pushPkts(pkts.frames, src.format.streams[src.streamIndex], srcIndex),
+        () => filterBalancer.pushPkts([], src.format.streams[src.streamIndex], srcIndex, true), reject);
 
-    srcStream.pipe(decStream).pipe(filterSource);
-  });
+      srcStream.pipe(decStream).pipe(filterSource);
+    });
 
-  return new Promise(resolve => {
     const streamTee = teeBalancer({ highWaterMark : 2 }, streams.length);
-    const filtStream = createTransform({ highWaterMark : 2 }, frms => filterer.filter(frms));
+    const filtStream = createTransform({ highWaterMark : 2 }, async frms => filterer.filter(frms), () => {}, reject);
     const streamSource = createWriteStream({ highWaterMark : 2 },
-      frms => streamTee.pushFrames(frms), () => streamTee.pushFrames([], true));
+      frms => streamTee.pushFrames(frms), () => streamTee.pushFrames([], true), reject);
 
     filterBalancer.pipe(filtStream).pipe(streamSource);
 
     streams.forEach((str, i) => {
       const dicer = new frameDicer(str.stream);
       const diceStream = createTransform({ highWaterMark : 2 },
-        frms => diceFrames(dicer, frms), () => diceFrames(dicer, [], true));
-      const encStream = createTransform({ highWaterMark : 2 }, frms => str.encoder.encode(frms), () => str.encoder.flush());
+        async frms => diceFrames(dicer, frms), () => diceFrames(dicer, [], true), reject);
+      const encStream = createTransform({ highWaterMark : 2 }, async frms => str.encoder.encode(frms), () => str.encoder.flush(), reject);
       const muxStream = createWriteStream({ highWaterMark : 2 }, 
         pkts => writeMux(mux, pkts.packets, str.stream.index, timeBaseStream, str.stream, muxBalancer),
-        () => writeMux(mux, [], str.stream.index, timeBaseStream, str.stream, muxBalancer, true));
-      muxStream.on('error', console.error);
+        () => writeMux(mux, [], str.stream.index, timeBaseStream, str.stream, muxBalancer, true), reject);
       muxStream.on('finish', resolve);
 
       streamTee[i].pipe(diceStream).pipe(encStream).pipe(muxStream);
@@ -537,10 +509,7 @@ async function makeStreams(params) {
 }
 
 async function testStreams() {
-  console.log('Running testStreams');
-  let start = Date.now();
-
-  const spec = mediaSpec.parseMediaSpec('70s-72s');
+  const spec = mediaSpec.parseMediaSpec('50s-52s');
   const urls = [ 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf', 'file:../../Media/big_buck_bunny_1080p_h264.mov' ];
 
   const params = {
@@ -548,10 +517,10 @@ async function testStreams() {
       {
         sources: [
           { ms: spec, url: urls[0], streamIndex: 0 },
-          { ms: spec, url: urls[1], streamIndex: 0 },
+          // { ms: spec, url: urls[1], streamIndex: 0 },
         ],
-        filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]',
-        // filterSpec: '[in0:v] scale=1280:720, colorspace=all=bt709 [out0:v]',
+        // filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]',
+        filterSpec: '[in0:v] scale=1280:720, colorspace=all=bt709 [out0:v]',
         streams: [
           { width: 1280, height: 720 }
         ]
@@ -583,9 +552,11 @@ async function testStreams() {
     ]
   };
 
-  await makeStreams(params).catch(console.error);
-
-  console.log(`Finished ${Date.now() - start}ms`);
+  await makeStreams(params);
 }
 
-testStreams();
+console.log('Running testStreams');
+let start = Date.now();
+testStreams()
+  .then(() => { console.log(`Finished ${Date.now() - start}ms`); process.exit(0); })
+  .catch(err => { console.log(err), process.exit(1); });
