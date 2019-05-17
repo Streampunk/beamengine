@@ -45,7 +45,7 @@
   },
   "homepage": "https://github.com/Streampunk/aerostat#readme",
   "dependencies": {
-    "beamcoder": "^0.1.16",
+    "beamcoder": "^0.2.0",
     "boom": "^7.3.0",
     "bull": "^3.7.0",
     "got": "^9.6.0",
