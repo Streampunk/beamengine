@@ -35,28 +35,28 @@
   "author": "Streampunk Media Ltd",
   "license": "GPL-3.0",
   "devDependencies": {
-    "cross-env": "^5.2.0",
-    "eslint": "^5.15.1",
-    "nodemon": "^1.18.10",
-    "supertest": "^3.4.2"
+    "cross-env": "^6.0.3",
+    "eslint": "^6.8.0",
+    "nodemon": "^2.0.2",
+    "supertest": "^4.0.2"
   },
   "bugs": {
     "url": "https://github.com/Streampunk/aerostat/issues"
   },
   "homepage": "https://github.com/Streampunk/aerostat#readme",
   "dependencies": {
-    "beamcoder": "^0.2.0",
+    "beamcoder": "^0.4.1",
     "boom": "^7.3.0",
-    "bull": "^3.7.0",
-    "got": "^9.6.0",
-    "ioredis": "^4.6.2",
-    "koa": "^2.7.0",
+    "bull": "^3.12.1",
+    "got": "^10.2.1",
+    "ioredis": "^4.14.1",
+    "koa": "^2.11.0",
     "koa-bodyparser": "^4.2.1",
-    "koa-ejs": "^4.2.0",
+    "koa-ejs": "^4.3.0",
     "koa-router": "^7.4.0",
-    "path-to-regexp": "^3.0.0",
-    "tape": "^4.10.1",
-    "uuid": "^3.3.2"
+    "path-to-regexp": "^6.1.0",
+    "tape": "^4.12.1",
+    "uuid": "^3.3.3"
   },
   "nodemonConfig": {
     "watch": [
