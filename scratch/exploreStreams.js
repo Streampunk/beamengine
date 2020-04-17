@@ -23,6 +23,14 @@ const beamcoder = require('beamcoder');
 const mediaSpec = require('../lib/mediaSpec.js');
 const { Readable } = require('stream');
 
+function filterControl(stream, graph, tag, adjFn) {
+  const filt = graph.filters.find(f => f.name.includes(tag));
+  return pts => {
+    const ts = pts * stream.time_base[0] / stream.time_base[1];
+    filt.priv = adjFn(ts);
+  };
+}
+
 const srcPktsGen = async function*(url, mediaSpec, index) {
   for (let pos = mediaSpec.start; pos != mediaSpec.end; ++pos) {
     yield await redisio.retrieveMedia(url, index, pos, pos+0.98, 0, Number.MAX_SAFE_INTEGER, mediaSpec.flags, false);
@@ -69,7 +77,7 @@ async function testStreams() {
           { url: urls[0], ms: spec, streamIndex: 0 },
           { url: urls[1], ms: spec, streamIndex: 0 },
         ],
-        filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]',
+        filterSpec: '[in0:v] scale=1280:720 [left]; [in1:v] scale@tag1=640:360 [right]; [left][right] overlay=format=auto:x=640 [out0:v]',
         // filterSpec: '[in0:v] scale=1280:720, colorspace=all=bt709 [out0:v]',
         streams: [
           { name: 'h264', time_base: [1, 90000], encoderName: 'libx264',
@@ -139,7 +147,16 @@ async function testStreams() {
   params.audio.forEach(p => p.sources.forEach(src =>
     src.stream = genToStream({ highWaterMark : 2 }, srcPktsGen(src.url, src.ms, src.streamIndex))));
 
-  await beamcoder.makeStreams(params);
+  const beamStreams = await beamcoder.makeStreams(params);
+
+  params.video.forEach(p => {
+    const stream = p.sources[0].format.streams[p.sources[0].streamIndex];
+    p.filter.cb = filterControl(stream, p.filter.graph, 'tag1', ts => {
+      return { width: (ts * 16 - 400).toString() };
+    });
+  });
+
+  await beamStreams.run();
 }
 
 console.log('Running testStreams');

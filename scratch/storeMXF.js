@@ -28,6 +28,7 @@ const convertToPathPart = n => converter({ name: n });
 
 async function run() {
   let location = 'file:../../Media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf';
+  // let location = 'file:../../Media/big_buck_bunny_1080p_h264.mov';
   let mxfFmt = await beamcoder.demuxer(location);
   let locPathPart = convertToPathPart(location);
   try {
@@ -43,22 +44,20 @@ async function run() {
       }
     });
 
-    let numFrames = 50;
-    await mxfFmt.seek({ time: 30 });
+    let numFrames = 1000;
+    await mxfFmt.seek({ time: 50 });
     let pkt = await mxfFmt.read();
     for ( ; (pkt != null) && (numFrames != 0) ; pkt = await mxfFmt.read()) {
-      if (pkt.stream_index === 0) {
-        console.log(pkt);
+      if (0 === pkt.stream_index)
         numFrames--;
-        await got.put(`http://localhost:3000/beams/${locPathPart}/stream_0/packet_${pkt.pts}`, {
-          body: pkt.toJSON(),
-          json: true
-        });
-        await got.put(`http://localhost:3000/beams/${locPathPart}/stream_0/packet_${pkt.pts}/data`, {
-          body: pkt.data,
-          headers: { 'Content-Type': 'application/octet-stream' }
-        });
-      }
+      await got.put(`http://localhost:3000/beams/${locPathPart}/stream_${pkt.stream_index}/packet_${pkt.pts}`, {
+        body: pkt.toJSON(),
+        json: true
+      });
+      await got.put(`http://localhost:3000/beams/${locPathPart}/stream_${pkt.stream_index}/packet_${pkt.pts}/data`, {
+        body: pkt.data,
+        headers: { 'Content-Type': 'application/octet-stream' }
+      });
     }
   } catch (err) {
     console.error(err.stack);
